@@ -3,8 +3,8 @@
 
 #include <map>
 
+#include "Error.h"
 #include "FileManager.h"
-#include "StorageError.h"
 #include "internal/LinkedList.h"
 
 namespace SimpleDB {
@@ -41,11 +41,6 @@ private:
 
         PageMeta() : fd(-1), page(-1) {}
         PageMeta(FileDescriptor fd, int page) : fd(fd), page(page) {}
-
-        bool operator<(const PageMeta &rhs) const {
-            return fd.value * MAX_PAGE_NUM + page <
-                   rhs.fd.value * MAX_PAGE_NUM + rhs.page;
-        }
     };
 
     struct PageCache {

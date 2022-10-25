@@ -21,8 +21,8 @@ FileCoordinator::~FileCoordinator() {
     }
 }
 
-FileDescriptor FileCoordinator::createFile(const std::string &fileName) {
-    return fileManager->createFile(fileName);
+void FileCoordinator::createFile(const std::string &fileName) {
+    fileManager->createFile(fileName);
 }
 
 FileDescriptor FileCoordinator::openFile(const std::string &fileName) {

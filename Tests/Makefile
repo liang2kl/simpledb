@@ -1,9 +1,12 @@
+TEST_TARGET = SimpleDBTest
+
+MAKE = make
 CC = g++
-CXXFLAGS = -g -O2 -std=c++14
+CXXFLAGS = -g -O2 -std=c++17
 
 SRC_DIR = src
 BIN_DIR = bin
-TMP_DIR = tmp
+OBJ_DIR = obj
 
 INCLUDE = -I../SimpleDB/include -I../googletest/googletest/include
 
@@ -12,18 +15,21 @@ GTEST_LIB = ../googletest/build/lib/libgtest.a
 
 LIBS = -L../SimpleDB/lib -lSimpleDB -L../googletest/build/lib -lgtest
 
-TEST_SRC = $(shell find $(SRC_DIR) -name '*Test.cc')
-TEST_TARGETS = $(foreach file,$(TEST_SRC),$(BIN_DIR)/$(notdir $(basename $(file))))
+TEST_SRC = $(shell find $(SRC_DIR) -name '*.cc')
+TEST_OBJS = $(foreach file,$(TEST_SRC),$(OBJ_DIR)/$(notdir $(basename $(file))).o)
 
-all: $(TEST_TARGETS)
+all: $(BIN_DIR)/$(TEST_TARGET)
 
-test-all: $(TEST_TARGETS)
-	@sh scripts/testAll.sh
+test: $(BIN_DIR)/$(TEST_TARGET)
+	@$(BIN_DIR)/$(TEST_TARGET)
 
-$(BIN_DIR)/%: $(SRC_DIR)/%.cc $(DB_LIB) $(GTEST_LIB) | $(BIN_DIR) $(TMP_DIR)
-	@mkdir -p $(BIN_DIR)
-	$(CC) $(INCLUDE) $(LIBS) $(CXXFLAGS) $< -o $@
+$(BIN_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(DB_LIB) $(GTEST_LIB) | $(BIN_DIR) $(OBJ_DIR)
+	$(CC) $(CXXFLAGS) $(LIBS) $^ -o $@
 
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
+	$(CC) $(INCLUDE) $(CXXFLAGS) -c $< -o $@
+
+.PHONY: $(DB_LIB)
 $(DB_LIB):
 	$(MAKE) -j -C ../SimpleDB
 
@@ -35,9 +41,9 @@ $(GTEST_LIB):
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR)
 
-$(TMP_DIR):
-	mkdir -p $(TMP_DIR)
+$(OBJ_DIR):
+	mkdir -p $(OBJ_DIR)
 
 .PHONY: clean
 clean:
-	- rm -r $(BIN_DIR)
+	- rm -r $(BIN_DIR) $(OBJ_DIR)

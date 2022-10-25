@@ -22,7 +22,6 @@ public:
      * | guard | -> | actual tail | -> ...
      * +-------+    +-------------+
      */
-
     Node *insertHead(T *data) {
         Node *node = new Node();
         node->data = data;
@@ -36,6 +35,7 @@ public:
 
     T *removeTail() {
         if (head == tail) {
+            assert(false);
             return nullptr;
         }
         return remove(tail->next);
@@ -48,7 +48,7 @@ public:
         }
 
         T *data = node->data;
-        delete node;
+        // delete node;
         _size--;
 
         return data;

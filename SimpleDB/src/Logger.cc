@@ -1,5 +1,6 @@
-#include "internal/Logger.h"
+#include "Logger.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 
 namespace SimpleDB {
@@ -9,6 +10,12 @@ FILE *Logger::errorStream = stderr;
 void Logger::log(LogLevel level, const char *fmt, ...) {
     if (level < displayMinLevel) return;
     fprintf(errorStream, "[%s] ", logLevelNames[level]);
-    fprintf(errorStream, fmt, logLevelNames[level]);
+
+    va_list argList;
+
+    va_start(argList, fmt);
+    vfprintf(errorStream, fmt, argList);
+    va_end(argList);
 }
+
 }  // namespace SimpleDB

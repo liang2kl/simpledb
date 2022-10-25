@@ -1,7 +1,7 @@
 LIB_TARGET = libSimpleDB.a
 
 CC = g++
-CXXFLAGS = -g -O2 -std=c++14
+CXXFLAGS = -g -O2 -std=c++17
 AR = ar
 
 SRC_DIR = src

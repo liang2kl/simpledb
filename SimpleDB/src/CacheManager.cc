@@ -1,12 +1,13 @@
 #include "CacheManager.h"
 
-#include "internal/Logger.h"
+#include "Logger.h"
 
 namespace SimpleDB {
 
 CacheManager::CacheManager(FileManager *fileManager) {
     this->fileManager = fileManager;
     cacheBuf = new PageCache[NUM_BUFFER_PAGE];
+    activeCacheMapVec.resize(FileManager::MAX_OPEN_FILES);
     for (int i = 0; i < NUM_BUFFER_PAGE; i++) {
         cacheBuf[i].id = i;
         freeCache.insertHead(&cacheBuf[i]);
@@ -19,14 +20,21 @@ void CacheManager::onCloseFile(FileDescriptor fd) {
     if (!fileManager->validateFileDescriptor(fd)) {
         Logger::log(
             ERROR,
-            "CacheManager: fail on closing page: invalid file descriptor: %d",
+            "CacheManager: fail on closing file: invalid file descriptor: %d",
             fd.value);
-        throw StorageError::INVALID_DESCRIPTOR;
+        throw Error::InvalidDescriptorError();
     }
 
     auto &map = activeCacheMapVec[fd];
+
+    // Store the reference to avoid iterator invalidation.
+    std::vector<PageCache *> caches;
     for (auto &pair : map) {
-        writeBack(pair.second);
+        caches.push_back(pair.second);
+    }
+
+    for (auto cache : caches) {
+        writeBack(cache);
     }
 }
 
@@ -34,11 +42,19 @@ void CacheManager::close() {
     if (closed) {
         return;
     }
+
+    std::vector<PageCache *> caches;
+
     for (auto &map : activeCacheMapVec) {
         for (auto &pair : map) {
-            writeBack(pair.second);
+            caches.push_back(pair.second);
         }
     }
+
+    for (auto cache : caches) {
+        writeBack(cache);
+    }
+
     closed = true;
     delete[] cacheBuf;
 }
@@ -51,7 +67,15 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
             "CacheManager: fail to get page cache: invalid file descriptor: %d",
             fd.value);
 
-        throw StorageError::INVALID_DESCRIPTOR;
+        throw Error::InvalidDescriptorError();
+    }
+
+    if (page < 0) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail to get page cache: invalid page number %d\n",
+            page);
+        throw Error::InvalidPageNumberError();
     }
 
     // Check if the page is in the cache.
@@ -96,12 +120,18 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
 
         // Write back the original cache.
         writeBack(cache);
-        // Now we can claim this cache slot.
-        cache->reset({fd, page});
     }
 
-    // Read the page from disk as it is not cached.
-    fileManager->readPage(fd, page, cache->buf);
+    // Now we can claim this cache slot.
+    cache->reset({fd, page});
+
+    // Read the page from disk as it is not cached. Note that the page might not
+    // exist yet, so we must tolerate the error.
+    try {
+        fileManager->readPage(fd, page, cache->buf, true);
+    } catch (Error::ReadFileError) {
+        // Do nothing...
+    }
 
     // Now add this active cache to the map and the linked list.
     cacheMap[page] = cache;
@@ -128,6 +158,9 @@ void CacheManager::writePage(FileDescriptor fd, int page, char *data) {
 void CacheManager::writeBack(PageCache *cache) {
     // As we are dealing with a valid pointer to the cache, we assume that the
     // descriptor is valid.
+    Logger::log(VERBOSE, "CacheManager: write back page %d of file %d\n",
+                cache->meta.page, cache->meta.fd.value);
+
     if (cache->dirty) {
         fileManager->writePage(cache->meta.fd, cache->meta.page, cache->buf);
     }
@@ -145,7 +178,15 @@ void CacheManager::writeBack(FileDescriptor fd, int page) {
             "CacheManager: fail to write back page: invalid file descriptor: "
             "%d",
             fd.value);
-        throw StorageError::INVALID_DESCRIPTOR;
+        throw Error::InvalidDescriptorError();
+    }
+
+    if (page < 0) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail to write back page: invalid page number %d\n",
+            page);
+        throw Error::InvalidPageNumberError();
     }
 
     auto &cacheMap = activeCacheMapVec[fd];
