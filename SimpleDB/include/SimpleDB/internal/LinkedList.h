@@ -35,7 +35,6 @@ public:
 
     T *removeTail() {
         if (head == tail) {
-            assert(false);
             return nullptr;
         }
         return remove(tail->next);
@@ -56,7 +55,9 @@ public:
 
     inline int size() { return _size; };
 
+#ifndef TESTING
 private:
+#endif
     Node *head;
     Node *tail;
     int _size = 0;

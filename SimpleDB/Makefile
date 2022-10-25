@@ -1,4 +1,10 @@
-LIB_TARGET = libSimpleDB.a
+ifeq ($(TESTING), true)
+	LIB_TARGET = libSimpleDB-Test.a
+	FLAGS += -DTESTING
+else
+	LIB_TARGET = libSimpleDB.a
+endif
+
 
 CC = g++
 CXXFLAGS = -g -O2 -std=c++17
@@ -23,7 +29,7 @@ $(LIB_DIR)/$(LIB_TARGET): $(OBJS) | $(LIB_DIR)
 define make-goal
 $1obj/%.o: $1%.cc $(HEADERS)
 	@mkdir -p $1/obj
-	$(CC) $(INCLUDE) $(CXXFLAGS) -c $$< -o $$@
+	$(CC) $(INCLUDE) $(CXXFLAGS) $(FLAGS) -c $$< -o $$@
 endef
 
 $(foreach dir,$(SUB_DIRS),$(eval $(call make-goal,$(dir))))

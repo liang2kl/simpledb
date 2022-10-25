@@ -1,5 +1,9 @@
 #include "CacheManager.h"
 
+#include <string.h>
+
+#include <cassert>
+
 #include "Logger.h"
 
 namespace SimpleDB {
@@ -196,4 +200,40 @@ void CacheManager::writeBack(FileDescriptor fd, int page) {
     }
 }
 
+#ifdef TESTING
+// ==== Testing-only methods ====
+void CacheManager::discard(FileDescriptor fd, int page) {
+    auto &cacheMap = activeCacheMapVec[fd];
+    auto iter = cacheMap.find(page);
+    if (iter != cacheMap.end()) {
+        PageCache *cache = iter->second;
+        activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
+        activeCache.remove(cache->nodeInActiveCache);
+        freeCache.insertHead(cache);
+    }
+}
+
+void CacheManager::discardAll(FileDescriptor fd) {
+    auto &map = activeCacheMapVec[fd];
+    std::vector<PageCache *> caches;
+    for (auto &pair : map) {
+        caches.push_back(pair.second);
+    }
+    for (auto cache : caches) {
+        discard(cache->meta.fd, cache->meta.page);
+    }
+}
+
+void CacheManager::discardAll() {
+    std::vector<PageCache *> caches;
+    for (auto &map : activeCacheMapVec) {
+        for (auto &pair : map) {
+            caches.push_back(pair.second);
+        }
+    }
+    for (auto cache : caches) {
+        discard(cache->meta.fd, cache->meta.page);
+    }
+}
+#endif
 }  // namespace SimpleDB

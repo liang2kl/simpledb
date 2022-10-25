@@ -22,7 +22,9 @@ public:
     void readPage(FileDescriptor fd, int page, char *data);
     void writePage(FileDescriptor fd, int page, char *data);
 
+#ifndef TESTING
 private:
+#endif
     bool shouldFreeFileManager;
     FileManager *fileManager;
     CacheManager *cacheManager;

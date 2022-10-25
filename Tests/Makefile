@@ -10,13 +10,15 @@ OBJ_DIR = obj
 
 INCLUDE = -I../SimpleDB/include -I../googletest/googletest/include
 
-DB_LIB = ../SimpleDB/lib/libSimpleDB.a
+DB_LIB = ../SimpleDB/lib/libSimpleDB-Test.a
 GTEST_LIB = ../googletest/build/lib/libgtest.a
 
-LIBS = -L../SimpleDB/lib -lSimpleDB -L../googletest/build/lib -lgtest
+LIBS = -L../SimpleDB/lib -lSimpleDB-Test -L../googletest/build/lib -lgtest
 
 TEST_SRC = $(shell find $(SRC_DIR) -name '*.cc')
 TEST_OBJS = $(foreach file,$(TEST_SRC),$(OBJ_DIR)/$(notdir $(basename $(file))).o)
+
+export TESTING = true
 
 all: $(BIN_DIR)/$(TEST_TARGET)
 

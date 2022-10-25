@@ -1,5 +1,4 @@
-// Simple hack to allow accessing private members.
-#define private public
+#define TESTING
 
 #include <SimpleDB/SimpleDB.h>
 #include <gtest/gtest.h>

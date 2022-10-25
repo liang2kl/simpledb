@@ -1,5 +1,4 @@
-// Simple hack to allow accessing private members.
-#define private public
+#define TESTING
 
 #include <SimpleDB/SimpleDB.h>
 #include <gtest/gtest.h>
@@ -80,7 +79,7 @@ TEST_F(CacheManagerTest, TestPageExchange) {
     manager->readPage(fd, NUM_BUFFER_PAGE, buf);
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 1);
 
-    EXPECT_NO_THROW(manager->onCloseFile(fd));
+    EXPECT_NO_THROW(manager->discardAll(fd));
     fileManager->closeFile(fd);
 }
 
@@ -101,6 +100,5 @@ TEST_F(CacheManagerTest, TestLeak) {
     EXPECT_EQ(manager->freeCache.size(), NUM_BUFFER_PAGE);
     EXPECT_EQ(manager->activeCache.size(), 0);
 
-    EXPECT_NO_THROW(manager->onCloseFile(fd));
     fileManager->closeFile(fd);
 }

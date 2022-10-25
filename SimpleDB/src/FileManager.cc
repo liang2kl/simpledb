@@ -1,5 +1,7 @@
 #include "FileManager.h"
 
+#include <string.h>
+
 #include <filesystem>
 #include <iostream>
 

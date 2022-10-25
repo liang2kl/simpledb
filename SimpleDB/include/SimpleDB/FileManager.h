@@ -28,7 +28,9 @@ public:
     // Check if the file descriptor is valid.
     bool validateFileDescriptor(FileDescriptor fd);
 
+#ifndef TESTING
 private:
+#endif
     struct OpenedFile {
         std::string fileName;
         FILE *fd = nullptr;
