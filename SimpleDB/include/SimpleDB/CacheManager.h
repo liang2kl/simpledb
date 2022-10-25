@@ -4,7 +4,8 @@
 #include <map>
 
 #include "FileManager.h"
-#include "LinkedList.h"
+#include "StorageError.h"
+#include "internal/LinkedList.h"
 
 namespace SimpleDB {
 
@@ -24,7 +25,7 @@ public:
     void writeBack(FileDescriptor fd, int page);
 
     // A handler to do some cleanup before the file manager closes the file.
-    void onCloseFile(FileDescriptor fd);
+    void onCloseFile(FileDescriptor fd) noexcept(false);
 
     // Write back all pages and destroy the cache manager.
     void close();
@@ -63,7 +64,7 @@ private:
         }
     };
 
-    std::map<PageMeta, PageCache *> activeCacheMap;
+    std::vector<std::map<int, PageCache *>> activeCacheMapVec;
 
     LinkedList<PageCache> freeCache;
     LinkedList<PageCache> activeCache;
@@ -76,7 +77,7 @@ private:
 
     // Get the cache for certain page. Claim a slot (and read from disk) if it
     // is not cached.
-    PageCache *getPageCache(FileDescriptor fd, int page);
+    PageCache *getPageCache(FileDescriptor fd, int page) noexcept(false);
 };
 
 }  // namespace SimpleDB

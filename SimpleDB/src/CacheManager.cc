@@ -1,6 +1,6 @@
 #include "CacheManager.h"
 
-#include "Logger.h"
+#include "internal/Logger.h"
 
 namespace SimpleDB {
 
@@ -9,18 +9,24 @@ CacheManager::CacheManager(FileManager *fileManager) {
     cacheBuf = new PageCache[NUM_BUFFER_PAGE];
     for (int i = 0; i < NUM_BUFFER_PAGE; i++) {
         cacheBuf[i].id = i;
-        freeCache.insert(&cacheBuf[i]);
+        freeCache.insertHead(&cacheBuf[i]);
     }
 }
 
 CacheManager::~CacheManager() { close(); }
 
 void CacheManager::onCloseFile(FileDescriptor fd) {
-    // FIXME: Need a better data structure to find associated caches.
-    for (auto &pair : activeCacheMap) {
-        if (pair.first.fd == fd) {
-            writeBack(pair.second);
-        }
+    if (!fileManager->validateFileDescriptor(fd)) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail on closing page: invalid file descriptor: %d",
+            fd.value);
+        throw StorageError::INVALID_DESCRIPTOR;
+    }
+
+    auto &map = activeCacheMapVec[fd];
+    for (auto &pair : map) {
+        writeBack(pair.second);
     }
 }
 
@@ -28,8 +34,10 @@ void CacheManager::close() {
     if (closed) {
         return;
     }
-    for (auto &pair : activeCacheMap) {
-        writeBack(pair.second);
+    for (auto &map : activeCacheMapVec) {
+        for (auto &pair : map) {
+            writeBack(pair.second);
+        }
     }
     closed = true;
     delete[] cacheBuf;
@@ -37,11 +45,19 @@ void CacheManager::close() {
 
 CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                                                     int page) {
-    PageMeta meta = {fd, page};
+    if (!fileManager->validateFileDescriptor(fd)) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail to get page cache: invalid file descriptor: %d",
+            fd.value);
+
+        throw StorageError::INVALID_DESCRIPTOR;
+    }
 
     // Check if the page is in the cache.
-    auto iter = activeCacheMap.find(meta);
-    if (iter != activeCacheMap.end()) {
+    auto &cacheMap = activeCacheMapVec[fd];
+    auto iter = cacheMap.find(page);
+    if (iter != cacheMap.end()) {
         // The page is cached.
         Logger::log(VERBOSE, "CacheManager: get cached page %d of file %d\n",
                     page, fd.value);
@@ -49,7 +65,7 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
 
         // Move the cache to the head.
         activeCache.remove(cache->nodeInActiveCache);
-        cache->nodeInActiveCache = activeCache.insert(cache);
+        cache->nodeInActiveCache = activeCache.insertHead(cache);
 
         return cache;
     }
@@ -63,15 +79,15 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                     "CacheManager: get free cache for page %d of file %d\n",
                     page, fd.value);
 
-        cache = freeCache.removeLRU();
+        cache = freeCache.removeTail();
         assert(cache != nullptr);
     } else {
         // The cache is full. Select the last recently used page to replace.
-        cache = activeCache.removeLRU();
+        cache = activeCache.removeTail();
         assert(cache != nullptr);
 
         // Also remove from the map!
-        activeCacheMap.erase(cache->meta);
+        cacheMap.erase(page);
 
         Logger::log(VERBOSE,
                     "CacheManager: replace cache of page %d of file %d for "
@@ -81,15 +97,15 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
         // Write back the original cache.
         writeBack(cache);
         // Now we can claim this cache slot.
-        cache->reset(meta);
+        cache->reset({fd, page});
     }
 
     // Read the page from disk as it is not cached.
     fileManager->readPage(fd, page, cache->buf);
 
     // Now add this active cache to the map and the linked list.
-    activeCacheMap[meta] = cache;
-    cache->nodeInActiveCache = activeCache.insert(cache);
+    cacheMap[page] = cache;
+    cache->nodeInActiveCache = activeCache.insertHead(cache);
 
     return cache;
 }
@@ -102,7 +118,6 @@ void CacheManager::readPage(FileDescriptor fd, int page, char *data) {
 }
 
 void CacheManager::writePage(FileDescriptor fd, int page, char *data) {
-    PageMeta meta = {fd, page};
     PageCache *cache = getPageCache(fd, page);
     // Set the dirty flag as we are writing.
     cache->dirty = true;
@@ -111,20 +126,31 @@ void CacheManager::writePage(FileDescriptor fd, int page, char *data) {
 }
 
 void CacheManager::writeBack(PageCache *cache) {
+    // As we are dealing with a valid pointer to the cache, we assume that the
+    // descriptor is valid.
     if (cache->dirty) {
         fileManager->writePage(cache->meta.fd, cache->meta.page, cache->buf);
     }
 
     // Discard the cache and add it back to the free list.
-    activeCacheMap.erase(cache->meta);
-    PageCache *cache = activeCache.remove(cache->nodeInActiveCache);
-    freeCache.insert(cache);
+    activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
+    activeCache.remove(cache->nodeInActiveCache);
+    freeCache.insertHead(cache);
 }
 
 void CacheManager::writeBack(FileDescriptor fd, int page) {
-    PageMeta meta = {fd, page};
-    auto iter = activeCacheMap.find(meta);
-    if (iter != activeCacheMap.end()) {
+    if (!fileManager->validateFileDescriptor(fd)) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail to write back page: invalid file descriptor: "
+            "%d",
+            fd.value);
+        throw StorageError::INVALID_DESCRIPTOR;
+    }
+
+    auto &cacheMap = activeCacheMapVec[fd];
+    auto iter = cacheMap.find(page);
+    if (iter != cacheMap.end()) {
         writeBack(iter->second);
     }
 }
