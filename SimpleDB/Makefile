@@ -33,4 +33,4 @@ $(LIB_DIR):
 
 .PHONY: clean
 clean:
-	- rm -rf $(OBJS) $(LIB_DIR)
+	- rm -r $(OBJS) $(LIB_DIR)

@@ -1,5 +1,5 @@
-# VSCode configurations
 .vscode
+.DS_Store
 
 # Prerequisites
 *.d
