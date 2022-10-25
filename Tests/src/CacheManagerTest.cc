@@ -16,8 +16,8 @@ protected:
     }
 
     ~CacheManagerTest() {
-        // delete manager;
-        // delete fileManager;
+        delete manager;
+        delete fileManager;
     }
 
     void SetUp() override { std::filesystem::create_directory("tmp"); }
@@ -80,6 +80,7 @@ TEST_F(CacheManagerTest, TestPageExchange) {
     manager->readPage(fd, NUM_BUFFER_PAGE, buf);
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 1);
 
+    EXPECT_NO_THROW(manager->onCloseFile(fd));
     fileManager->closeFile(fd);
 }
 
@@ -100,5 +101,6 @@ TEST_F(CacheManagerTest, TestLeak) {
     EXPECT_EQ(manager->freeCache.size(), NUM_BUFFER_PAGE);
     EXPECT_EQ(manager->activeCache.size(), 0);
 
+    EXPECT_NO_THROW(manager->onCloseFile(fd));
     fileManager->closeFile(fd);
 }
