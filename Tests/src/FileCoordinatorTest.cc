@@ -17,7 +17,7 @@ protected:
 };
 
 // The same as FileManagerTest.TestWriteReadPage
-TEST_F(FileCoordinatorTest, TestCoordinatation) {
+TEST_F(FileCoordinatorTest, TestCoordinatorTest) {
     // Initialize data.
     char buf[PAGE_SIZE] = {0x00, 0x00, 0x12, 0x24};
     buf[PAGE_SIZE - 2] = 0x36;
