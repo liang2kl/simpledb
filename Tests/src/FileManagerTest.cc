@@ -56,6 +56,8 @@ TEST_F(FileManagerTest, TestWriteReadPage) {
         << "Read data mismatch with written data";
     EXPECT_EQ(readBuf[PAGE_SIZE - 2], 0x36)
         << "Read data mismatch with written data";
+
+    manager.closeFile(fd);
 }
 
 TEST_F(FileManagerTest, TestExceedFiles) {
