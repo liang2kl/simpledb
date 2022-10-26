@@ -165,7 +165,7 @@ void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
 
 bool FileManager::validateFileDescriptor(FileDescriptor fd) {
     return fd >= 0 && fd < MAX_OPEN_FILES &&
-           (descriptorBitmap & (1 << fd)) != 0;
+           (descriptorBitmap & (1L << fd)) != 0;
 }
 
 FileDescriptor FileManager::genNewDescriptor(FILE *fd,

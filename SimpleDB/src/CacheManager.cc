@@ -66,10 +66,10 @@ void CacheManager::close() {
 CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                                                     int page) {
     if (!fileManager->validateFileDescriptor(fd)) {
-        Logger::log(
-            ERROR,
-            "CacheManager: fail to get page cache: invalid file descriptor: %d",
-            fd.value);
+        Logger::log(ERROR,
+                    "CacheManager: fail to get page cache: invalid file "
+                    "descriptor: %d\n",
+                    fd.value);
 
         throw Error::InvalidDescriptorError();
     }
@@ -180,7 +180,7 @@ void CacheManager::writeBack(FileDescriptor fd, int page) {
         Logger::log(
             ERROR,
             "CacheManager: fail to write back page: invalid file descriptor: "
-            "%d",
+            "%d\n",
             fd.value);
         throw Error::InvalidDescriptorError();
     }
