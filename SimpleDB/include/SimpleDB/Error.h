@@ -16,7 +16,7 @@ namespace Error {
         virtual const char* what() const noexcept { return description; } \
     };
 
-// ==== Storage Error ====
+// ==== I/O Error ====
 DECLARE_ERROR(OpenFile, "Fail to open file");
 DECLARE_ERROR(CreateFile, "Fail to create file");
 DECLARE_ERROR(CloseFile, "Fail to close file");
@@ -28,6 +28,8 @@ DECLARE_ERROR(InvalidDescriptor, "Invalid file descriptor");
 DECLARE_ERROR(InvalidPageNumber, "Invalid file descriptor");
 DECLARE_ERROR(OpenFileExceeded, "Number of opened files has exceeded");
 
+// ==== Table Operation Error ====
+DECLARE_ERROR(ReadTable, "Fail to read table");
 #undef DECLARE_ERROR
 
 }  // namespace Error

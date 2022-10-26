@@ -2,6 +2,8 @@
 
 namespace SimpleDB {
 
+FileCoordinator FileCoordinator::shared = FileCoordinator(new FileManager());
+
 FileCoordinator::FileCoordinator(FileManager *manager) {
     if (manager != nullptr) {
         shouldFreeFileManager = false;
@@ -46,4 +48,4 @@ void FileCoordinator::writePage(FileDescriptor fd, int page, char *data) {
     cacheManager->writePage(fd, page, data);
 }
 
-}
+}  // namespace SimpleDB

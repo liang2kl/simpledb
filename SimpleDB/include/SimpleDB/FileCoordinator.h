@@ -15,6 +15,8 @@ public:
     FileCoordinator(FileManager *manager = nullptr);
     ~FileCoordinator();
 
+    static FileCoordinator shared;
+
     void createFile(const std::string &fileName);
     FileDescriptor openFile(const std::string &fileName);
     void closeFile(FileDescriptor fd);
