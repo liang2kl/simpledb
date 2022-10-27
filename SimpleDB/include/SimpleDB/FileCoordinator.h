@@ -17,7 +17,6 @@ namespace SimpleDB {
 // error handling.
 class FileCoordinator {
 public:
-    FileCoordinator(FileManager *manager = nullptr);
     ~FileCoordinator();
 
     static FileCoordinator shared;
@@ -39,7 +38,8 @@ public:
 #ifndef TESTING
 private:
 #endif
-    bool shouldFreeFileManager;
+    FileCoordinator();
+
     FileManager *fileManager;
     CacheManager *cacheManager;
 };

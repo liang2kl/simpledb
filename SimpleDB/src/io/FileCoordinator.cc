@@ -2,25 +2,16 @@
 
 namespace SimpleDB {
 
-FileCoordinator FileCoordinator::shared = FileCoordinator(new FileManager());
+FileCoordinator FileCoordinator::shared = FileCoordinator();
 
-FileCoordinator::FileCoordinator(FileManager *manager) {
-    if (manager != nullptr) {
-        shouldFreeFileManager = false;
-        fileManager = manager;
-    } else {
-        shouldFreeFileManager = true;
-        fileManager = new FileManager();
-    }
-
+FileCoordinator::FileCoordinator() {
+    fileManager = new FileManager();
     cacheManager = new CacheManager(fileManager);
 }
 
 FileCoordinator::~FileCoordinator() {
     delete cacheManager;
-    if (shouldFreeFileManager) {
-        delete fileManager;
-    }
+    delete fileManager;
 }
 
 void FileCoordinator::createFile(const std::string &fileName) {
