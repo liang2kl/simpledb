@@ -1,16 +1,12 @@
 #ifndef _SIMPLEDB_FILE_COORDINATOR_H
 #define _SIMPLEDB_FILE_COORDINATOR_H
 
-#include "CacheManager.h"
 #include "FileDescriptor.h"
-#include "FileManager.h"
+#include "PageHandle.h"
+#include "internal/CacheManager.h"
+#include "internal/FileManager.h"
 
 namespace SimpleDB {
-
-#define GET_HANDLE(fd, page) FileCoordinator::shared.getHandle(fd, page)
-#define LOAD_H(handle) FileCoordinator::shared.load(handle)
-#define LOAD_H_RAW(handle) FileCoordinator::shared.loadRaw(handle)
-#define RENEW_H(handle) (handle = FileCoordinator::shared.renew(handle))
 
 // A proxy class to coordinate page access in FileManager and CacheManger, which
 // should be the only interface to access the storage. It is not responsible for

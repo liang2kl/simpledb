@@ -1,10 +1,11 @@
-#include "CacheManager.h"
+#include "internal/CacheManager.h"
 
 #include <string.h>
 
 #include <cassert>
 
 #include "Logger.h"
+#include "PageHandle.h"
 
 namespace SimpleDB {
 

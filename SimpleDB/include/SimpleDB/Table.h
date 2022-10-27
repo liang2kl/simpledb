@@ -3,8 +3,8 @@
 
 #include <stdint.h>
 
-#include "FileCoordinator.h"
 #include "Macros.h"
+#include "internal/FileCoordinator.h"
 
 namespace SimpleDB {
 

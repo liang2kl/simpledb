@@ -4,7 +4,7 @@
 #include <map>
 
 #include "Error.h"
-#include "FileManager.h"
+#include "internal/FileManager.h"
 #include "internal/LinkedList.h"
 
 namespace SimpleDB {
@@ -109,27 +109,6 @@ private:
     // Get the cache for certain page. Claim a slot (and load from disk) if it
     // is not cached.
     PageCache *getPageCache(FileDescriptor fd, int page) noexcept(false);
-};
-
-// A handle of a page cache used to access a page.
-struct PageHandle {
-    friend class CacheManager;
-
-public:
-    // This constructor is only for declaration, and must be initialized before
-    // use.
-    PageHandle() = default;
-    bool validate() const { return cache->generation == generation; }
-
-#ifndef TESTING
-private:
-#else
-public:
-#endif
-    PageHandle(CacheManager::PageCache *cache)
-        : cache(cache), generation(cache->generation) {}
-    int generation = -1;
-    CacheManager::PageCache *cache;
 };
 
 }  // namespace SimpleDB

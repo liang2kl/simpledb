@@ -1,5 +1,6 @@
-#include "FileCoordinator.h"
+#include "internal/FileCoordinator.h"
 
+#include "PageHandle.h"
 namespace SimpleDB {
 
 FileCoordinator FileCoordinator::shared = FileCoordinator();
