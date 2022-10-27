@@ -85,15 +85,20 @@ TEST_F(TableTest, TestInitFromInvalidFile) {
 TEST_F(TableTest, TestInsertGet) {
     initTable();
 
-    std::pair<int, int> slotPair;
-    EXPECT_NO_THROW(slotPair = table.insert(testColumns));
+    // Write a few pages.
+    for (int i = 0; i < 3 * NUM_SLOT_PER_PAGE; i++) {
+        std::pair<int, int> slotPair;
+        ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
-    Column readColumns[3];
-    EXPECT_NO_THROW(table.get(slotPair.first, slotPair.second, readColumns));
-    compareColumns(testColumns, readColumns);
+        Column readColumns[3];
+        ASSERT_NO_THROW(
+            table.get(slotPair.first, slotPair.second, readColumns));
+        compareColumns(testColumns, readColumns);
 
-    // Check if the meta is flushed.
-    EXPECT_TRUE(table.meta.occupied[slotPair.first] & (1 << slotPair.second));
+        // Check if the meta is flushed.
+        EXPECT_TRUE(table.meta.occupied[slotPair.first] &
+                    (1 << slotPair.second));
+    }
 }
 
 TEST_F(TableTest, TestUpdate) {

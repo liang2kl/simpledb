@@ -135,6 +135,9 @@ std::pair<int, int> Table::insert(Columns columns) {
         throw Error::SlotFullError();
     }
 
+    Logger::log(VERBOSE, "Table: insert record to page %d slot %d\n", page,
+                slot);
+
     PageHandle *handle = getHandle(page);
     char *start = IO::load(handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
@@ -268,17 +271,10 @@ void Table::validateSlot(int page, int slot) {
 
 std::pair<int, int> Table::getEmptySlot() {
     for (int i = 1; i < MAX_PAGE_PER_TABLE; i++) {
-        int index = ffs(int(~meta.occupied[i]) & 0x000000FF);
+        int index = ffs(int(~meta.occupied[i]) & SLOT_OCCUPY_MASK);
         if (index == 0) {
             continue;
         }
-#ifdef _DEBUG
-        if (i == 0 && index - 1 == 0) {
-            Logger::log(ERROR,
-                        "Table: unexpedtedly found slot for metadata empty\n");
-            throw Error::InvalidSlotError();
-        }
-#endif
         return std::make_pair(i, index - 1);
     }
     return std::make_pair(-1, -1);
