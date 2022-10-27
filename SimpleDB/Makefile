@@ -5,6 +5,9 @@ else
 	LIB_TARGET = libSimpleDB.a
 endif
 
+ifeq ($(DEBUG), true)
+	FLAGS += -D_DEBUG
+endif
 
 CC = g++
 CXXFLAGS = -g -O2 -std=c++17

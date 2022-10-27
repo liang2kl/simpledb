@@ -7,6 +7,10 @@
 
 namespace SimpleDB {
 
+#define GET_HANDLE(fd, page) FileCoordinator::shared.getHandle(fd, page)
+#define GET_BUF(handle) FileCoordinator::shared.read(handle)
+#define GET_RAW_BUF(handle) FileCoordinator::shared.readRaw(handle)
+
 // A proxy class to coordinate page access in FileManager and CacheManger, which
 // should be the only interface to access the storage. It is not responsible for
 // error handling.
@@ -21,8 +25,12 @@ public:
     FileDescriptor openFile(const std::string &fileName);
     void closeFile(FileDescriptor fd);
     void deleteFile(const std::string &fileName);
-    void readPage(FileDescriptor fd, int page, char *data);
-    void writePage(FileDescriptor fd, int page, char *data);
+    PageHandle getHandle(FileDescriptor fd, int page);
+    char *read(const PageHandle &handle);
+    inline char *readRaw(const PageHandle &handle) {
+        return cacheManager->readRaw(handle);
+    }
+    void modify(const PageHandle &handle);
 
 #ifndef TESTING
 private:

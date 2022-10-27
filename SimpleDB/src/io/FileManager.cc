@@ -42,7 +42,7 @@ FileDescriptor FileManager::openFile(const std::string &fileName) {
 }
 
 void FileManager::closeFile(FileDescriptor descriptor) {
-    if (!validateFileDescriptor(descriptor)) {
+    if (!validate(descriptor)) {
         Logger::log(ERROR,
                     "FileManager: fail to close file: invalid descriptor %d\n",
                     descriptor.value);
@@ -78,7 +78,7 @@ void FileManager::deleteFile(const std::string &fileName) {
 
 void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
                            bool couldFail) {
-    if (!validateFileDescriptor(descriptor)) {
+    if (!validate(descriptor)) {
         Logger::log(ERROR,
                     "FileManager: fail to read page: invalid descriptor %d\n",
                     descriptor.value);
@@ -124,7 +124,7 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
 }
 
 void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
-    if (!validateFileDescriptor(descriptor)) {
+    if (!validate(descriptor)) {
         Logger::log(ERROR,
                     "FileManager: fail to write page: invalid descriptor %d\n",
                     descriptor.value);
@@ -163,7 +163,7 @@ void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
                 file.fileName.c_str());
 }
 
-bool FileManager::validateFileDescriptor(FileDescriptor fd) {
+bool FileManager::validate(FileDescriptor fd) {
     return fd >= 0 && fd < MAX_OPEN_FILES &&
            (descriptorBitmap & (1L << fd)) != 0;
 }

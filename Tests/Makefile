@@ -19,6 +19,7 @@ TEST_SRC = $(shell find $(SRC_DIR) -name '*.cc')
 TEST_OBJS = $(foreach file,$(TEST_SRC),$(OBJ_DIR)/$(notdir $(basename $(file))).o)
 
 export TESTING = true
+export DEBUG = true
 
 all: $(BIN_DIR)/$(TEST_TARGET)
 

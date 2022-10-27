@@ -6,8 +6,6 @@
 
 namespace SimpleDB {
 
-static char pageBuf[PAGE_SIZE];
-
 Table::~Table() {
     if (initialized) {
         // Release the file descriptor.
@@ -21,15 +19,14 @@ void Table::init(const std::string &file) {
         // Open the file.
         fd = FileCoordinator::shared.openFile(file);
         // The metadata is written in the first page.
-        FileCoordinator::shared.readPage(fd, 0, pageBuf);
+        PageHandle handle = GET_HANDLE(fd, 0);
+        meta = *(TableMeta *)GET_RAW_BUF(handle);
+        initialized = true;
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
                     fd.value);
         throw Error::ReadTableError();
     }
-
-    meta = *(TableMeta *)pageBuf;
-    initialized = true;
 }
 
 }  // namespace SimpleDB

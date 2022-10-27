@@ -4,6 +4,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <random>
 
 using namespace SimpleDB;
 
@@ -29,30 +30,42 @@ protected:
 TEST_F(CacheManagerTest, TestReadWritePage) {
     const char filePath[] = "tmp/file";
     char readBuf[PAGE_SIZE];
-    char buf[PAGE_SIZE] = {0x01, 0x02};
-    buf[PAGE_SIZE - 1] = 0x03;
+    char buf[PAGE_SIZE];
+
+    for (int i = 0; i < PAGE_SIZE; i++) {
+        buf[i] = char(rand());
+    }
 
     fileManager->createFile(filePath);
     FileDescriptor fd = fileManager->openFile(filePath);
     fileManager->writePage(fd, 1, buf);
 
+    PageHandle handle;
+
     // Read page.
-    EXPECT_NO_THROW(manager->readPage(fd, 1, readBuf));
-    EXPECT_EQ(memcmp(buf, readBuf, PAGE_SIZE), 0);
+    EXPECT_NO_THROW(handle = manager->getHandle(fd, 1));
+    EXPECT_TRUE(handle.validate());
+    EXPECT_EQ(manager->read(handle), handle.cache->buf);
 
     // Write cache.
-    buf[0] = 0x04;
-    buf[PAGE_SIZE - 1] = 0x05;
+    char *cacheBuf = manager->read(handle);
+    char c = cacheBuf[0];
+    while (c == cacheBuf[0]) {
+        c = char(rand());
+    }
+    cacheBuf[0] = c;
 
-    EXPECT_NO_THROW(manager->writePage(fd, 1, buf));
-    EXPECT_NO_THROW(manager->readPage(fd, 1, readBuf));
-    EXPECT_EQ(memcmp(buf, readBuf, PAGE_SIZE), 0);
+    EXPECT_FALSE(handle.cache->dirty);
+    EXPECT_NO_THROW(manager->modify(handle));
+    EXPECT_TRUE(handle.cache->dirty);
+
+    EXPECT_EQ(handle.cache->buf[0], c);
 
     // Write back.
-    EXPECT_NO_THROW(manager->writeBack(fd, 1));
+    EXPECT_NO_THROW(manager->writeBack(handle));
     memset(readBuf, 0, PAGE_SIZE);
     fileManager->readPage(fd, 1, readBuf);
-    EXPECT_EQ(memcmp(buf, readBuf, PAGE_SIZE), 0);
+    EXPECT_EQ(memcmp(cacheBuf, readBuf, PAGE_SIZE), 0);
 
     // Cleanup.
     EXPECT_NO_THROW(manager->onCloseFile(fd));
@@ -61,23 +74,31 @@ TEST_F(CacheManagerTest, TestReadWritePage) {
 
 TEST_F(CacheManagerTest, TestPageExchange) {
     const char filePath[] = "tmp/file";
-    char buf[PAGE_SIZE];
 
     fileManager->createFile(filePath);
     FileDescriptor fd = fileManager->openFile(filePath);
 
+    std::vector<PageHandle> handles;
+
     for (int i = 0; i < NUM_BUFFER_PAGE; i++) {
-        ASSERT_NO_THROW(manager->writePage(fd, i, buf));
+        PageHandle handle;
+        ASSERT_NO_THROW(handle = manager->getHandle(fd, i));
+        ASSERT_NO_THROW(manager->modify(handle));
+        handles.push_back(handle);
     }
 
     // Validate LRU algorithm.
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 0);
 
-    manager->readPage(fd, 5, buf);
+    PageHandle handle = manager->getHandle(fd, 5);
     EXPECT_EQ(manager->activeCache.head->data->id, 5);
 
-    manager->readPage(fd, NUM_BUFFER_PAGE, buf);
+    PageHandle handle1 = manager->getHandle(fd, NUM_BUFFER_PAGE);
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 1);
+
+    // At this time, the cache of page 0 should be written back, thus
+    // invalidating the handle.
+    EXPECT_FALSE(handles[0].validate());
 
     EXPECT_NO_THROW(manager->discardAll(fd));
     fileManager->closeFile(fd);
@@ -91,7 +112,8 @@ TEST_F(CacheManagerTest, TestLeak) {
     FileDescriptor fd = fileManager->openFile(filePath);
 
     for (int i = 0; i < 20; i++) {
-        ASSERT_NO_THROW(manager->writePage(fd, i, buf));
+        PageHandle handle;
+        ASSERT_NO_THROW(handle = manager->getHandle(fd, i));
         EXPECT_EQ(manager->freeCache.size(), NUM_BUFFER_PAGE - i - 1);
         EXPECT_EQ(manager->activeCache.size(), i + 1);
     }

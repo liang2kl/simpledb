@@ -26,7 +26,7 @@ public:
     void writePage(FileDescriptor fd, int page, char *data) noexcept(false);
 
     // Check if the file descriptor is valid.
-    bool validateFileDescriptor(FileDescriptor fd);
+    bool validate(FileDescriptor fd);
 
 #ifndef TESTING
 private:

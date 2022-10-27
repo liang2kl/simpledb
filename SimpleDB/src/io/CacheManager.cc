@@ -21,7 +21,7 @@ CacheManager::CacheManager(FileManager *fileManager) {
 CacheManager::~CacheManager() { close(); }
 
 void CacheManager::onCloseFile(FileDescriptor fd) {
-    if (!fileManager->validateFileDescriptor(fd)) {
+    if (!fileManager->validate(fd)) {
         Logger::log(
             ERROR,
             "CacheManager: fail on closing file: invalid file descriptor: %d",
@@ -65,7 +65,7 @@ void CacheManager::close() {
 
 CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                                                     int page) {
-    if (!fileManager->validateFileDescriptor(fd)) {
+    if (!fileManager->validate(fd)) {
         Logger::log(ERROR,
                     "CacheManager: fail to get page cache: invalid file "
                     "descriptor: %d\n",
@@ -144,19 +144,59 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
     return cache;
 }
 
-void CacheManager::readPage(FileDescriptor fd, int page, char *data) {
-    PageMeta meta = {fd, page};
+PageHandle CacheManager::getHandle(FileDescriptor fd, int page) {
     PageCache *cache = getPageCache(fd, page);
 
-    memcpy(data, cache->buf, PAGE_SIZE);
+    return PageHandle(cache);
 }
 
-void CacheManager::writePage(FileDescriptor fd, int page, char *data) {
-    PageCache *cache = getPageCache(fd, page);
-    // Set the dirty flag as we are writing.
-    cache->dirty = true;
+PageHandle CacheManager::renew(const PageHandle &handle) {
+    if (handle.validate()) {
+        Logger::log(DEBUG,
+                    "CacheManager: trying to renew a valid page handle for "
+                    "page %d of file %d\n",
+                    handle.cache->meta.page, handle.cache->meta.fd.value);
+        return handle;
+    }
 
-    memcpy(cache->buf, data, PAGE_SIZE);
+    return getHandle(handle.cache->meta.fd, handle.cache->meta.page);
+}
+
+char *CacheManager::read(const PageHandle &handle) {
+    if (!handle.validate()) {
+        Logger::log(DEBUG,
+                    "CacheManager: trying to read data with an outdated page "
+                    "handle for page %d of file %d\n",
+                    handle.cache->meta.page, handle.cache->meta.fd.value);
+        return nullptr;
+    }
+
+    return handle.cache->buf;
+}
+
+char *CacheManager::readRaw(const PageHandle &handle) {
+#ifdef _DEBUG
+    if (!handle.validate()) {
+        throw Error::InvalidPageHandleError();
+    }
+#endif
+    return handle.cache->buf;
+}
+
+void CacheManager::modify(const PageHandle &handle) {
+    PageCache *cache = handle.cache;
+
+    if (!handle.validate()) {
+        Logger::log(
+            ERROR,
+            "CacheManager: fail to modify page %d of file %d: "
+            "possible outdated page handle: current generation %d, got %d\n",
+            cache->meta.fd.value, cache->meta.page, cache->generation,
+            handle.generation);
+        throw Error::InvalidPageHandleError();
+    }
+
+    cache->dirty = true;
 }
 
 void CacheManager::writeBack(PageCache *cache) {
@@ -173,31 +213,25 @@ void CacheManager::writeBack(PageCache *cache) {
     activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
     activeCache.remove(cache->nodeInActiveCache);
     freeCache.insertHead(cache);
+    // Don't forget to bump the generation number, as the previous cache is no
+    // longer valid.
+    cache->generation++;
 }
 
-void CacheManager::writeBack(FileDescriptor fd, int page) {
-    if (!fileManager->validateFileDescriptor(fd)) {
+void CacheManager::writeBack(const PageHandle &handle) {
+    PageCache *cache = handle.cache;
+
+    if (!handle.validate()) {
         Logger::log(
             ERROR,
-            "CacheManager: fail to write back page: invalid file descriptor: "
-            "%d\n",
-            fd.value);
-        throw Error::InvalidDescriptorError();
+            "CacheManager: fail to write back page %d of file %d: "
+            "possible outdated page handle: current generation %d, got %d\n",
+            cache->meta.fd.value, cache->meta.page, cache->generation,
+            handle.generation);
+        throw Error::InvalidPageHandleError();
     }
 
-    if (page < 0) {
-        Logger::log(
-            ERROR,
-            "CacheManager: fail to write back page: invalid page number %d\n",
-            page);
-        throw Error::InvalidPageNumberError();
-    }
-
-    auto &cacheMap = activeCacheMapVec[fd];
-    auto iter = cacheMap.find(page);
-    if (iter != cacheMap.end()) {
-        writeBack(iter->second);
-    }
+    writeBack(cache);
 }
 
 #ifdef TESTING
@@ -210,6 +244,7 @@ void CacheManager::discard(FileDescriptor fd, int page) {
         activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
         activeCache.remove(cache->nodeInActiveCache);
         freeCache.insertHead(cache);
+        cache->generation++;
     }
 }
 

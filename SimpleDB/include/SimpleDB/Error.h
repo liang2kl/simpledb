@@ -27,6 +27,7 @@ DECLARE_ERROR(FileExists, "File already exists");
 DECLARE_ERROR(InvalidDescriptor, "Invalid file descriptor");
 DECLARE_ERROR(InvalidPageNumber, "Invalid file descriptor");
 DECLARE_ERROR(OpenFileExceeded, "Number of opened files has exceeded");
+DECLARE_ERROR(InvalidPageHandle, "Invalid page handle");
 
 // ==== Table Operation Error ====
 DECLARE_ERROR(ReadTable, "Fail to read table");

@@ -19,7 +19,6 @@ protected:
 TEST_F(FileCoordinatorTest, TestCoordinator) {
     // Initialize data.
     char buf[PAGE_SIZE] = {0x00, 0x00, 0x12, 0x24};
-    buf[PAGE_SIZE - 2] = 0x36;
 
     const char filePath[] = "tmp/file-rw";
     EXPECT_NO_THROW(coordinator.createFile(filePath));
@@ -27,15 +26,16 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
         << "Fail to create file " << filePath;
 
     FileDescriptor fd = coordinator.openFile(filePath);
+    PageHandle handle = coordinator.getHandle(fd, 2);
 
-    EXPECT_NO_THROW(coordinator.writePage(fd, 2, buf));
+    memcpy(coordinator.read(handle), buf, PAGE_SIZE);
+    EXPECT_NO_THROW(coordinator.modify(handle));
 
-    char readBuf[PAGE_SIZE];
-    EXPECT_NO_THROW(coordinator.readPage(fd, 2, readBuf));
+    EXPECT_NO_THROW(coordinator.closeFile(fd));
+    EXPECT_NO_THROW(fd = coordinator.openFile(filePath));
+    EXPECT_NO_THROW(handle = coordinator.getHandle(fd, 2));
 
-    EXPECT_EQ(memcmp(buf, readBuf, PAGE_SIZE), 0)
-        << "Read data mismatch with written data";
-    EXPECT_EQ(readBuf[PAGE_SIZE - 2], 0x36)
+    EXPECT_EQ(memcmp(buf, coordinator.read(handle), PAGE_SIZE), 0)
         << "Read data mismatch with written data";
 
     coordinator.closeFile(fd);

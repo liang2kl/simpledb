@@ -9,20 +9,42 @@
 
 namespace SimpleDB {
 
+// Forward declaration.
+struct PageHandle;
+
 class CacheManager {
+    friend class PageHandle;
+
 public:
     CacheManager(FileManager *fileManager);
     ~CacheManager();
 
     // Read a page from the cache (or the disk).
-    void readPage(FileDescriptor fd, int page, char *data);
+    PageHandle getHandle(FileDescriptor fd, int page);
 
-    // Write a page to the cache.
-    void writePage(FileDescriptor fd, int page, char *data);
+    // Renew the page handle, if it's invalidated.
+    PageHandle renew(const PageHandle &handle);
+
+    // Get the pointer to the buffer, NULL if the handle is invalid (i.e.
+    // outdated), which indicates that the caller should re-read the page using
+    // readPage(). The result can be cached between two cache operations for
+    // better performance and convenience.
+    char *read(const PageHandle &handle);
+
+    // The unsafe version of `read`, in which the validity of the handle is not
+    // examined.
+    char *readRaw(const PageHandle &handle);
+
+    // Mark the page as dirty, should be called after every write to the buffer.
+    // The handle must be validated via validate() before calling this function,
+    // otherwise InvalidPageHandleError might be thrown.
+    void modify(const PageHandle &handle);
 
     // Write the cache back to the disk if it is dirty, and remove the cache. If
-    // the cache does not exist, do nothing.
-    void writeBack(FileDescriptor fd, int page);
+    // the cache does not exist, do nothing. The handle must be validated via
+    // validate() before calling this function, otherwise InvalidPageHandleError
+    // might be thrown.
+    void writeBack(const PageHandle &handle);
 
     // A handler to do some cleanup before the file manager closes the file.
     void onCloseFile(FileDescriptor fd) noexcept(false);
@@ -58,13 +80,18 @@ private:
         bool dirty;
         char buf[PAGE_SIZE];
 
+        int generation = 0;
+
         // A reverse pointer to the node in the linked list.
         LinkedList<PageCache>::Node *nodeInActiveCache = nullptr;
 
+        // Replace this cache with another page.
         void reset(const PageMeta &meta) {
             this->meta = meta;
             dirty = false;
             nodeInActiveCache = nullptr;
+            // We don't need to bump the generation number here. It's done
+            // during write back.
         }
     };
 
@@ -82,6 +109,27 @@ private:
     // Get the cache for certain page. Claim a slot (and read from disk) if it
     // is not cached.
     PageCache *getPageCache(FileDescriptor fd, int page) noexcept(false);
+};
+
+// A handle of a page cache used to access a page.
+struct PageHandle {
+    friend class CacheManager;
+
+public:
+    PageHandle() = default;
+    bool validate() const { return cache->generation == generation; }
+
+#ifndef TESTING
+private:
+#else
+public:
+#endif
+    PageHandle(CacheManager::PageCache *cache)
+        : cache(cache), generation(cache->generation) {}
+    // Default -1 to allow default construction publicly while ensuring the
+    // validity.
+    int generation = -1;
+    CacheManager::PageCache *cache;
 };
 
 }  // namespace SimpleDB

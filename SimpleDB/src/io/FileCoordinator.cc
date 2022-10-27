@@ -40,12 +40,18 @@ void FileCoordinator::deleteFile(const std::string &fileName) {
     fileManager->deleteFile(fileName);
 }
 
-void FileCoordinator::readPage(FileDescriptor fd, int page, char *data) {
-    cacheManager->readPage(fd, page, data);
+PageHandle FileCoordinator::getHandle(FileDescriptor fd, int page) {
+    return cacheManager->getHandle(fd, page);
 }
 
-void FileCoordinator::writePage(FileDescriptor fd, int page, char *data) {
-    cacheManager->writePage(fd, page, data);
+char *FileCoordinator::read(const PageHandle &handle) {
+    return cacheManager->read(handle);
 }
+
+void FileCoordinator::modify(const PageHandle &handle) {
+    cacheManager->modify(handle);
+}
+
+// PageHandle FileCoordinator
 
 }  // namespace SimpleDB
