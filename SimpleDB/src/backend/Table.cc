@@ -20,7 +20,7 @@ void Table::init(const std::string &file) {
         fd = FileCoordinator::shared.openFile(file);
         // The metadata is written in the first page.
         PageHandle handle = GET_HANDLE(fd, 0);
-        meta = *(TableMeta *)GET_RAW_BUF(handle);
+        meta = *(TableMeta *)LOAD_H_RAW(handle);
         initialized = true;
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",

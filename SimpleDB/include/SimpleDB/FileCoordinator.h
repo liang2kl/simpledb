@@ -8,8 +8,8 @@
 namespace SimpleDB {
 
 #define GET_HANDLE(fd, page) FileCoordinator::shared.getHandle(fd, page)
-#define GET_BUF(handle) FileCoordinator::shared.read(handle)
-#define GET_RAW_BUF(handle) FileCoordinator::shared.readRaw(handle)
+#define LOAD_H(handle) FileCoordinator::shared.load(handle)
+#define LOAD_H_RAW(handle) FileCoordinator::shared.loadRaw(handle)
 #define RENEW_H(handle) (handle = FileCoordinator::shared.renew(handle))
 
 // A proxy class to coordinate page access in FileManager and CacheManger, which
@@ -27,11 +27,11 @@ public:
     void closeFile(FileDescriptor fd);
     void deleteFile(const std::string &fileName);
     PageHandle getHandle(FileDescriptor fd, int page);
-    // A safe method to read handle (valid/invalid). Note that the handle might
-    // be renewed.
+    // A safe method to load a page with a handle (valid/invalid). Note that the
+    // handle might be renewed.
     char *load(PageHandle *handle);
     // Directly return the buffer without validation.
-    inline char *readRaw(const PageHandle &handle) {
+    inline char *loadRaw(const PageHandle &handle) {
         return cacheManager->loadRaw(handle);
     }
     void modify(const PageHandle &handle);

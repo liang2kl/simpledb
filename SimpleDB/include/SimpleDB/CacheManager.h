@@ -19,19 +19,19 @@ public:
     CacheManager(FileManager *fileManager);
     ~CacheManager();
 
-    // Read a page from the cache (or the disk).
+    // Load a page from the cache (or the disk).
     PageHandle getHandle(FileDescriptor fd, int page);
 
     // Renew the page handle, if it's invalidated.
     PageHandle renew(const PageHandle &handle);
 
     // Get the pointer to the buffer, NULL if the handle is invalid (i.e.
-    // outdated), which indicates that the caller should re-read the page using
-    // readPage(). The result can be cached between two cache operations for
+    // outdated), which indicates that the caller should re-load the page using
+    // renew(). The result can be cached between two cache operations for
     // better performance and convenience.
     char *load(const PageHandle &handle);
 
-    // The unsafe version of `read`, in which the validity of the handle is not
+    // The unsafe version of `load`, in which the validity of the handle is not
     // examined.
     char *loadRaw(const PageHandle &handle);
 
@@ -106,7 +106,7 @@ private:
     // Write the cache back to the disk if it is dirty, and remove the cache.
     void writeBack(PageCache *cache);
 
-    // Get the cache for certain page. Claim a slot (and read from disk) if it
+    // Get the cache for certain page. Claim a slot (and load from disk) if it
     // is not cached.
     PageCache *getPageCache(FileDescriptor fd, int page) noexcept(false);
 };
@@ -116,6 +116,8 @@ struct PageHandle {
     friend class CacheManager;
 
 public:
+    // This constructor is only for declaration, and must be initialized before
+    // use.
     PageHandle() = default;
     bool validate() const { return cache->generation == generation; }
 
@@ -126,8 +128,6 @@ public:
 #endif
     PageHandle(CacheManager::PageCache *cache)
         : cache(cache), generation(cache->generation) {}
-    // Default -1 to allow default construction publicly while ensuring the
-    // validity.
     int generation = -1;
     CacheManager::PageCache *cache;
 };
