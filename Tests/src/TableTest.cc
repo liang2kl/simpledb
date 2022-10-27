@@ -126,3 +126,10 @@ TEST_F(TableTest, TestRemove) {
     EXPECT_THROW(table.get(slotPair.first, slotPair.second, nullptr),
                  Error::InvalidSlotError);
 }
+
+TEST_F(TableTest, TestColumnName) {
+    initTable();
+    for (int i = 0; i < numColumn; i++) {
+        EXPECT_EQ(table.getColumn(columnMetas[i].name), i);
+    }
+}
