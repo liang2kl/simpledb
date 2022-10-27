@@ -29,11 +29,11 @@ public:
     // outdated), which indicates that the caller should re-read the page using
     // readPage(). The result can be cached between two cache operations for
     // better performance and convenience.
-    char *read(const PageHandle &handle);
+    char *load(const PageHandle &handle);
 
     // The unsafe version of `read`, in which the validity of the handle is not
     // examined.
-    char *readRaw(const PageHandle &handle);
+    char *loadRaw(const PageHandle &handle);
 
     // Mark the page as dirty, should be called after every write to the buffer.
     // The handle must be validated via validate() before calling this function,

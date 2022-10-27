@@ -44,8 +44,9 @@ PageHandle FileCoordinator::getHandle(FileDescriptor fd, int page) {
     return cacheManager->getHandle(fd, page);
 }
 
-char *FileCoordinator::read(const PageHandle &handle) {
-    return cacheManager->read(handle);
+char *FileCoordinator::load(PageHandle *handle) {
+    *handle = cacheManager->renew(*handle);
+    return cacheManager->loadRaw(*handle);
 }
 
 void FileCoordinator::modify(const PageHandle &handle) {

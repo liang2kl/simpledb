@@ -28,14 +28,14 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
     FileDescriptor fd = coordinator.openFile(filePath);
     PageHandle handle = coordinator.getHandle(fd, 2);
 
-    memcpy(coordinator.read(handle), buf, PAGE_SIZE);
+    memcpy(coordinator.load(&handle), buf, PAGE_SIZE);
     EXPECT_NO_THROW(coordinator.modify(handle));
 
     EXPECT_NO_THROW(coordinator.closeFile(fd));
     EXPECT_NO_THROW(fd = coordinator.openFile(filePath));
     EXPECT_NO_THROW(handle = coordinator.getHandle(fd, 2));
 
-    EXPECT_EQ(memcmp(buf, coordinator.read(handle), PAGE_SIZE), 0)
+    EXPECT_EQ(memcmp(buf, coordinator.load(&handle), PAGE_SIZE), 0)
         << "Read data mismatch with written data";
 
     coordinator.closeFile(fd);
@@ -44,4 +44,22 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
     EXPECT_EQ(coordinator.cacheManager->activeCache.size(), 0);
     // The FileManager should have released the file descriptor.
     EXPECT_EQ(coordinator.fileManager->descriptorBitmap, 0);
+}
+
+TEST_F(FileCoordinatorTest, TestRenewHandle) {
+    const char filePath[] = "tmp/file-rw";
+    EXPECT_NO_THROW(coordinator.createFile(filePath));
+    ASSERT_TRUE(std::filesystem::exists(filePath))
+        << "Fail to create file " << filePath;
+
+    FileDescriptor fd = coordinator.openFile(filePath);
+    PageHandle handle = coordinator.getHandle(fd, 2);
+
+    EXPECT_NE(coordinator.load(&handle), nullptr);
+    coordinator.cacheManager->writeBack(handle.cache);
+
+    EXPECT_EQ(coordinator.cacheManager->load(handle), nullptr);
+    // Renew happens here.
+    EXPECT_NE(coordinator.load(&handle), nullptr);
+    EXPECT_NE(coordinator.cacheManager->load(handle), nullptr);
 }

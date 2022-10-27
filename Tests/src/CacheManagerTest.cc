@@ -45,10 +45,10 @@ TEST_F(CacheManagerTest, TestReadWritePage) {
     // Read page.
     EXPECT_NO_THROW(handle = manager->getHandle(fd, 1));
     EXPECT_TRUE(handle.validate());
-    EXPECT_EQ(manager->read(handle), handle.cache->buf);
+    EXPECT_EQ(manager->load(handle), handle.cache->buf);
 
     // Write cache.
-    char *cacheBuf = manager->read(handle);
+    char *cacheBuf = manager->load(handle);
     char c = cacheBuf[0];
     while (c == cacheBuf[0]) {
         c = char(rand());

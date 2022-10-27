@@ -152,17 +152,13 @@ PageHandle CacheManager::getHandle(FileDescriptor fd, int page) {
 
 PageHandle CacheManager::renew(const PageHandle &handle) {
     if (handle.validate()) {
-        Logger::log(DEBUG,
-                    "CacheManager: trying to renew a valid page handle for "
-                    "page %d of file %d\n",
-                    handle.cache->meta.page, handle.cache->meta.fd.value);
         return handle;
     }
 
     return getHandle(handle.cache->meta.fd, handle.cache->meta.page);
 }
 
-char *CacheManager::read(const PageHandle &handle) {
+char *CacheManager::load(const PageHandle &handle) {
     if (!handle.validate()) {
         Logger::log(DEBUG,
                     "CacheManager: trying to read data with an outdated page "
@@ -174,7 +170,7 @@ char *CacheManager::read(const PageHandle &handle) {
     return handle.cache->buf;
 }
 
-char *CacheManager::readRaw(const PageHandle &handle) {
+char *CacheManager::loadRaw(const PageHandle &handle) {
 #ifdef _DEBUG
     if (!handle.validate()) {
         throw Error::InvalidPageHandleError();
