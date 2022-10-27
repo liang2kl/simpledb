@@ -14,6 +14,7 @@ class Logger {
 public:
     static void setErrorStream(FILE* stream) { errorStream = stream; }
     static void setLogLevel(LogLevel level) { displayMinLevel = level; }
+    static LogLevel getLogLevel() { return displayMinLevel; }
     static void log(LogLevel level, const char* fmt, ...)
 #ifdef __GNUC__
         __attribute__((format(printf, 2, 3)));

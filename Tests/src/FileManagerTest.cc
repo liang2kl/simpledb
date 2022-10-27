@@ -4,6 +4,8 @@
 
 #include <filesystem>
 
+#include "Util.h"
+
 using namespace SimpleDB;
 
 class FileManagerTest : public ::testing::Test {
@@ -15,6 +17,8 @@ protected:
 };
 
 TEST_F(FileManagerTest, TestCreateRemoveFile) {
+    DisableLogGuard guard;
+
     for (int i = 0; i < FileManager::MAX_OPEN_FILES; i++) {
         char filePath[50];
         sprintf(filePath, "tmp/file-%d", i);
@@ -61,6 +65,8 @@ TEST_F(FileManagerTest, TestWriteReadPage) {
 }
 
 TEST_F(FileManagerTest, TestExceedFiles) {
+    DisableLogGuard guard;
+
     for (int i = 0; i < FileManager::MAX_OPEN_FILES; i++) {
         char filePath[50];
         sprintf(filePath, "tmp/file-%d", i);
@@ -79,6 +85,8 @@ TEST_F(FileManagerTest, TestExceedFiles) {
 }
 
 TEST_F(FileManagerTest, TestInvalidFileDescriptor) {
+    DisableLogGuard guard;
+
     char buf[PAGE_SIZE];
 
     for (int fdValue = -1; fdValue <= FileManager::MAX_OPEN_FILES; fdValue++) {

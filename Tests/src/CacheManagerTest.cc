@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <random>
 
+#include "Util.h"
+
 using namespace SimpleDB;
 
 class CacheManagerTest : public ::testing::Test {
@@ -73,6 +75,8 @@ TEST_F(CacheManagerTest, TestReadWritePage) {
 }
 
 TEST_F(CacheManagerTest, TestPageExchange) {
+    DisableLogGuard guard;
+
     const char filePath[] = "tmp/file";
 
     fileManager->createFile(filePath);
@@ -105,6 +109,8 @@ TEST_F(CacheManagerTest, TestPageExchange) {
 }
 
 TEST_F(CacheManagerTest, TestLeak) {
+    DisableLogGuard guard;
+
     const char filePath[] = "tmp/file";
     char buf[PAGE_SIZE];
 

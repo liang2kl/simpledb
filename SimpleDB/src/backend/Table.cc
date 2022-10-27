@@ -18,6 +18,8 @@ Table::Table() {
 Table::~Table() { close(); }
 
 void Table::initFromFile(const std::string &file) {
+    Logger::log(VERBOSE, "Table: initializing table from %s\n", file.c_str());
+
     if (initialized) {
         Logger::log(WARNING,
                     "Table: table is already initailized, but attempting to "
@@ -33,31 +35,35 @@ void Table::initFromFile(const std::string &file) {
         PageHandle handle = IO::getHandle(fd, 0);
         meta = *(TableMeta *)IO::loadRaw(handle);
 
-        // Check the vadality of the meta.
-        if (meta.headCanary != TABLE_META_CANARY ||
-            meta.tailCanary != TABLE_META_CANARY) {
-            Logger::log(ERROR,
-                        "Table: fail to read table metadata from file %d: "
-                        "invalid canary values\n",
-                        fd.value);
-            throw Error::ReadTableError();
-        }
-
-        // Initialize name mapping.
-        for (int i = 0; i < meta.numColumn; i++) {
-            columnNameMap[meta.columns[i].name] = i;
-        }
-
-        initialized = true;
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
                     fd.value);
         throw Error::ReadTableError();
     }
+
+    // Check the vadality of the meta.
+    if (meta.headCanary != TABLE_META_CANARY ||
+        meta.tailCanary != TABLE_META_CANARY) {
+        Logger::log(ERROR,
+                    "Table: fail to read table metadata from file %d: "
+                    "invalid canary values\n",
+                    fd.value);
+        throw Error::ReadTableError();
+    }
+
+    // Initialize name mapping.
+    for (int i = 0; i < meta.numColumn; i++) {
+        columnNameMap[meta.columns[i].name] = i;
+    }
+
+    initialized = true;
 }
 
 void Table::initEmpty(const std::string &file, int numColumn,
                       ColumnMeta *columns) {
+    Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
+                file.c_str());
+
     if (initialized) {
         Logger::log(WARNING,
                     "Table: table is already initailized, but attempting to "
@@ -105,6 +111,9 @@ void Table::flushMeta() {
 }
 
 void Table::get(int page, int slot, Columns columns) {
+    Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", page,
+                slot);
+
     checkInit();
     validateSlot(page, slot);
 
@@ -116,11 +125,13 @@ void Table::get(int page, int slot, Columns columns) {
         throw Error::InvalidSlotError();
     }
     PageHandle *handle = getHandle(page);
-    char *start = IO::load(handle) + slot * RECORD_SLOT_SIZE;
+    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     deserialize(start, columns);
 }
 
 std::pair<int, int> Table::insert(Columns columns) {
+    Logger::log(VERBOSE, "Table: inserting record\n");
+
     checkInit();
 
     // Find an empty slot.
@@ -139,7 +150,7 @@ std::pair<int, int> Table::insert(Columns columns) {
                 slot);
 
     PageHandle *handle = getHandle(page);
-    char *start = IO::load(handle) + slot * RECORD_SLOT_SIZE;
+    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
 
     // Mark the page as dirty.
@@ -153,6 +164,9 @@ std::pair<int, int> Table::insert(Columns columns) {
 }
 
 void Table::update(int page, int slot, Columns columns) {
+    Logger::log(VERBOSE, "Table: updating record from page %d slot %d\n", page,
+                slot);
+
     checkInit();
     validateSlot(page, slot);
 
@@ -165,7 +179,7 @@ void Table::update(int page, int slot, Columns columns) {
     }
 
     PageHandle *handle = getHandle(page);
-    char *start = IO::load(handle) + slot * RECORD_SLOT_SIZE;
+    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
 
     // Mark dirty.
@@ -173,6 +187,9 @@ void Table::update(int page, int slot, Columns columns) {
 }
 
 void Table::remove(int page, int slot) {
+    Logger::log(VERBOSE, "Table: removing record from page %d slot %d\n", page,
+                slot);
+
     checkInit();
     validateSlot(page, slot);
 
@@ -192,6 +209,8 @@ void Table::close() {
     if (!initialized) {
         return;
     }
+    Logger::log(VERBOSE, "Table: closing table\n");
+
     IO::close(fd);
     for (int i = 0; i < MAX_PAGE_PER_TABLE; i++) {
         if (handles[i] != nullptr) {
@@ -209,7 +228,7 @@ int Table::getColumn(const char *name) {
 }
 
 PageHandle *Table::getHandle(int page) {
-    if (handles[page] != nullptr) {
+    if (handles[page] != nullptr && handles[page]->validate()) {
         return handles[page];
     }
     PageHandle handle = IO::getHandle(fd, page);
