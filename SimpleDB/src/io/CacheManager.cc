@@ -123,8 +123,9 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                     "page %d of file %d\n",
                     cache->meta.page, cache->meta.fd.value, page, fd.value);
 
-        // Write back the original cache.
-        writeBack(cache);
+        // Write back the original cache. Don't remove from list again as it has
+        // already done.
+        writeBack(cache, /*removeFromList=*/false);
     }
 
     // Now we can claim this cache slot.
@@ -196,7 +197,7 @@ void CacheManager::modify(const PageHandle &handle) {
     cache->dirty = true;
 }
 
-void CacheManager::writeBack(PageCache *cache) {
+void CacheManager::writeBack(PageCache *cache, bool removeFromList) {
     // As we are dealing with a valid pointer to the cache, we assume that the
     // descriptor is valid.
     Logger::log(VERBOSE, "CacheManager: write back page %d of file %d\n",
@@ -208,7 +209,9 @@ void CacheManager::writeBack(PageCache *cache) {
 
     // Discard the cache and add it back to the free list.
     activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
-    activeCache.remove(cache->nodeInActiveCache);
+    if (removeFromList) {
+        activeCache.remove(cache->nodeInActiveCache);
+    }
     freeCache.insertHead(cache);
     // Don't forget to bump the generation number, as the previous cache is no
     // longer valid.

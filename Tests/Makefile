@@ -2,13 +2,13 @@ TEST_TARGET = SimpleDBTest
 
 MAKE = make
 CC = g++
-CXXFLAGS = -g -O2 -std=c++17
+CXXFLAGS = -g -O0 -std=c++17
 
 SRC_DIR = src
 BIN_DIR = bin
 OBJ_DIR = obj
 
-INCLUDE = -I../SimpleDB/include -I../googletest/googletest/include
+INCLUDE = -I../SimpleDB/include -I../SimpleDB/include/SimpleDB -I../googletest/googletest/include
 
 DB_LIB = ../SimpleDB/lib/libSimpleDB-Test.a
 GTEST_LIB = ../googletest/build/lib/libgtest.a
@@ -26,7 +26,7 @@ all: $(BIN_DIR)/$(TEST_TARGET)
 test: $(BIN_DIR)/$(TEST_TARGET)
 	@$(BIN_DIR)/$(TEST_TARGET)
 
-$(BIN_DIR)/$(TEST_TARGET): $(TEST_OBJS) $(DB_LIB) $(GTEST_LIB) | $(BIN_DIR) $(OBJ_DIR)
+$(BIN_DIR)/$(TEST_TARGET): $(DB_LIB) $(GTEST_LIB) $(TEST_OBJS) | $(BIN_DIR) $(OBJ_DIR)
 	$(CC) $(CXXFLAGS) $(LIBS) $^ -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
@@ -49,4 +49,6 @@ $(OBJ_DIR):
 
 .PHONY: clean
 clean:
+	- $(MAKE) -C ../SimpleDB clean
+	- $(MAKE) -C ../googletest/build clean
 	- rm -r $(BIN_DIR) $(OBJ_DIR)

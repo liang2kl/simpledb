@@ -44,10 +44,12 @@ public:
         node->prev->next = node->next;
         if (node != head) {
             node->next->prev = node->prev;
+        } else {
+            head = node->prev;
         }
 
         T *data = node->data;
-        // delete node;
+        delete node;
         _size--;
 
         return data;

@@ -7,10 +7,13 @@ endif
 
 ifeq ($(DEBUG), true)
 	FLAGS += -D_DEBUG
+	CXXFLAGS += -O0 -g
+else
+	CXXFLAGS += -O2
 endif
 
 CC = g++
-CXXFLAGS = -g -O2 -std=c++17
+CXXFLAGS += -std=c++17
 AR = ar
 
 SRC_DIR = src

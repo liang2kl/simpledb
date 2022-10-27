@@ -7,5 +7,6 @@
 #include "Logger.h"
 #include "Macros.h"
 #include "PageHandle.h"
+#include "Table.h"
 
 #endif
