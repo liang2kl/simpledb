@@ -25,14 +25,14 @@ TEST_F(FileManagerTest, TestCreateRemoveFile) {
         // Remove files before testing.
         std::filesystem::remove(filePath);
 
-        EXPECT_NO_THROW(manager.createFile(filePath));
+        ASSERT_NO_THROW(manager.createFile(filePath));
         EXPECT_TRUE(std::filesystem::exists(filePath))
             << "Fail to create file " << filePath;
 
         FileDescriptor fd = manager.openFile(filePath);
 
-        EXPECT_NO_THROW(manager.closeFile(fd));
-        EXPECT_NO_THROW(manager.deleteFile(filePath));
+        ASSERT_NO_THROW(manager.closeFile(fd));
+        ASSERT_NO_THROW(manager.deleteFile(filePath));
         EXPECT_FALSE(std::filesystem::exists(filePath))
             << "Fail to delete file " << filePath;
         ;
@@ -45,16 +45,16 @@ TEST_F(FileManagerTest, TestWriteReadPage) {
     buf[PAGE_SIZE - 2] = 0x36;
 
     const char filePath[] = "tmp/file-rw";
-    EXPECT_NO_THROW(manager.createFile(filePath));
+    ASSERT_NO_THROW(manager.createFile(filePath));
     ASSERT_TRUE(std::filesystem::exists(filePath))
         << "Fail to create file " << filePath;
 
     FileDescriptor fd = manager.openFile(filePath);
 
-    EXPECT_NO_THROW(manager.writePage(fd, 2, buf));
+    ASSERT_NO_THROW(manager.writePage(fd, 2, buf));
 
     char readBuf[PAGE_SIZE];
-    EXPECT_NO_THROW(manager.readPage(fd, 2, readBuf));
+    ASSERT_NO_THROW(manager.readPage(fd, 2, readBuf));
 
     EXPECT_EQ(memcmp(buf, readBuf, PAGE_SIZE), 0)
         << "Read data mismatch with written data";
@@ -78,10 +78,10 @@ TEST_F(FileManagerTest, TestExceedFiles) {
 
     char filePath[] = "tmp/file-overflow";
 
-    EXPECT_NO_THROW(manager.createFile(filePath));
+    ASSERT_NO_THROW(manager.createFile(filePath));
     EXPECT_THROW(manager.openFile(filePath), Error::OpenFileExceededError)
         << "Open files exceeded but not thrown";
-    EXPECT_NO_THROW(manager.deleteFile(filePath));
+    ASSERT_NO_THROW(manager.deleteFile(filePath));
 }
 
 TEST_F(FileManagerTest, TestInvalidFileDescriptor) {
@@ -104,13 +104,13 @@ TEST_F(FileManagerTest, TestInvalidFileDescriptor) {
 
 TEST_F(FileManagerTest, TestInvalidPageNumber) {
     const char filePath[] = "tmp/file";
-    EXPECT_NO_THROW(manager.createFile(filePath));
+    ASSERT_NO_THROW(manager.createFile(filePath));
 
     FileDescriptor fd;
-    EXPECT_NO_THROW(fd = manager.openFile(filePath));
+    ASSERT_NO_THROW(fd = manager.openFile(filePath));
 
     char buf[PAGE_SIZE];
 
     EXPECT_THROW(manager.readPage(fd, -1, buf), Error::InvalidPageNumberError);
-    EXPECT_NO_THROW(manager.deleteFile(filePath));
+    ASSERT_NO_THROW(manager.deleteFile(filePath));
 }

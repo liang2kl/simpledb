@@ -29,11 +29,11 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
     PageHandle handle = coordinator.getHandle(fd, 2);
 
     memcpy(coordinator.load(&handle), buf, PAGE_SIZE);
-    EXPECT_NO_THROW(coordinator.modify(handle));
+    ASSERT_NO_THROW(coordinator.modify(handle));
 
-    EXPECT_NO_THROW(coordinator.closeFile(fd));
-    EXPECT_NO_THROW(fd = coordinator.openFile(filePath));
-    EXPECT_NO_THROW(handle = coordinator.getHandle(fd, 2));
+    ASSERT_NO_THROW(coordinator.closeFile(fd));
+    ASSERT_NO_THROW(fd = coordinator.openFile(filePath));
+    ASSERT_NO_THROW(handle = coordinator.getHandle(fd, 2));
 
     EXPECT_EQ(memcmp(buf, coordinator.load(&handle), PAGE_SIZE), 0)
         << "Read data mismatch with written data";
@@ -48,7 +48,7 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
 
 TEST_F(FileCoordinatorTest, TestRenewHandle) {
     const char filePath[] = "tmp/file-rw";
-    EXPECT_NO_THROW(coordinator.createFile(filePath));
+    ASSERT_NO_THROW(coordinator.createFile(filePath));
     ASSERT_TRUE(std::filesystem::exists(filePath))
         << "Fail to create file " << filePath;
 

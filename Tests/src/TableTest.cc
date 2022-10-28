@@ -113,12 +113,12 @@ TEST_F(TableTest, TestUpdate) {
     };
 
     std::pair<int, int> slotPair;
-    EXPECT_NO_THROW(slotPair = table.insert(testColumns));
+    ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
-    EXPECT_NO_THROW(table.update(slotPair.first, slotPair.second, newColumns));
+    ASSERT_NO_THROW(table.update(slotPair.first, slotPair.second, newColumns));
 
     Column readColumns[3];
-    EXPECT_NO_THROW(table.get(slotPair.first, slotPair.second, readColumns));
+    ASSERT_NO_THROW(table.get(slotPair.first, slotPair.second, readColumns));
     compareColumns(newColumns, readColumns);
 }
 
@@ -126,11 +126,11 @@ TEST_F(TableTest, TestRemove) {
     initTable();
 
     std::pair<int, int> slotPair;
-    EXPECT_NO_THROW(slotPair = table.insert(testColumns));
+    ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
     PageHandle handle = PF::getHandle(table.fd, slotPair.first);
 
-    EXPECT_NO_THROW(table.remove(slotPair.first, slotPair.second));
+    ASSERT_NO_THROW(table.remove(slotPair.first, slotPair.second));
     EXPECT_FALSE(table.occupied(handle, slotPair.second));
     EXPECT_THROW(table.get(slotPair.first, slotPair.second, nullptr),
                  Error::InvalidSlotError);
