@@ -22,11 +22,15 @@ enum DataType {
 struct Column {
     DataType type;
     ColumnSizeType size;
+    bool isNull = false;
     char data[MAX_COLUMN_SIZE];
 
     int deserializeInt();
     float deserializeFloat();
     void deserializeVarchar(char *dest);
+
+    // Initialize a null column.
+    static Column nullColumn(DataType type, ColumnSizeType size);
 
     // Convenienve constructors.
     Column(int data);
@@ -39,7 +43,11 @@ struct Column {
 struct ColumnMeta {
     DataType type;
     ColumnSizeType size;
+    bool nullable;
     char name[MAX_COLUMN_NAME_LEN];
+
+    bool hasDefault;
+    char defaultValue[MAX_COLUMN_SIZE];
 };
 
 using Columns = Column *;
@@ -53,15 +61,25 @@ public:
     Table() = default;
     ~Table();
 
+    // Open the table from a file, which must be created by `create()` before.
     void open(const std::string &file) noexcept(false);
+
+    // Create a new table in a file.
     void create(const std::string &file, const std::string &name, int numColumn,
                 ColumnMeta *columns) noexcept(false);
 
+    // Get record.
     void get(int page, int slot, Columns columns);
+
+    // Insert record, returns (page, slot) of the inserted record.
     std::pair<int, int> insert(Columns columns);
+
+    // Update record.
+    // TODO: Partial update.
     void update(int page, int slot, Columns columns);
+
+    // Remove record.
     void remove(int page, int slot);
-    // void addColumn(ColumnMeta column);
 
     void close();
 
@@ -105,6 +123,10 @@ private:
     // The metadata should be fit into the first slot.
     static_assert(sizeof(TableMeta) < PAGE_SIZE);
     static_assert(sizeof(PageMeta) < RECORD_SLOT_SIZE);
+
+    struct RecordMeta {
+        uint16_t nullBitmap;
+    };
 
     bool initialized = false;
     FileDescriptor fd;

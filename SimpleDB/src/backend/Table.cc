@@ -104,22 +104,32 @@ void Table::create(const std::string &file, const std::string &name,
         // Validate column meta.
         if (columns[i].size > MAX_COLUMN_SIZE) {
             Logger::log(ERROR,
-                        "Table: column %d has size %d, which is larger than "
+                        "Table: insert failed: column %d has size %d, which is "
+                        "larger than "
                         "maximum size %d\n",
                         i, columns[i].size, MAX_COLUMN_SIZE);
             throw Error::InvalidColumnSizeError();
         }
+
+        if (columnNameMap.find(columns[i].name) != columnNameMap.end()) {
+            Logger::log(ERROR,
+                        "Table: insert failed: duplicate column name %s\n",
+                        columns[i].name);
+            throw Error::DuplicateColumnNameError();
+        }
+
+        // TODO: Validate size
         meta.columns[i] = columns[i];
         columnNameMap[columns[i].name] = i;
 
         totalSize += columns[i].size;
     }
 
-    if (totalSize > MAX_COLUMN_SIZE) {
+    if (totalSize > RECORD_SLOT_SIZE - sizeof(RecordMeta)) {
         Logger::log(ERROR,
                     "Table: total size of columns is %d, which is larger than "
                     "maximum size %d\n",
-                    totalSize, MAX_COLUMN_SIZE);
+                    totalSize, RECORD_SLOT_SIZE - int(sizeof(RecordMeta)));
         throw Error::InvalidColumnSizeError();
     }
 
@@ -237,7 +247,7 @@ void Table::remove(int page, int slot) {
     // Mark the slot as unoccupied.
     pageMeta->occupied &= ~(1L << slot);
 
-    if (pageMeta->occupied == 0x0) {
+    if ((pageMeta->occupied & SLOT_OCCUPY_MASK) == 0) {
         // TODO: If the page is empty, we can free it.
     }
 
@@ -303,32 +313,71 @@ void Table::checkInit() {
 }
 
 void Table::deserialize(const char *srcData, Columns destObjects) {
+    // First, fetch record meta.
+    RecordMeta *recordMeta = (RecordMeta *)srcData;
+    srcData += sizeof(RecordMeta);
+
     for (int i = 0; i < meta.numColumn; i++) {
-        destObjects[i].size = meta.columns[i].size;
-        destObjects[i].type = meta.columns[i].type;
-        // We must copy the data here as we are directly using the buffer, which
-        // can be invalidated.
-        memcpy(destObjects[i].data, srcData, destObjects[i].size);
+        Column &column = destObjects[i];
+        column.size = meta.columns[i].size;
+        column.type = meta.columns[i].type;
+
+        if (recordMeta->nullBitmap & (1L << i)) {
+            // The column is null.
+#ifdef _DEBUG
+            if (!meta.columns[i].nullable) {
+                Logger::log(ERROR,
+                            "Table: internal error: column %s is not nullable, "
+                            "but a null value is found\n",
+                            meta.columns[i].name);
+                throw Error::NullValueFoundInNotNullColumnError();
+            }
+#endif
+            column.isNull = true;
+        } else {
+            // We must copy the data here as we are directly using the buffer,
+            // which can be invalidated.
+            memcpy(column.data, srcData, column.size);
+            column.isNull = false;
+        }
+
         srcData += meta.columns[i].size;
     }
 }
 
 void Table::serialize(const Columns srcObjects, char *destData) {
+    RecordMeta *recordMeta = (RecordMeta *)destData;
+    destData += sizeof(RecordMeta);
+
     for (int i = 0; i < meta.numColumn; i++) {
-        if (srcObjects[i].type != meta.columns[i].type) {
+        const Column &column = srcObjects[i];
+        if (column.type != meta.columns[i].type) {
             Logger::log(ERROR,
                         "Table: column type mismatch when serializing data of "
                         "column %d: expected %d, actual %d\n",
-                        i, meta.columns[i].type, srcObjects[i].type);
+                        i, meta.columns[i].type, column.type);
             throw Error::ColumnSerializationError();
-        } else if (srcObjects[i].size != meta.columns[i].size) {
+        } else if (column.size != meta.columns[i].size) {
             Logger::log(ERROR,
                         "Table: column size mismatch when serializing data of "
                         "column %d: expected %d, actual %d\n",
-                        i, meta.columns[i].size, srcObjects[i].size);
+                        i, meta.columns[i].size, column.size);
             throw Error::ColumnSerializationError();
         }
-        memcpy(destData, srcObjects[i].data, srcObjects[i].size);
+
+        if (column.isNull) {
+            if (!meta.columns[i].nullable) {
+                Logger::log(ERROR,
+                            "Table: column %s is not nullable, but a null "
+                            "value is given\n",
+                            meta.columns[i].name);
+                throw Error::NullValueGivenForNotNullColumnError();
+            }
+            recordMeta->nullBitmap |= (1L << i);
+        } else {
+            recordMeta->nullBitmap &= ~(1L << i);
+            memcpy(destData, column.data, column.size);
+        }
         destData += srcObjects[i].size;
     }
 }
@@ -439,6 +488,14 @@ void Column::deserializeVarchar(char *dest) {
         throw Error::ColumnSerializationError();
     }
     memcpy(dest, data, size);
+}
+
+Column Column::nullColumn(DataType type, ColumnSizeType size) {
+    Column column;
+    column.type = type;
+    column.size = size;
+    column.isNull = true;
+    return column;
 }
 
 Column::Column(int data) {
