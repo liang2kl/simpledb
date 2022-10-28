@@ -3,24 +3,27 @@
 
 namespace SimpleDB {
 const int PAGE_SIZE = 8192;
-const int NUM_BUFFER_PAGE = 60000;
+const int NUM_BUFFER_PAGE = 1024;
 
-const int MAX_VARCHAR_LEN = 128;
-const int MAX_COLUMNS = 16;
+const int MAX_VARCHAR_LEN = 256;
 const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN;
+const int MAX_COLUMNS = 16;
 const int MAX_COLUMN_NAME_LEN = 64;
+const int MAX_TABLE_NAME_LEN = 64;
 
 // Can be fit into a single page.
-const int RECORD_SLOT_SIZE = MAX_VARCHAR_LEN * MAX_COLUMNS;
-const int NUM_SLOT_PER_PAGE = PAGE_SIZE / RECORD_SLOT_SIZE;
-// Should update when NUM_SLOT_PER_PAGE changes.
-const int SLOT_OCCUPY_MASK = 0x0000000F;
-const int MAX_PAGE_PER_TABLE = 1500;
-const int MAX_RECORD_PER_TABLE = NUM_SLOT_PER_PAGE * MAX_PAGE_PER_TABLE;
-
+const int RECORD_SLOT_SIZE = 512;
 static_assert(RECORD_SLOT_SIZE <= PAGE_SIZE);
 
-const uint64_t TABLE_META_CANARY = 81249122;
+const int NUM_SLOT_PER_PAGE = PAGE_SIZE / RECORD_SLOT_SIZE;
+// Should update when NUM_SLOT_PER_PAGE changes.
+const int SLOT_OCCUPY_MASK = 0b1111111111111110;
+static_assert((SLOT_OCCUPY_MASK & 1) == 0);
+const int16_t SLOT_FULL_MASK = 0xFFFF;
+
+const uint16_t TABLE_META_CANARY = 0xDDBB;
+const uint16_t PAGE_META_CANARY = 0xDBDB;
+
 }  // namespace SimpleDB
 
 #endif

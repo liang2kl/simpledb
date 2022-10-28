@@ -1,8 +1,10 @@
 ifeq ($(TESTING), true)
 	LIB_TARGET = libSimpleDB-Test.a
 	FLAGS += -DTESTING
+	OBJ_SUFFIX = .test.o
 else
 	LIB_TARGET = libSimpleDB.a
+	OBJ_SUFFIX = .o
 endif
 
 ifeq ($(DEBUG), true)
@@ -21,7 +23,7 @@ LIB_DIR = lib
 INCLUDE_DIR = include/SimpleDB
 
 SRC_FILES = $(shell find $(SRC_DIR) -type f -name "*.cc")
-OBJS = $(foreach file,$(SRC_FILES),$(dir $(file))obj/$(notdir $(basename $(file))).o)
+OBJS = $(foreach file,$(SRC_FILES),$(dir $(file))obj/$(notdir $(basename $(file)))$(OBJ_SUFFIX))
 HEADERS = $(shell find $(INCLUDE_DIR) -name '*.h')
 INCLUDE = -I$(INCLUDE_DIR)
 
@@ -33,7 +35,7 @@ $(LIB_DIR)/$(LIB_TARGET): $(OBJS) | $(LIB_DIR)
 	$(AR) rcs $@ $^
 
 define make-goal
-$1obj/%.o: $1%.cc $(HEADERS)
+$1obj/%$(OBJ_SUFFIX): $1%.cc $(HEADERS)
 	@mkdir -p $1/obj
 	$(CC) $(INCLUDE) $(CXXFLAGS) $(FLAGS) -c $$< -o $$@
 endef

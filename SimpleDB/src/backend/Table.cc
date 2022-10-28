@@ -9,12 +9,6 @@
 
 namespace SimpleDB {
 
-Table::Table() {
-    for (int i = 0; i < MAX_PAGE_PER_TABLE; i++) {
-        handles[i] = nullptr;
-    }
-}
-
 Table::~Table() { close(); }
 
 void Table::open(const std::string &file) {
@@ -58,8 +52,8 @@ void Table::open(const std::string &file) {
     initialized = true;
 }
 
-void Table::create(const std::string &file, int numColumn,
-                   ColumnMeta *columns) {
+void Table::create(const std::string &file, const std::string &name,
+                   int numColumn, ColumnMeta *columns) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 
@@ -68,6 +62,14 @@ void Table::create(const std::string &file, int numColumn,
                     "Table: table is already initailized, but attempting to "
                     "re-initialize an empty table to %s\n",
                     file.c_str());
+    }
+
+    if (numColumn > MAX_COLUMNS) {
+        Logger::log(
+            ERROR,
+            "Table: fail to create table: too many columns: %d, max %d\n",
+            numColumn, MAX_COLUMNS);
+        throw Error::TooManyColumnsError();
     }
 
     try {
@@ -84,8 +86,20 @@ void Table::create(const std::string &file, int numColumn,
         throw Error::CreateTableError();
     }
 
-    meta.numColumn = numColumn;
+    if (name.size() > MAX_TABLE_NAME_LEN) {
+        Logger::log(
+            ERROR,
+            "Table: fail to create table to %s: table name %s too long\n",
+            file.c_str(), name.c_str());
+        throw Error::CreateTableError();
+    }
 
+    meta.firstFree = 1;
+    meta.numUsedPages = 1;
+    meta.numColumn = numColumn;
+    strcpy(meta.name, name.c_str());
+
+    int totalSize = 0;
     for (int i = 0; i < numColumn; i++) {
         // Validate column meta.
         if (columns[i].size > MAX_COLUMN_SIZE) {
@@ -97,6 +111,16 @@ void Table::create(const std::string &file, int numColumn,
         }
         meta.columns[i] = columns[i];
         columnNameMap[columns[i].name] = i;
+
+        totalSize += columns[i].size;
+    }
+
+    if (totalSize > MAX_COLUMN_SIZE) {
+        Logger::log(ERROR,
+                    "Table: total size of columns is %d, which is larger than "
+                    "maximum size %d\n",
+                    totalSize, MAX_COLUMN_SIZE);
+        throw Error::InvalidColumnSizeError();
     }
 
     flushMeta();
@@ -109,6 +133,12 @@ void Table::flushMeta() {
     PF::modify(handle);
 }
 
+void Table::flushPageMeta(int page, const PageMeta &meta) {
+    PageHandle handle = PF::getHandle(fd, page);
+    memcpy(PF::loadRaw(handle), &meta, sizeof(PageMeta));
+    PF::modify(handle);
+}
+
 void Table::get(int page, int slot, Columns columns) {
     Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", page,
                 slot);
@@ -116,14 +146,16 @@ void Table::get(int page, int slot, Columns columns) {
     checkInit();
     validateSlot(page, slot);
 
-    if (!occupied(page, slot)) {
+    PageHandle *handle = getHandle(page);
+
+    if (!occupied(*handle, slot)) {
         Logger::log(
             ERROR,
             "Table: fail to get record: page %d slot %d is not occupied\n",
             page, slot);
         throw Error::InvalidSlotError();
     }
-    PageHandle *handle = getHandle(page);
+
     char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     deserialize(start, columns);
 }
@@ -136,13 +168,6 @@ std::pair<int, int> Table::insert(Columns columns) {
     int page = slotPair.first;
     int slot = slotPair.second;
 
-    if (page == -1) {
-        Logger::log(
-            ERROR,
-            "Table: fail to insert record: fail to find an empty slot\n");
-        throw Error::SlotFullError();
-    }
-
     Logger::log(VERBOSE, "Table: insert record to page %d slot %d\n", page,
                 slot);
 
@@ -153,9 +178,7 @@ std::pair<int, int> Table::insert(Columns columns) {
     // Mark the page as dirty.
     PF::modify(*handle);
 
-    // Update metadata.
-    meta.occupied[page] |= (1L << slot);
-    flushMeta();
+    // We don't need to flush meta here.
 
     return slotPair;
 }
@@ -167,7 +190,9 @@ void Table::update(int page, int slot, Columns columns) {
     checkInit();
     validateSlot(page, slot);
 
-    if (!occupied(page, slot)) {
+    PageHandle *handle = getHandle(page);
+
+    if (!occupied(*handle, slot)) {
         Logger::log(
             ERROR,
             "Table: fail to update record: page %d slot %d is not occupied\n",
@@ -175,7 +200,6 @@ void Table::update(int page, int slot, Columns columns) {
         throw Error::InvalidSlotError();
     }
 
-    PageHandle *handle = getHandle(page);
     char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
 
@@ -190,7 +214,9 @@ void Table::remove(int page, int slot) {
     checkInit();
     validateSlot(page, slot);
 
-    if (!occupied(page, slot)) {
+    PageHandle *handle = getHandle(page);
+
+    if (!occupied(*handle, slot)) {
         Logger::log(
             ERROR,
             "Table: fail to remove record: page %d slot %d is not occupied\n",
@@ -198,8 +224,25 @@ void Table::remove(int page, int slot) {
         throw Error::InvalidSlotError();
     }
 
-    meta.occupied[page] &= ~(1L << slot);
-    flushMeta();
+    PageMeta *pageMeta = (PageMeta *)PF::loadRaw(*handle);
+
+    // Check previous occupation.
+    if (pageMeta->occupied == SLOT_FULL_MASK) {
+        // The page now will have an empty slot. Add it to the free list.
+        pageMeta->nextFree = meta.firstFree;
+        meta.firstFree = page;
+        flushMeta();
+    }
+
+    // Mark the slot as unoccupied.
+    pageMeta->occupied &= ~(1L << slot);
+
+    if (pageMeta->occupied == 0x0) {
+        // TODO: If the page is empty, we can free it.
+    }
+
+    // As we are dealing with the pointer directly, we don't need to flush.
+    assert(handle->validate());
 }
 
 void Table::close() {
@@ -209,28 +252,47 @@ void Table::close() {
     Logger::log(VERBOSE, "Table: closing table\n");
 
     PF::close(fd);
-    for (int i = 0; i < MAX_PAGE_PER_TABLE; i++) {
-        if (handles[i] != nullptr) {
-            delete handles[i];
-            handles[i] = nullptr;
+    for (auto &iter : pageHandleMap) {
+        if (iter.second != nullptr) {
+            delete iter.second;
         }
     }
+
     initialized = false;
     columnNameMap.clear();
+    pageHandleMap.clear();
 }
 
-int Table::getColumn(const char *name) {
+int Table::getColumnIndex(const char *name) {
     auto iter = columnNameMap.find(name);
     return iter == columnNameMap.end() ? -1 : iter->second;
 }
 
-PageHandle *Table::getHandle(int page) {
-    if (handles[page] != nullptr && handles[page]->validate()) {
-        return handles[page];
+void Table::getColumnName(int index, char *name) {
+    if (index < 0 || index >= meta.numColumn) {
+        Logger::log(ERROR, "Table: column index %d out of range [0, %d)\n",
+                    index, meta.numColumn);
+        throw Error::InvalidColumnIndexError();
     }
+    strcpy(name, meta.columns[index].name);
+}
+
+PageHandle *Table::getHandle(int page) {
+    auto iter = pageHandleMap.find(page);
+    if (iter != pageHandleMap.end()) {
+        if (iter->second->validate()) {
+            return iter->second;
+        } else {
+            delete iter->second;
+            // Fall through to create a new handle.
+        }
+    }
+
     PageHandle handle = PF::getHandle(fd, page);
-    handles[page] = new PageHandle(handle);
-    return handles[page];
+    // Create a handle in the heap to allow updating in PF::read().
+    PageHandle *newHandle = new PageHandle(handle);
+    pageHandleMap[page] = newHandle;
+    return newHandle;
 }
 
 void Table::checkInit() {
@@ -271,29 +333,84 @@ void Table::serialize(const Columns srcObjects, char *destData) {
     }
 }
 
-bool Table::occupied(int page, int slot) {
-    return meta.occupied[page] & (1L << slot);
+bool Table::occupied(const PageHandle &handle, int slot) {
+    PageMeta *meta = (PageMeta *)PF::loadRaw(handle);
+    return meta->occupied & (1L << slot);
 }
 
 void Table::validateSlot(int page, int slot) {
-    bool valid = page > 0 && page < MAX_PAGE_PER_TABLE;
+    // The first slot of each page (except 0) is for metadata.
+    bool valid = page >= 1 && page < meta.numUsedPages && slot >= 1 &&
+                 slot < NUM_SLOT_PER_PAGE;
     if (!valid) {
-        Logger::log(ERROR,
-                    "Table: page %d is not valid, must be in range [1, %d)\n",
-                    page, MAX_PAGE_PER_TABLE);
+        Logger::log(
+            ERROR,
+            "Table: page/slot pair (%d, %d) is not valid, must be in range [0, "
+            "%d) X [1, %d)\n",
+            page, slot, meta.numUsedPages, NUM_SLOT_PER_PAGE);
         throw Error::InvalidSlotError();
     }
 }
 
 std::pair<int, int> Table::getEmptySlot() {
-    for (int i = 1; i < MAX_PAGE_PER_TABLE; i++) {
-        int index = ffs(int(~meta.occupied[i]) & SLOT_OCCUPY_MASK);
-        if (index == 0) {
-            continue;
+    if (meta.numUsedPages == meta.firstFree) {
+        // All pages are full, create a new page.
+        Logger::log(VERBOSE,
+                    "Table: all pages are full, creating a new page %d\n",
+                    meta.firstFree);
+
+        PageMeta pageMeta;
+        pageMeta.nextFree = meta.firstFree + 1;
+        pageMeta.occupied =
+            0b11;  // The first slot (starting from 2) is now occupied.
+
+        flushPageMeta(meta.firstFree, pageMeta);
+
+        meta.numUsedPages++;
+        // The firstFree of table remain unchanged.
+
+        return std::make_pair(meta.firstFree, 1);
+    } else {
+        // One of the allocated pages has empty slots.
+        Logger::log(VERBOSE, "Table: got first free page %d\n", meta.firstFree);
+
+        int page = meta.firstFree;
+        PageHandle *handle = getHandle(page);
+        PageMeta *pageMeta = (PageMeta *)(PF::loadRaw(*handle));
+
+        if (pageMeta->headCanary != PAGE_META_CANARY ||
+            pageMeta->tailCanary != PAGE_META_CANARY) {
+            Logger::log(ERROR,
+                        "Table: page %d meta corrupted: head canary %d, tail "
+                        "canary %d\n",
+                        page, pageMeta->headCanary, pageMeta->tailCanary);
+            throw Error::InvalidPageMetaError();
         }
-        return std::make_pair(i, index - 1);
+
+        int index = ffs(int(~pageMeta->occupied) & SLOT_OCCUPY_MASK);
+
+        if (index == 0) {
+            Logger::log(
+                ERROR, "Table: page %d is full but not marked as full\n", page);
+            throw Error::InvalidPageMetaError();
+        }
+
+        index--;
+
+        pageMeta->occupied |= (1L << index);
+
+        if (pageMeta->occupied == SLOT_FULL_MASK) {
+            // This page is full, modify meta.
+            meta.firstFree = pageMeta->nextFree;
+            flushMeta();
+        }
+
+        // Mark the page as dirty.
+        assert(handle->validate());
+        PF::modify(*handle);
+
+        return std::make_pair(page, index);
     }
-    return std::make_pair(-1, -1);
 }
 
 // ==== Column ====
@@ -322,7 +439,6 @@ void Column::deserializeVarchar(char *dest) {
         throw Error::ColumnSerializationError();
     }
     memcpy(dest, data, size);
-    dest[size] = '\0';
 }
 
 Column::Column(int data) {

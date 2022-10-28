@@ -29,8 +29,11 @@ protected:
         Column(testVarChar, 100),
     };
 
+    const char *tableName = "table_name";
+
     void initTable() {
-        ASSERT_NO_THROW(table.create("tmp/table", numColumn, columnMetas));
+        ASSERT_NO_THROW(
+            table.create("tmp/table", tableName, numColumn, columnMetas));
     }
 
     void compareColumns(Column *columns, Column *readColumns) {
@@ -61,12 +64,7 @@ TEST_F(TableTest, TestCreateNewTable) {
     initTable();
 
     EXPECT_EQ(table.meta.numColumn, numColumn);
-    for (int page = 1; page < MAX_PAGE_PER_TABLE; page++) {
-        EXPECT_EQ(table.meta.occupied[page], 0);
-        for (int slot = 0; slot < NUM_SLOT_PER_PAGE; slot++) {
-            EXPECT_EQ(table.occupied(page, slot), false);
-        }
-    }
+    EXPECT_EQ(strcmp(tableName, table.meta.name), 0);
 }
 
 TEST_F(TableTest, TestCloseReset) {
@@ -86,18 +84,22 @@ TEST_F(TableTest, TestInsertGet) {
     initTable();
 
     // Write a few pages.
-    for (int i = 0; i < 3 * NUM_SLOT_PER_PAGE; i++) {
-        std::pair<int, int> slotPair;
-        ASSERT_NO_THROW(slotPair = table.insert(testColumns));
+    for (int page = 1; page <= 3; page++) {
+        for (int i = 0; i < NUM_SLOT_PER_PAGE - 1; i++) {
+            std::pair<int, int> slotPair;
+            ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
-        Column readColumns[3];
-        ASSERT_NO_THROW(
-            table.get(slotPair.first, slotPair.second, readColumns));
-        compareColumns(testColumns, readColumns);
+            Column readColumns[3];
+            ASSERT_NO_THROW(
+                table.get(slotPair.first, slotPair.second, readColumns));
+            compareColumns(testColumns, readColumns);
 
-        // Check if the meta is flushed.
-        EXPECT_TRUE(table.meta.occupied[slotPair.first] &
-                    (1 << slotPair.second));
+            // Check if the meta is flushed.
+            PageHandle handle = PF::getHandle(table.fd, slotPair.first);
+            EXPECT_TRUE(table.occupied(handle, slotPair.second));
+        }
+
+        EXPECT_EQ(table.meta.firstFree, page + 1);
     }
 }
 
@@ -126,15 +128,44 @@ TEST_F(TableTest, TestRemove) {
     std::pair<int, int> slotPair;
     EXPECT_NO_THROW(slotPair = table.insert(testColumns));
 
+    PageHandle handle = PF::getHandle(table.fd, slotPair.first);
+
     EXPECT_NO_THROW(table.remove(slotPair.first, slotPair.second));
-    EXPECT_FALSE(table.occupied(slotPair.first, slotPair.second));
+    EXPECT_FALSE(table.occupied(handle, slotPair.second));
     EXPECT_THROW(table.get(slotPair.first, slotPair.second, nullptr),
                  Error::InvalidSlotError);
 }
 
+TEST_F(TableTest, TestReleasePage) {
+    initTable();
+
+    // Write two pages (1, 2).
+    for (int i = 0; i < 2 * (NUM_SLOT_PER_PAGE - 1); i++) {
+        ASSERT_NO_THROW(table.insert(testColumns));
+    }
+
+    EXPECT_EQ(table.meta.firstFree, 3);
+
+    // Release a slot from the first page (1).
+    ASSERT_NO_THROW(table.remove(1, 1));
+
+    // The first free page should be 1.
+    ASSERT_EQ(table.meta.firstFree, 1);
+}
+
 TEST_F(TableTest, TestColumnName) {
     initTable();
+
+    char readName[MAX_COLUMN_NAME_LEN + 1];
+
     for (int i = 0; i < numColumn; i++) {
-        EXPECT_EQ(table.getColumn(columnMetas[i].name), i);
+        EXPECT_EQ(table.getColumnIndex(columnMetas[i].name), i);
+        EXPECT_NO_THROW(table.getColumnName(i, readName));
+        EXPECT_EQ(strcmp(readName, columnMetas[i].name), 0);
     }
+
+    EXPECT_THROW(table.getColumnName(-1, readName),
+                 Error::InvalidColumnIndexError);
+    EXPECT_THROW(table.getColumnName(numColumn, readName),
+                 Error::InvalidColumnIndexError);
 }
