@@ -29,7 +29,7 @@ protected:
     const char *testVarChar = "Hello, world";
 
     Column testColumns[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                             Column::nullColumn(INT, 4)};
+                             Column::nullIntColumn()};
 
     const char *tableName = "table_name";
 
@@ -38,8 +38,8 @@ protected:
             table.create("tmp/table", tableName, numColumn, columnMetas));
     }
 
-    void compareColumns(Column *columns, Column *readColumns) {
-        for (int i = 0; i < numColumn; i++) {
+    void compareColumns(Column *columns, Column *readColumns, int num) {
+        for (int i = 0; i < num; i++) {
             EXPECT_EQ(columns[i].type, readColumns[i].type);
             EXPECT_EQ(columns[i].size, readColumns[i].size);
             if (columns[i].isNull) {
@@ -109,7 +109,7 @@ TEST_F(TableTest, TestInsertGet) {
             Column readColumns[4];
             ASSERT_NO_THROW(
                 table.get(slotPair.first, slotPair.second, readColumns));
-            compareColumns(testColumns, readColumns);
+            compareColumns(testColumns, readColumns, numColumn);
 
             // Check if the meta is flushed.
             PageHandle handle = PF::getHandle(table.fd, slotPair.first);
@@ -123,19 +123,23 @@ TEST_F(TableTest, TestInsertGet) {
 TEST_F(TableTest, TestUpdate) {
     initTable();
 
-    Column newColumns[4] = {
-        Column(2), Column(3.1F), Column("Thank you!", 100),
+    // Partial update.
+    ColumnBitmap bitmap = 0b00001101;
+    Column newColumns[3] = {
+        Column(2), Column("Thank you!", 100),
         Column(4)  // Not null now
     };
 
     std::pair<int, int> slotPair;
     ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
-    ASSERT_NO_THROW(table.update(slotPair.first, slotPair.second, newColumns));
+    ASSERT_NO_THROW(
+        table.update(slotPair.first, slotPair.second, newColumns, bitmap));
 
-    Column readColumns[4];
-    ASSERT_NO_THROW(table.get(slotPair.first, slotPair.second, readColumns));
-    compareColumns(newColumns, readColumns);
+    Column readColumns[3];
+    ASSERT_NO_THROW(
+        table.get(slotPair.first, slotPair.second, readColumns, bitmap));
+    compareColumns(newColumns, readColumns, 3);
 }
 
 TEST_F(TableTest, TestRemove) {

@@ -149,7 +149,8 @@ void Table::flushPageMeta(int page, const PageMeta &meta) {
     PF::modify(handle);
 }
 
-void Table::get(int page, int slot, Columns columns) {
+void Table::get(int page, int slot, Columns columns,
+                ColumnBitmap columnBitmap) {
     Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", page,
                 slot);
 
@@ -167,7 +168,7 @@ void Table::get(int page, int slot, Columns columns) {
     }
 
     char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
-    deserialize(start, columns);
+    deserialize(start, columns, columnBitmap);
 }
 
 std::pair<int, int> Table::insert(Columns columns) {
@@ -183,7 +184,7 @@ std::pair<int, int> Table::insert(Columns columns) {
 
     PageHandle *handle = getHandle(page);
     char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
-    serialize(columns, start);
+    serialize(columns, start, COLUMN_BITMAP_ALL);
 
     // Mark the page as dirty.
     PF::modify(*handle);
@@ -193,7 +194,7 @@ std::pair<int, int> Table::insert(Columns columns) {
     return slotPair;
 }
 
-void Table::update(int page, int slot, Columns columns) {
+void Table::update(int page, int slot, Columns columns, ColumnBitmap bitmap) {
     Logger::log(VERBOSE, "Table: updating record from page %d slot %d\n", page,
                 slot);
 
@@ -211,7 +212,7 @@ void Table::update(int page, int slot, Columns columns) {
     }
 
     char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
-    serialize(columns, start);
+    serialize(columns, start, bitmap);
 
     // Mark dirty.
     PF::modify(*handle);
@@ -312,13 +313,21 @@ void Table::checkInit() {
     }
 }
 
-void Table::deserialize(const char *srcData, Columns destObjects) {
+void Table::deserialize(const char *srcData, Columns destObjects,
+                        ColumnBitmap bitmap) {
     // First, fetch record meta.
     RecordMeta *recordMeta = (RecordMeta *)srcData;
     srcData += sizeof(RecordMeta);
 
+    // Actual index of `destObjects`.
+    int index = 0;
     for (int i = 0; i < meta.numColumn; i++) {
-        Column &column = destObjects[i];
+        if ((bitmap & (ColumnBitmap(1) << i)) == 0) {
+            srcData += meta.columns[i].size;
+            continue;
+        }
+
+        Column &column = destObjects[index];
         column.size = meta.columns[i].size;
         column.type = meta.columns[i].type;
 
@@ -342,15 +351,23 @@ void Table::deserialize(const char *srcData, Columns destObjects) {
         }
 
         srcData += meta.columns[i].size;
+        index++;
     }
 }
 
-void Table::serialize(const Columns srcObjects, char *destData) {
+void Table::serialize(const Columns srcObjects, char *destData,
+                      ColumnBitmap bitmap) {
     RecordMeta *recordMeta = (RecordMeta *)destData;
     destData += sizeof(RecordMeta);
 
+    // The actual index in `srcObjects`.
+    int index = 0;
     for (int i = 0; i < meta.numColumn; i++) {
-        const Column &column = srcObjects[i];
+        if ((bitmap & (ColumnBitmap(1) << i)) == 0) {
+            destData += meta.columns[i].size;
+            continue;
+        }
+        const Column &column = srcObjects[index];
         if (column.type != meta.columns[i].type) {
             Logger::log(ERROR,
                         "Table: column type mismatch when serializing data of "
@@ -378,7 +395,9 @@ void Table::serialize(const Columns srcObjects, char *destData) {
             recordMeta->nullBitmap &= ~(1L << i);
             memcpy(destData, column.data, column.size);
         }
-        destData += srcObjects[i].size;
+
+        destData += meta.columns[i].size;
+        index++;
     }
 }
 
@@ -497,6 +516,12 @@ Column Column::nullColumn(DataType type, ColumnSizeType size) {
     column.isNull = true;
     return column;
 }
+
+Column Column::nullIntColumn() { return nullColumn(INT, 4); }
+Column Column::nullFloatColumn() { return nullColumn(FLOAT, 4); };
+Column Column::nullVarcharColumn(ColumnSizeType size) {
+    return nullColumn(VARCHAR, size);
+};
 
 Column::Column(int data) {
     size = 4;

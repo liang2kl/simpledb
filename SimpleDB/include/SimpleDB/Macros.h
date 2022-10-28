@@ -20,6 +20,7 @@ const int NUM_SLOT_PER_PAGE = PAGE_SIZE / RECORD_SLOT_SIZE;
 const int SLOT_OCCUPY_MASK = 0b11111110;
 static_assert((SLOT_OCCUPY_MASK & 1) == 0);
 const int16_t SLOT_FULL_MASK = 0x00FF;
+const int16_t COLUMN_BITMAP_ALL = 0xFF;
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
 const uint16_t PAGE_META_CANARY = 0xDBDB;

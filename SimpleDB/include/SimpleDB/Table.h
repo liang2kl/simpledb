@@ -31,6 +31,9 @@ struct Column {
 
     // Initialize a null column.
     static Column nullColumn(DataType type, ColumnSizeType size);
+    static Column nullIntColumn();
+    static Column nullFloatColumn();
+    static Column nullVarcharColumn(ColumnSizeType size);
 
     // Convenienve constructors.
     Column(int data);
@@ -51,6 +54,9 @@ struct ColumnMeta {
 };
 
 using Columns = Column *;
+using ColumnBitmap = int16_t;
+
+static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 
 // A Table holds the metadata of a certain table, which should be unique
 // thourghout the program, and be stored in memory once created for the sake of
@@ -69,14 +75,15 @@ public:
                 ColumnMeta *columns) noexcept(false);
 
     // Get record.
-    void get(int page, int slot, Columns columns);
+    void get(int page, int slot, Columns columns,
+             ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
     std::pair<int, int> insert(Columns columns);
 
     // Update record.
-    // TODO: Partial update.
-    void update(int page, int slot, Columns columns);
+    void update(int page, int slot, Columns columns,
+                ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Remove record.
     void remove(int page, int slot);
@@ -125,7 +132,7 @@ private:
     static_assert(sizeof(PageMeta) < RECORD_SLOT_SIZE);
 
     struct RecordMeta {
-        uint16_t nullBitmap;
+        ColumnBitmap nullBitmap;
     };
 
     bool initialized = false;
@@ -141,8 +148,9 @@ private:
 
     PageHandle *getHandle(int page);
 
-    void deserialize(const char *srcData, Columns destObjects);
-    void serialize(const Columns srcObjects, char *destData);
+    void deserialize(const char *srcData, Columns destObjects,
+                     ColumnBitmap columnBitmap);
+    void serialize(const Columns srcObjects, char *destData, ColumnBitmap map);
 
     // Must ensure that the handle is valid.
     bool occupied(const PageHandle &handle, int slot);
