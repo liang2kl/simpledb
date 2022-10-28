@@ -13,21 +13,23 @@ protected:
 
     Table table;
 
-    const int numColumn = 3;
+    const int numColumn = 4;
 
-    ColumnMeta columnMetas[3] = {
-        {INT, 4, "int_val"},
-        {FLOAT, 4, "float_val"},
-        {VARCHAR, 100, "varchar_val"},
+    ColumnMeta columnMetas[4] = {
+        {.type = INT, .size = 4, .nullable = false, .name = "int_val"},
+        {.type = FLOAT, .size = 4, .nullable = false, .name = "float_val"},
+        {.type = VARCHAR,
+         .size = 100,
+         .nullable = false,
+         .name = "varchar_val"},
+        // A nullable column.
+        {.type = INT, .size = 4, .nullable = true, .name = "int_val_nullable"},
     };
 
     const char *testVarChar = "Hello, world";
 
-    Column testColumns[3] = {
-        Column(1),
-        Column(1.1F),
-        Column(testVarChar, 100),
-    };
+    Column testColumns[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                             Column::nullColumn(INT, 4)};
 
     const char *tableName = "table_name";
 
@@ -40,6 +42,12 @@ protected:
         for (int i = 0; i < numColumn; i++) {
             EXPECT_EQ(columns[i].type, readColumns[i].type);
             EXPECT_EQ(columns[i].size, readColumns[i].size);
+            if (columns[i].isNull) {
+                EXPECT_TRUE(readColumns[i].isNull);
+                continue;
+            } else {
+                EXPECT_FALSE(readColumns[i].isNull);
+            }
             if (columns[i].type == VARCHAR) {
                 EXPECT_EQ(memcmp(columns[i].data, readColumns[i].data,
                                  strlen(columns[i].data)),
@@ -80,6 +88,15 @@ TEST_F(TableTest, TestInitFromInvalidFile) {
     EXPECT_THROW(table.open(fileName), Error::ReadTableError);
 }
 
+TEST_F(TableTest, TestInitWithDuplicateColumnName) {
+    ColumnMeta columnMetas[2] = {
+        {.type = INT, .size = 4, .name = "int_val"},
+        {.type = INT, .size = 4, .name = "int_val"},
+    };
+    EXPECT_THROW(table.create("tmp/table", tableName, 2, columnMetas),
+                 Error::DuplicateColumnNameError);
+}
+
 TEST_F(TableTest, TestInsertGet) {
     initTable();
 
@@ -89,7 +106,7 @@ TEST_F(TableTest, TestInsertGet) {
             std::pair<int, int> slotPair;
             ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
-            Column readColumns[3];
+            Column readColumns[4];
             ASSERT_NO_THROW(
                 table.get(slotPair.first, slotPair.second, readColumns));
             compareColumns(testColumns, readColumns);
@@ -106,10 +123,9 @@ TEST_F(TableTest, TestInsertGet) {
 TEST_F(TableTest, TestUpdate) {
     initTable();
 
-    Column newColumns[3] = {
-        Column(2),
-        Column(3.1F),
-        Column("Thank you!", 100),
+    Column newColumns[4] = {
+        Column(2), Column(3.1F), Column("Thank you!", 100),
+        Column(4)  // Not null now
     };
 
     std::pair<int, int> slotPair;
@@ -117,7 +133,7 @@ TEST_F(TableTest, TestUpdate) {
 
     ASSERT_NO_THROW(table.update(slotPair.first, slotPair.second, newColumns));
 
-    Column readColumns[3];
+    Column readColumns[4];
     ASSERT_NO_THROW(table.get(slotPair.first, slotPair.second, readColumns));
     compareColumns(newColumns, readColumns);
 }
