@@ -17,7 +17,7 @@ Table::Table() {
 
 Table::~Table() { close(); }
 
-void Table::initFromFile(const std::string &file) {
+void Table::open(const std::string &file) {
     Logger::log(VERBOSE, "Table: initializing table from %s\n", file.c_str());
 
     if (initialized) {
@@ -34,7 +34,6 @@ void Table::initFromFile(const std::string &file) {
         // The metadata is written in the first page.
         PageHandle handle = PF::getHandle(fd, 0);
         meta = *(TableMeta *)PF::loadRaw(handle);
-
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
                     fd.value);
@@ -59,8 +58,8 @@ void Table::initFromFile(const std::string &file) {
     initialized = true;
 }
 
-void Table::initEmpty(const std::string &file, int numColumn,
-                      ColumnMeta *columns) {
+void Table::create(const std::string &file, int numColumn,
+                   ColumnMeta *columns) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 

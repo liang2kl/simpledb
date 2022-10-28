@@ -30,7 +30,7 @@ protected:
     };
 
     void initTable() {
-        ASSERT_NO_THROW(table.initEmpty("tmp/table", numColumn, columnMetas));
+        ASSERT_NO_THROW(table.create("tmp/table", numColumn, columnMetas));
     }
 
     void compareColumns(Column *columns, Column *readColumns) {
@@ -73,13 +73,13 @@ TEST_F(TableTest, TestCloseReset) {
     initTable();
     table.close();
 
-    ASSERT_NO_THROW(table.initFromFile("tmp/table"));
+    ASSERT_NO_THROW(table.open("tmp/table"));
 }
 
 TEST_F(TableTest, TestInitFromInvalidFile) {
     const char *fileName = "tmp/invalid_file";
     PF::create(fileName);
-    EXPECT_THROW(table.initFromFile(fileName), Error::ReadTableError);
+    EXPECT_THROW(table.open(fileName), Error::ReadTableError);
 }
 
 TEST_F(TableTest, TestInsertGet) {

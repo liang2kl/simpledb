@@ -54,9 +54,9 @@ public:
     Table();
     ~Table();
 
-    void initFromFile(const std::string &file) noexcept(false);
-    void initEmpty(const std::string &file, int numColumn,
-                   ColumnMeta *columns) noexcept(false);
+    void open(const std::string &file) noexcept(false);
+    void create(const std::string &file, int numColumn,
+                ColumnMeta *columns) noexcept(false);
 
     void get(int page, int slot, Columns columns);
     std::pair<int, int> insert(Columns columns);
