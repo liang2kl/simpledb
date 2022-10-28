@@ -1,11 +1,11 @@
-#ifndef _SIMPLEDB_IO_H
-#define _SIMPLEDB_IO_H
+#ifndef _SIMPLEDB_PAGE_FILE_H
+#define _SIMPLEDB_PAGE_FILE_H
 
 #include "internal/FileCoordinator.h"
 
 namespace SimpleDB {
-// Public interfaces for using FileCoordinator::shared.
-namespace IO {
+// The PageFile interfaces.
+namespace PF {
 
 inline void create(const std::string &fileName) {
     FileCoordinator::shared.createFile(fileName);
@@ -37,7 +37,7 @@ inline void modify(const PageHandle &handle) {
     FileCoordinator::shared.modify(handle);
 }
 
-}  // namespace IO
+}  // namespace PF
 }  // namespace SimpleDB
 
 #endif

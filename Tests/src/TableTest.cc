@@ -78,7 +78,7 @@ TEST_F(TableTest, TestCloseReset) {
 
 TEST_F(TableTest, TestInitFromInvalidFile) {
     const char *fileName = "tmp/invalid_file";
-    IO::create(fileName);
+    PF::create(fileName);
     EXPECT_THROW(table.initFromFile(fileName), Error::ReadTableError);
 }
 

@@ -2,9 +2,9 @@
 
 #include <string.h>
 
-#include "IO.h"
 #include "Logger.h"
 #include "Macros.h"
+#include "PageFile.h"
 #include "cmath"
 
 namespace SimpleDB {
@@ -30,10 +30,10 @@ void Table::initFromFile(const std::string &file) {
     // Initialize table metadata from the file.
     try {
         // Open the file.
-        fd = IO::open(file);
+        fd = PF::open(file);
         // The metadata is written in the first page.
-        PageHandle handle = IO::getHandle(fd, 0);
-        meta = *(TableMeta *)IO::loadRaw(handle);
+        PageHandle handle = PF::getHandle(fd, 0);
+        meta = *(TableMeta *)PF::loadRaw(handle);
 
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
@@ -73,8 +73,8 @@ void Table::initEmpty(const std::string &file, int numColumn,
 
     try {
         // Create and open the file.
-        IO::create(file);
-        fd = IO::open(file);
+        PF::create(file);
+        fd = PF::open(file);
     } catch (Error::FileExistsError) {
         Logger::log(
             WARNING,
@@ -105,9 +105,9 @@ void Table::initEmpty(const std::string &file, int numColumn,
 }
 
 void Table::flushMeta() {
-    PageHandle handle = IO::getHandle(fd, 0);
-    memcpy(IO::loadRaw(handle), &meta, sizeof(TableMeta));
-    IO::modify(handle);
+    PageHandle handle = PF::getHandle(fd, 0);
+    memcpy(PF::loadRaw(handle), &meta, sizeof(TableMeta));
+    PF::modify(handle);
 }
 
 void Table::get(int page, int slot, Columns columns) {
@@ -125,13 +125,11 @@ void Table::get(int page, int slot, Columns columns) {
         throw Error::InvalidSlotError();
     }
     PageHandle *handle = getHandle(page);
-    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     deserialize(start, columns);
 }
 
 std::pair<int, int> Table::insert(Columns columns) {
-    Logger::log(VERBOSE, "Table: inserting record\n");
-
     checkInit();
 
     // Find an empty slot.
@@ -150,11 +148,11 @@ std::pair<int, int> Table::insert(Columns columns) {
                 slot);
 
     PageHandle *handle = getHandle(page);
-    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
 
     // Mark the page as dirty.
-    IO::modify(*handle);
+    PF::modify(*handle);
 
     // Update metadata.
     meta.occupied[page] |= (1L << slot);
@@ -179,11 +177,11 @@ void Table::update(int page, int slot, Columns columns) {
     }
 
     PageHandle *handle = getHandle(page);
-    char *start = IO::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
     serialize(columns, start);
 
     // Mark dirty.
-    IO::modify(*handle);
+    PF::modify(*handle);
 }
 
 void Table::remove(int page, int slot) {
@@ -211,7 +209,7 @@ void Table::close() {
     }
     Logger::log(VERBOSE, "Table: closing table\n");
 
-    IO::close(fd);
+    PF::close(fd);
     for (int i = 0; i < MAX_PAGE_PER_TABLE; i++) {
         if (handles[i] != nullptr) {
             delete handles[i];
@@ -231,7 +229,7 @@ PageHandle *Table::getHandle(int page) {
     if (handles[page] != nullptr && handles[page]->validate()) {
         return handles[page];
     }
-    PageHandle handle = IO::getHandle(fd, page);
+    PageHandle handle = PF::getHandle(fd, page);
     handles[page] = new PageHandle(handle);
     return handles[page];
 }
