@@ -190,9 +190,13 @@ bool RecordIterator::validate(const Columns columns,
 
         Column &column = columns[columnIndex];
 
-        // FIXME: What's the standard to deal with this?
         if (condition.op == IS_NULL || condition.op == NOT_NULL) {
             return _nullComparer(condition.op, column);
+        }
+
+        // FIXME: What's the specification to deal with this?
+        if (column.isNull) {
+            return false;
         }
 
         if (condition.op == LIKE) {

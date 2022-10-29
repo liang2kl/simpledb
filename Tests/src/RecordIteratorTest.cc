@@ -248,6 +248,42 @@ TEST_F(RecordIteratorTest, TestLikeOp) {
                  Error::InvalidRegexError);
 }
 
+TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
+    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                              Column::nullIntColumn()};
+    ASSERT_NO_THROW(table.insert(testColumns0));
+
+    CompareConditions conditions = CompareConditions(1);
+    conditions[0] = CompareCondition(columnMetas[0].name, LIKE, "[0-9]+");
+
+    Column readColumns[4];
+    EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
+                 Error::InvalidOperatorError);
+}
+
+TEST_F(RecordIteratorTest, TestNullValue) {
+    Column testColumns0[4] = {Column(1), Column(1.1F),
+                              Column::nullVarcharColumn(100), Column(2)};
+
+    ASSERT_NO_THROW(table.insert(testColumns0));
+
+    std::vector<std::pair<CompareOp, int>> testCases = {
+        {EQ, 0}, {NE, 0},   {GT, 0},      {GE, 0},       {LT, 0},
+        {LE, 0}, {LIKE, 0}, {IS_NULL, 1}, {NOT_NULL, 0},
+    };
+
+    CompareConditions conditions = CompareConditions(1);
+
+    for (auto &testCase : testCases) {
+        conditions[0] =
+            CompareCondition(columnMetas[2].name, testCase.first, nullptr);
+
+        Column readColumns[4];
+        int numRecords = iter.iterate(readColumns, conditions, [&](int) {});
+        EXPECT_EQ(numRecords, testCase.second);
+    }
+}
+
 TEST_F(RecordIteratorTest, TestIndexedScan) {
     Column testColumns0[4] = {Column(0), Column(1.1F), Column(testVarChar, 100),
                               Column::nullIntColumn()};
