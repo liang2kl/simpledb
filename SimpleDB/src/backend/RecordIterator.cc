@@ -15,7 +15,7 @@ int RecordIterator::iterate(Columns bufColumns, CompareConditions conditions,
         PageHandle *handle = table->getHandle(page);
         for (int slot = 1; slot < NUM_SLOT_PER_PAGE; slot++) {
             if (table->occupied(*handle, slot)) {
-                table->get(page, slot, bufColumns);
+                table->get({page, slot}, bufColumns);
                 if (validate(bufColumns, conditions)) {
                     callback(numReturns);
                     numReturns++;
@@ -28,12 +28,12 @@ int RecordIterator::iterate(Columns bufColumns, CompareConditions conditions,
 }
 
 int RecordIterator::iterate(Columns bufColumns, CompareConditions conditions,
-                            GetNextSlotFunc getNext, IteratorFunc callback) {
+                            GetNextRecordFunc getNext, IteratorFunc callback) {
     int numReturns = 0;
-    RecordSlot slotPair;
+    RecordID id;
 
-    while (slotPair = getNext(), slotPair.first != -1) {
-        table->get(slotPair.first, slotPair.second, bufColumns);
+    while (id = getNext(), id.page != -1) {
+        table->get(id, bufColumns);
         if (validate(bufColumns, conditions)) {
             callback(numReturns);
             numReturns++;

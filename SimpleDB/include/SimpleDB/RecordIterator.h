@@ -9,8 +9,8 @@ namespace SimpleDB {
 // Forward declaration.
 class Table;
 struct Column;
+struct RecordID;
 using Columns = Column *;
-using RecordSlot = std::pair<int, int>;
 
 enum CompareOp {
     EQ,  // =
@@ -37,13 +37,13 @@ class RecordIterator {
 public:
     RecordIterator(Table *table);
     using IteratorFunc = std::function<void(int index)>;
-    using GetNextSlotFunc = std::function<RecordSlot(void)>;
+    using GetNextRecordFunc = std::function<RecordID(void)>;
 
     // Iterate through all records of the table.
     int iterate(Columns bufColumns, CompareConditions conditions,
                 IteratorFunc callback);
     int iterate(Columns bufColumns, CompareConditions conditions,
-                GetNextSlotFunc getNext, IteratorFunc callback);
+                GetNextRecordFunc getNext, IteratorFunc callback);
 
 #ifdef TESTING
     RecordIterator() = default;

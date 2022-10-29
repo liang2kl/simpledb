@@ -59,7 +59,10 @@ using ColumnBitmap = int16_t;
 
 static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 
-using RecordSlot = std::pair<int, int>;
+struct RecordID {
+    int page;
+    int slot;
+};
 
 // A Table holds the metadata of a certain table, which should be unique
 // thourghout the program, and be stored in memory once created for the sake of
@@ -80,18 +83,18 @@ public:
                 ColumnMeta *columns) noexcept(false);
 
     // Get record.
-    void get(int page, int slot, Columns columns,
+    void get(RecordID id, Columns columns,
              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
-    RecordSlot insert(Columns columns);
+    RecordID insert(Columns columns);
 
     // Update record.
-    void update(int page, int slot, Columns columns,
+    void update(RecordID id, Columns columns,
                 ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Remove record.
-    void remove(int page, int slot);
+    void remove(RecordID id);
 
     void close();
 
@@ -164,7 +167,7 @@ private:
 
     // Side effect: might create a new page, thus modifying meta,
     // firstFreePagMeta, etc.
-    RecordSlot getEmptySlot();
+    RecordID getEmptySlot();
 
     void validateSlot(int page, int slot);
 };

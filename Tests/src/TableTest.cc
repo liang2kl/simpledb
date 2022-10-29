@@ -42,10 +42,11 @@ protected:
 };
 
 TEST_F(TableTest, TestUninitializeAccess) {
-    EXPECT_THROW(table.get(0, 0, nullptr), Error::TableNotInitializedError);
+    EXPECT_THROW(table.get({0, 0}, nullptr), Error::TableNotInitializedError);
     EXPECT_THROW(table.insert(nullptr), Error::TableNotInitializedError);
-    EXPECT_THROW(table.update(0, 0, nullptr), Error::TableNotInitializedError);
-    EXPECT_THROW(table.remove(0, 0), Error::TableNotInitializedError);
+    EXPECT_THROW(table.update({0, 0}, nullptr),
+                 Error::TableNotInitializedError);
+    EXPECT_THROW(table.remove({0, 0}), Error::TableNotInitializedError);
 }
 
 TEST_F(TableTest, TestCreateNewTable) {
@@ -83,17 +84,16 @@ TEST_F(TableTest, TestInsertGet) {
     // Write a few pages.
     for (int page = 1; page <= 3; page++) {
         for (int i = 0; i < NUM_SLOT_PER_PAGE - 1; i++) {
-            RecordSlot slotPair;
-            ASSERT_NO_THROW(slotPair = table.insert(testColumns));
+            RecordID id;
+            ASSERT_NO_THROW(id = table.insert(testColumns));
 
             Column readColumns[4];
-            ASSERT_NO_THROW(
-                table.get(slotPair.first, slotPair.second, readColumns));
+            ASSERT_NO_THROW(table.get(id, readColumns));
             compareColumns(testColumns, readColumns, numColumn);
 
             // Check if the meta is flushed.
-            PageHandle handle = PF::getHandle(table.fd, slotPair.first);
-            EXPECT_TRUE(table.occupied(handle, slotPair.second));
+            PageHandle handle = PF::getHandle(table.fd, id.page);
+            EXPECT_TRUE(table.occupied(handle, id.slot));
         }
 
         EXPECT_EQ(table.meta.firstFree, page + 1);
@@ -110,30 +110,27 @@ TEST_F(TableTest, TestUpdate) {
         Column(4)  // Not null now
     };
 
-    RecordSlot slotPair;
-    ASSERT_NO_THROW(slotPair = table.insert(testColumns));
+    RecordID id;
+    ASSERT_NO_THROW(id = table.insert(testColumns));
 
-    ASSERT_NO_THROW(
-        table.update(slotPair.first, slotPair.second, newColumns, bitmap));
+    ASSERT_NO_THROW(table.update(id, newColumns, bitmap));
 
     Column readColumns[3];
-    ASSERT_NO_THROW(
-        table.get(slotPair.first, slotPair.second, readColumns, bitmap));
+    ASSERT_NO_THROW(table.get(id, readColumns, bitmap));
     compareColumns(newColumns, readColumns, 3);
 }
 
 TEST_F(TableTest, TestRemove) {
     initTable();
 
-    RecordSlot slotPair;
-    ASSERT_NO_THROW(slotPair = table.insert(testColumns));
+    RecordID id;
+    ASSERT_NO_THROW(id = table.insert(testColumns));
 
-    PageHandle handle = PF::getHandle(table.fd, slotPair.first);
+    PageHandle handle = PF::getHandle(table.fd, id.page);
 
-    ASSERT_NO_THROW(table.remove(slotPair.first, slotPair.second));
-    EXPECT_FALSE(table.occupied(handle, slotPair.second));
-    EXPECT_THROW(table.get(slotPair.first, slotPair.second, nullptr),
-                 Error::InvalidSlotError);
+    ASSERT_NO_THROW(table.remove(id));
+    EXPECT_FALSE(table.occupied(handle, id.slot));
+    EXPECT_THROW(table.get(id, nullptr), Error::InvalidSlotError);
 }
 
 TEST_F(TableTest, TestReleasePage) {
@@ -147,7 +144,7 @@ TEST_F(TableTest, TestReleasePage) {
     EXPECT_EQ(table.meta.firstFree, 3);
 
     // Release a slot from the first page (1).
-    ASSERT_NO_THROW(table.remove(1, 1));
+    ASSERT_NO_THROW(table.remove({1, 1}));
 
     // The first free page should be 1.
     ASSERT_EQ(table.meta.firstFree, 1);
@@ -193,13 +190,13 @@ TEST_F(TableTest, TestMaxVarcharSize) {
         Column(varchar, MAX_VARCHAR_LEN),
     };
 
-    RecordSlot pair;
+    RecordID id;
 
     ASSERT_NO_THROW(table.create("tmp/table", tableName, 1, columnMetas));
-    ASSERT_NO_THROW(pair = table.insert(columns));
+    ASSERT_NO_THROW(id = table.insert(columns));
 
     Column readColumn[1];
-    ASSERT_NO_THROW(table.get(pair.first, pair.second, readColumn));
+    ASSERT_NO_THROW(table.get(id, readColumn));
 
     // Terminate this to compare.
     varchar[MAX_VARCHAR_LEN] = '\0';

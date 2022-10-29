@@ -2,10 +2,11 @@
 
 #include <string.h>
 
+#include <cmath>
+
 #include "Logger.h"
 #include "Macros.h"
 #include "PageFile.h"
-#include "cmath"
 
 namespace SimpleDB {
 
@@ -152,41 +153,38 @@ void Table::flushPageMeta(int page, const PageMeta &meta) {
     PF::modify(handle);
 }
 
-void Table::get(int page, int slot, Columns columns,
-                ColumnBitmap columnBitmap) {
-    Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", page,
-                slot);
+void Table::get(RecordID id, Columns columns, ColumnBitmap columnBitmap) {
+    Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", id.page,
+                id.slot);
 
     checkInit();
-    validateSlot(page, slot);
+    validateSlot(id.page, id.slot);
 
-    PageHandle *handle = getHandle(page);
+    PageHandle *handle = getHandle(id.page);
 
-    if (!occupied(*handle, slot)) {
+    if (!occupied(*handle, id.slot)) {
         Logger::log(
             ERROR,
             "Table: fail to get record: page %d slot %d is not occupied\n",
-            page, slot);
+            id.page, id.slot);
         throw Error::InvalidSlotError();
     }
 
-    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
     deserialize(start, columns, columnBitmap);
 }
 
-RecordSlot Table::insert(Columns columns) {
+RecordID Table::insert(Columns columns) {
     checkInit();
 
     // Find an empty slot.
-    auto slotPair = getEmptySlot();
-    int page = slotPair.first;
-    int slot = slotPair.second;
+    auto id = getEmptySlot();
 
-    Logger::log(VERBOSE, "Table: insert record to page %d slot %d\n", page,
-                slot);
+    Logger::log(VERBOSE, "Table: insert record to page %d slot %d\n", id.page,
+                id.slot);
 
-    PageHandle *handle = getHandle(page);
-    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    PageHandle *handle = getHandle(id.page);
+    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
     serialize(columns, start, COLUMN_BITMAP_ALL);
 
     // Mark the page as dirty.
@@ -194,47 +192,47 @@ RecordSlot Table::insert(Columns columns) {
 
     // We don't need to flush meta here.
 
-    return slotPair;
+    return id;
 }
 
-void Table::update(int page, int slot, Columns columns, ColumnBitmap bitmap) {
-    Logger::log(VERBOSE, "Table: updating record from page %d slot %d\n", page,
-                slot);
+void Table::update(RecordID id, Columns columns, ColumnBitmap bitmap) {
+    Logger::log(VERBOSE, "Table: updating record from page %d slot %d\n",
+                id.page, id.slot);
 
     checkInit();
-    validateSlot(page, slot);
+    validateSlot(id.page, id.slot);
 
-    PageHandle *handle = getHandle(page);
+    PageHandle *handle = getHandle(id.page);
 
-    if (!occupied(*handle, slot)) {
+    if (!occupied(*handle, id.slot)) {
         Logger::log(
             ERROR,
             "Table: fail to update record: page %d slot %d is not occupied\n",
-            page, slot);
+            id.page, id.slot);
         throw Error::InvalidSlotError();
     }
 
-    char *start = PF::loadRaw(*handle) + slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
     serialize(columns, start, bitmap);
 
     // Mark dirty.
     PF::modify(*handle);
 }
 
-void Table::remove(int page, int slot) {
-    Logger::log(VERBOSE, "Table: removing record from page %d slot %d\n", page,
-                slot);
+void Table::remove(RecordID id) {
+    Logger::log(VERBOSE, "Table: removing record from page %d slot %d\n",
+                id.page, id.slot);
 
     checkInit();
-    validateSlot(page, slot);
+    validateSlot(id.page, id.slot);
 
-    PageHandle *handle = getHandle(page);
+    PageHandle *handle = getHandle(id.page);
 
-    if (!occupied(*handle, slot)) {
+    if (!occupied(*handle, id.slot)) {
         Logger::log(
             ERROR,
             "Table: fail to remove record: page %d slot %d is not occupied\n",
-            page, slot);
+            id.page, id.slot);
         throw Error::InvalidSlotError();
     }
 
@@ -244,12 +242,12 @@ void Table::remove(int page, int slot) {
     if (pageMeta->occupied == SLOT_FULL_MASK) {
         // The page now will have an empty slot. Add it to the free list.
         pageMeta->nextFree = meta.firstFree;
-        meta.firstFree = page;
+        meta.firstFree = id.page;
         flushMeta();
     }
 
     // Mark the slot as unoccupied.
-    pageMeta->occupied &= ~(1L << slot);
+    pageMeta->occupied &= ~(1L << id.slot);
 
     if ((pageMeta->occupied & SLOT_OCCUPY_MASK) == 0) {
         // TODO: If the page is empty, we can free it.
@@ -429,7 +427,7 @@ void Table::validateSlot(int page, int slot) {
     }
 }
 
-RecordSlot Table::getEmptySlot() {
+RecordID Table::getEmptySlot() {
     if (meta.numUsedPages == meta.firstFree) {
         // All pages are full, create a new page.
         Logger::log(VERBOSE,
@@ -446,7 +444,7 @@ RecordSlot Table::getEmptySlot() {
         meta.numUsedPages++;
         // The firstFree of table remain unchanged.
 
-        return std::make_pair(meta.firstFree, 1);
+        return {meta.firstFree, 1};
     } else {
         // One of the allocated pages has empty slots.
         Logger::log(VERBOSE, "Table: got first free page %d\n", meta.firstFree);
@@ -486,7 +484,7 @@ RecordSlot Table::getEmptySlot() {
         assert(handle->validate());
         PF::modify(*handle);
 
-        return std::make_pair(page, index);
+        return {page, index};
     }
 }
 

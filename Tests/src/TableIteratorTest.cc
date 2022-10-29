@@ -210,27 +210,25 @@ TEST_F(RecordIteratorTest, TestIndexedScan) {
     Column *columns[] = {testColumns0, testColumns1, testColumns2,
                          testColumns3};
 
-    std::vector<RecordSlot> slots;
-    ASSERT_NO_THROW(slots.push_back(table.insert(testColumns0)));
-    ASSERT_NO_THROW(slots.push_back(table.insert(testColumns1)));
-    ASSERT_NO_THROW(slots.push_back(table.insert(testColumns2)));
-    ASSERT_NO_THROW(slots.push_back(table.insert(testColumns3)));
+    std::vector<RecordID> records;
+    ASSERT_NO_THROW(records.push_back(table.insert(testColumns0)));
+    ASSERT_NO_THROW(records.push_back(table.insert(testColumns1)));
+    ASSERT_NO_THROW(records.push_back(table.insert(testColumns2)));
+    ASSERT_NO_THROW(records.push_back(table.insert(testColumns3)));
 
     // Empty conditions.
     CompareConditions conditions;
     Column readColumns[4];
 
-    for (int i = 0; i < slots.size(); i++) {
+    for (int i = 0; i < records.size(); i++) {
         bool got = false;
         int numRecords = iter.iterate(
             readColumns, conditions,
-            [&]() {
-                // Only request for slots[i].
-                if (got) {
-                    return std::make_pair(-1, -1);
-                }
+            [&]() -> RecordID {
+                // Only request for records[i].
+                if (got) return {-1, -1};
                 got = true;
-                return slots[i];
+                return records[i];
             },
             [&](int) { compareColumns(columns[i], readColumns, 4); });
         EXPECT_EQ(numRecords, 1);
