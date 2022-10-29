@@ -186,8 +186,6 @@ bool RecordIterator::validate(const Columns columns,
             throw Error::InvalidColumnNameError();
         }
 
-        ColumnMeta &meta = table->meta.columns[columnIndex];
-
         Column &column = columns[columnIndex];
 
         if (condition.op == IS_NULL || condition.op == NOT_NULL) {
@@ -200,12 +198,12 @@ bool RecordIterator::validate(const Columns columns,
         }
 
         if (condition.op == LIKE) {
-            if (meta.type != VARCHAR) {
+            if (column.type != VARCHAR) {
                 Logger::log(ERROR,
                             "RecordIterator: LIKE can only be used on "
                             "VARCHAR column, but column %s is of type "
                             "%d\n",
-                            condition.columnName, meta.type);
+                            condition.columnName, column.type);
                 throw Error::InvalidOperatorError();
             }
             return _regexComparer(condition.op, column, condition.value);
