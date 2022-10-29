@@ -4,7 +4,7 @@ MAKE = make
 CC = g++
 CXXFLAGS = -g -O0 -std=c++17
 
-SRC_DIR = src
+SRC_DIR = .
 BIN_DIR = bin
 OBJ_DIR = obj
 
