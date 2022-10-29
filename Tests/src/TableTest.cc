@@ -4,6 +4,8 @@
 
 #include <filesystem>
 
+#include "Util.h"
+
 using namespace SimpleDB;
 
 class TableTest : public ::testing::Test {
@@ -36,28 +38,6 @@ protected:
     void initTable() {
         ASSERT_NO_THROW(
             table.create("tmp/table", tableName, numColumn, columnMetas));
-    }
-
-    void compareColumns(Column *columns, Column *readColumns, int num) {
-        for (int i = 0; i < num; i++) {
-            EXPECT_EQ(columns[i].type, readColumns[i].type);
-            EXPECT_EQ(columns[i].size, readColumns[i].size);
-            if (columns[i].isNull) {
-                EXPECT_TRUE(readColumns[i].isNull);
-                continue;
-            } else {
-                EXPECT_FALSE(readColumns[i].isNull);
-            }
-            if (columns[i].type == VARCHAR) {
-                EXPECT_EQ(memcmp(columns[i].data, readColumns[i].data,
-                                 strlen(columns[i].data)),
-                          0);
-            } else {
-                EXPECT_EQ(memcmp(columns[i].data, readColumns[i].data,
-                                 columns[i].size),
-                          0);
-            }
-        }
     }
 };
 
@@ -103,7 +83,7 @@ TEST_F(TableTest, TestInsertGet) {
     // Write a few pages.
     for (int page = 1; page <= 3; page++) {
         for (int i = 0; i < NUM_SLOT_PER_PAGE - 1; i++) {
-            std::pair<int, int> slotPair;
+            RecordSlot slotPair;
             ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
             Column readColumns[4];
@@ -124,13 +104,13 @@ TEST_F(TableTest, TestUpdate) {
     initTable();
 
     // Partial update.
-    ColumnBitmap bitmap = 0b00001101;
+    ColumnBitmap bitmap = 0b1101;
     Column newColumns[3] = {
         Column(2), Column("Thank you!", 100),
         Column(4)  // Not null now
     };
 
-    std::pair<int, int> slotPair;
+    RecordSlot slotPair;
     ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
     ASSERT_NO_THROW(
@@ -145,7 +125,7 @@ TEST_F(TableTest, TestUpdate) {
 TEST_F(TableTest, TestRemove) {
     initTable();
 
-    std::pair<int, int> slotPair;
+    RecordSlot slotPair;
     ASSERT_NO_THROW(slotPair = table.insert(testColumns));
 
     PageHandle handle = PF::getHandle(table.fd, slotPair.first);
@@ -188,4 +168,41 @@ TEST_F(TableTest, TestColumnName) {
                  Error::InvalidColumnIndexError);
     EXPECT_THROW(table.getColumnName(numColumn, readName),
                  Error::InvalidColumnIndexError);
+}
+
+TEST_F(TableTest, TestInvalidVarcharSize) {
+    ColumnMeta columnMetas[1] = {
+        {.type = VARCHAR, .size = MAX_VARCHAR_LEN + 1, .name = "val"},
+    };
+
+    EXPECT_THROW(table.create("tmp/table", tableName, 1, columnMetas),
+                 Error::InvalidColumnSizeError);
+}
+
+TEST_F(TableTest, TestMaxVarcharSize) {
+    char varchar[MAX_VARCHAR_LEN + 1];
+    memset(varchar, 'a', MAX_VARCHAR_LEN);
+    // This is an non-terminated string.
+    varchar[MAX_VARCHAR_LEN] = 'c';
+
+    ColumnMeta columnMetas[1] = {
+        {.type = VARCHAR, .size = MAX_VARCHAR_LEN, .name = "val"},
+    };
+
+    Column columns[1] = {
+        Column(varchar, MAX_VARCHAR_LEN),
+    };
+
+    RecordSlot pair;
+
+    ASSERT_NO_THROW(table.create("tmp/table", tableName, 1, columnMetas));
+    ASSERT_NO_THROW(pair = table.insert(columns));
+
+    Column readColumn[1];
+    ASSERT_NO_THROW(table.get(pair.first, pair.second, readColumn));
+
+    // Terminate this to compare.
+    varchar[MAX_VARCHAR_LEN] = '\0';
+
+    EXPECT_EQ(strcmp(readColumn[0].data, varchar), 0);
 }

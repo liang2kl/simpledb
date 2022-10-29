@@ -1,12 +1,14 @@
 #ifndef _SIMPLEDB_MACROS_H
 #define _SIMPLEDB_MACROS_H
 
+#include <limits>
+
 namespace SimpleDB {
 const int PAGE_SIZE = 8192;
 const int NUM_BUFFER_PAGE = 1024;
 
-const int MAX_VARCHAR_LEN = 256;
-const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN;
+const int MAX_VARCHAR_LEN = 256 - 1;
+const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN + 1;
 const int MAX_COLUMNS = 16;
 const int MAX_COLUMN_NAME_LEN = 64;
 const int MAX_TABLE_NAME_LEN = 64;
@@ -24,6 +26,8 @@ const int16_t COLUMN_BITMAP_ALL = 0xFF;
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
 const uint16_t PAGE_META_CANARY = 0xDBDB;
+
+const float EQUAL_PRECISION = std::numeric_limits<float>::epsilon();
 
 }  // namespace SimpleDB
 

@@ -15,4 +15,7 @@ private:
     SimpleDB::LogLevel level;
 };
 
+void compareColumns(SimpleDB::Column *columns, SimpleDB::Column *readColumns,
+                    int num);
+
 #endif

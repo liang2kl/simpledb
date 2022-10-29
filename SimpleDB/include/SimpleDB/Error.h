@@ -59,6 +59,11 @@ DECLARE_ERROR(NullValueFoundInNotNullColumn, TableErrorBase,
 DECLARE_ERROR(NullValueGivenForNotNullColumn, TableErrorBase,
               "Null value given for not null column");
 
+// ==== Iterator Error ====
+DECLARE_ERROR_CLASS(Iterator, BaseError, "Iterator error");
+
+DECLARE_ERROR(InvalidColumnName, IteratorErrorBase, "Invalid column name");
+
 #undef DECLARE_ERROR
 
 }  // namespace Error

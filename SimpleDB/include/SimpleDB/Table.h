@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "Macros.h"
+#include "RecordIterator.h"
 #include "internal/FileCoordinator.h"
 
 namespace SimpleDB {
@@ -58,10 +59,14 @@ using ColumnBitmap = int16_t;
 
 static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 
+using RecordSlot = std::pair<int, int>;
+
 // A Table holds the metadata of a certain table, which should be unique
 // thourghout the program, and be stored in memory once created for the sake of
 // metadata reading/writing performance.
 class Table {
+    friend class RecordIterator;
+
 public:
     // The metadata is not initialized in this constructor.
     Table() = default;
@@ -79,7 +84,7 @@ public:
              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
-    std::pair<int, int> insert(Columns columns);
+    RecordSlot insert(Columns columns);
 
     // Update record.
     void update(int page, int slot, Columns columns,
@@ -92,6 +97,8 @@ public:
 
     int getColumnIndex(const char *name);
     void getColumnName(int index, char *name);
+
+    RecordIterator getIterator() { return RecordIterator(this); }
 
 #ifndef TESTING
 private:
@@ -157,7 +164,7 @@ private:
 
     // Side effect: might create a new page, thus modifying meta,
     // firstFreePagMeta, etc.
-    std::pair<int, int> getEmptySlot();
+    RecordSlot getEmptySlot();
 
     void validateSlot(int page, int slot);
 };

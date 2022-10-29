@@ -102,7 +102,11 @@ void Table::create(const std::string &file, const std::string &name,
     int totalSize = 0;
     for (int i = 0; i < numColumn; i++) {
         // Validate column meta.
-        if (columns[i].size > MAX_COLUMN_SIZE) {
+        bool sizeValid = columns[i].type == VARCHAR
+                             ? columns[i].size <= MAX_VARCHAR_LEN
+                             : columns[i].size == 4;
+
+        if (!sizeValid) {
             Logger::log(ERROR,
                         "Table: insert failed: column %d has size %d, which is "
                         "larger than "
@@ -118,7 +122,6 @@ void Table::create(const std::string &file, const std::string &name,
             throw Error::DuplicateColumnNameError();
         }
 
-        // TODO: Validate size
         meta.columns[i] = columns[i];
         columnNameMap[columns[i].name] = i;
 
@@ -171,7 +174,7 @@ void Table::get(int page, int slot, Columns columns,
     deserialize(start, columns, columnBitmap);
 }
 
-std::pair<int, int> Table::insert(Columns columns) {
+RecordSlot Table::insert(Columns columns) {
     checkInit();
 
     // Find an empty slot.
@@ -348,6 +351,9 @@ void Table::deserialize(const char *srcData, Columns destObjects,
             // which can be invalidated.
             memcpy(column.data, srcData, column.size);
             column.isNull = false;
+            if (column.type == VARCHAR) {
+                column.data[column.size] = '\0';
+            }
         }
 
         srcData += meta.columns[i].size;
@@ -394,6 +400,9 @@ void Table::serialize(const Columns srcObjects, char *destData,
         } else {
             recordMeta->nullBitmap &= ~(1L << i);
             memcpy(destData, column.data, column.size);
+            if (column.type == VARCHAR) {
+                destData[column.size] = '\0';
+            }
         }
 
         destData += meta.columns[i].size;
@@ -420,7 +429,7 @@ void Table::validateSlot(int page, int slot) {
     }
 }
 
-std::pair<int, int> Table::getEmptySlot() {
+RecordSlot Table::getEmptySlot() {
     if (meta.numUsedPages == meta.firstFree) {
         // All pages are full, create a new page.
         Logger::log(VERBOSE,
@@ -541,13 +550,14 @@ Column::Column(const char *data, int maxLength) {
                     "Column: fail to create varchar column: length %d exceeds "
                     "maximum length %d\n",
                     maxLength, MAX_VARCHAR_LEN);
-        throw Error::ColumnSerializationError();
+        throw Error::InvalidColumnSizeError();
     }
 
     size = maxLength;
     type = VARCHAR;
     size_t copiedSize = std::min(strlen(data), size_t(maxLength));
     memcpy(this->data, data, copiedSize);
+    this->data[copiedSize] = '\0';
 }
 
 }  // namespace SimpleDB
