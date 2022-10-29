@@ -190,11 +190,62 @@ TEST_F(RecordIteratorTest, TestNullField) {
         CompareCondition(columnMetas[3].name, EQ, (const char *)(&value));
 
     Column readColumns[4];
-    int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns0, readColumns, 4);
-    });
+    int numRecords = iter.iterate(readColumns, conditions, [&](int) {});
 
     EXPECT_EQ(numRecords, 0);
+}
+
+TEST_F(RecordIteratorTest, TestNullOp) {
+    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                              Column::nullIntColumn()};
+    Column testColumns1[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                              Column(1)};
+
+    ASSERT_NO_THROW(table.insert(testColumns0));
+    ASSERT_NO_THROW(table.insert(testColumns1));
+
+    CompareConditions conditions = CompareConditions(1);
+    conditions[0] = CompareCondition(columnMetas[3].name, IS_NULL, nullptr);
+
+    Column readColumns[4];
+    int numRecords = iter.iterate(readColumns, conditions, [&](int) {
+        compareColumns(testColumns0, readColumns, 4);
+    });
+    EXPECT_EQ(numRecords, 1);
+
+    conditions[0].op = NOT_NULL;
+    numRecords = iter.iterate(readColumns, conditions, [&](int) {
+        compareColumns(testColumns1, readColumns, 4);
+    });
+    EXPECT_EQ(numRecords, 1);
+}
+
+TEST_F(RecordIteratorTest, TestLikeOp) {
+    Column testColumns0[4] = {Column(1), Column(1.1F), Column("123451", 100),
+                              Column::nullIntColumn()};
+    Column testColumns1[4] = {Column(1), Column(1.1F), Column("012314", 100),
+                              Column(1)};
+
+    ASSERT_NO_THROW(table.insert(testColumns0));
+    ASSERT_NO_THROW(table.insert(testColumns1));
+
+    // Matching the first but not second.
+    const char *regex = "[1-9]+";
+
+    CompareConditions conditions = CompareConditions(1);
+    conditions[0] = CompareCondition(columnMetas[2].name, LIKE, regex);
+
+    Column readColumns[4];
+    int numRecords = iter.iterate(readColumns, conditions, [&](int) {
+        compareColumns(testColumns0, readColumns, 4);
+    });
+    EXPECT_EQ(numRecords, 1);
+
+    // Test invalid regex.
+    regex = "[1-9";
+    conditions[0].value = regex;
+    EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
+                 Error::InvalidRegexError);
 }
 
 TEST_F(RecordIteratorTest, TestIndexedScan) {

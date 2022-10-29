@@ -13,12 +13,15 @@ struct RecordID;
 using Columns = Column *;
 
 enum CompareOp {
-    EQ,  // =
-    NE,  // <>
-    LT,  // <
-    LE,  // <=
-    GT,  // >
-    GE,  // >=
+    EQ,        // =
+    NE,        // <>
+    LT,        // <
+    LE,        // <=
+    GT,        // >
+    GE,        // >=
+    IS_NULL,   // IS NULL
+    NOT_NULL,  // NOT NULL
+    LIKE,      // LIKE
 };
 
 struct CompareCondition {

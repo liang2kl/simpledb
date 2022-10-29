@@ -63,6 +63,10 @@ DECLARE_ERROR(NullValueGivenForNotNullColumn, TableErrorBase,
 DECLARE_ERROR_CLASS(Iterator, BaseError, "Iterator error");
 
 DECLARE_ERROR(InvalidColumnName, IteratorErrorBase, "Invalid column name");
+DECLARE_ERROR(UnexpedtedOperator, IteratorErrorBase, "Unexpected operator");
+DECLARE_ERROR(InvalidOperator, IteratorErrorBase, "Invalid operator");
+DECLARE_ERROR(InvalidRegex, IteratorErrorBase,
+              "Invalid input regular expression");
 
 #undef DECLARE_ERROR
 
