@@ -442,6 +442,7 @@ RecordID Table::getEmptySlot() {
         flushPageMeta(meta.firstFree, pageMeta);
 
         meta.numUsedPages++;
+        flushMeta();
         // The firstFree of table remain unchanged.
 
         return {meta.firstFree, 1};
@@ -489,32 +490,6 @@ RecordID Table::getEmptySlot() {
 }
 
 // ==== Column ====
-
-int Column::deserializeInt() {
-    if (type != INT) {
-        Logger::log(ERROR, "Column: fail to deserialize int: type mismatch\n");
-        throw Error::ColumnSerializationError();
-    }
-    return *(int *)data;
-}
-
-float Column::deserializeFloat() {
-    if (type != FLOAT) {
-        Logger::log(ERROR,
-                    "Column: fail to deserialize float: type mismatch\n");
-        throw Error::ColumnSerializationError();
-    }
-    return *(float *)data;
-}
-
-void Column::deserializeVarchar(char *dest) {
-    if (type != VARCHAR) {
-        Logger::log(ERROR,
-                    "Column: fail to deserialize varchar: type mismatch\n");
-        throw Error::ColumnSerializationError();
-    }
-    memcpy(dest, data, size);
-}
 
 Column Column::nullColumn(DataType type, ColumnSizeType size) {
     Column column;

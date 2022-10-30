@@ -26,10 +26,6 @@ struct Column {
     bool isNull = false;
     char data[MAX_COLUMN_SIZE];
 
-    int deserializeInt();
-    float deserializeFloat();
-    void deserializeVarchar(char *dest);
-
     // Initialize a null column.
     static Column nullColumn(DataType type, ColumnSizeType size);
     static Column nullIntColumn();

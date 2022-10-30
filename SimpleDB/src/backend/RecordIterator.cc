@@ -145,13 +145,11 @@ static bool _nullComparer(CompareOp op, const Column &column) {
         case NOT_NULL:
             return !column.isNull;
         default:
-#ifdef _DEBUG
             Logger::log(ERROR,
                         "RecordIterator: internal error: invalid compare op %d "
                         "for IS_NULL or NOT_NULL comparision\n",
                         op);
             throw Error::UnexpedtedOperatorError();
-#endif
     }
 }
 
