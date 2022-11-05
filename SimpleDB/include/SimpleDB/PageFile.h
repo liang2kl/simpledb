@@ -33,6 +33,16 @@ inline char *loadRaw(const PageHandle &handle) {
     return FileCoordinator::shared.loadRaw(handle);
 }
 
+template <typename P>
+inline P load(PageHandle *handle) {
+    return reinterpret_cast<P>(load(handle));
+}
+
+template <typename P>
+inline P loadRaw(const PageHandle &handle) {
+    return reinterpret_cast<P>(loadRaw(handle));
+}
+
 inline void modify(const PageHandle &handle) {
     FileCoordinator::shared.modify(handle);
 }

@@ -33,7 +33,7 @@ void Table::open(const std::string &file) {
         fd = PF::open(file);
         // The metadata is written in the first page.
         PageHandle handle = PF::getHandle(fd, 0);
-        meta = *(TableMeta *)PF::loadRaw(handle);
+        meta = *PF::loadRaw<TableMeta *>(handle);
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
                     fd.value);
@@ -241,7 +241,7 @@ void Table::remove(RecordID id) {
         throw Error::InvalidSlotError();
     }
 
-    PageMeta *pageMeta = (PageMeta *)PF::loadRaw(*handle);
+    PageMeta *pageMeta = PF::loadRaw<PageMeta *>(*handle);
 
     // Check previous occupation.
     if (pageMeta->occupied == SLOT_FULL_MASK) {
@@ -414,7 +414,7 @@ void Table::serialize(const Columns srcObjects, char *destData,
 }
 
 bool Table::occupied(const PageHandle &handle, int slot) {
-    PageMeta *meta = (PageMeta *)PF::loadRaw(handle);
+    PageMeta *meta = PF::loadRaw<PageMeta *>(handle);
     return meta->occupied & (1L << slot);
 }
 

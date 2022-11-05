@@ -20,7 +20,7 @@ void Index::open(const std::string &file) {
     try {
         fd = PF::open(file);
         PageHandle handle = PF::getHandle(fd, 0);
-        meta = *(IndexMeta *)PF::loadRaw(handle);
+        meta = *PF::loadRaw<IndexMeta *>(handle);
     } catch (BaseError) {
         Logger::log(ERROR, "Index: fail to read index metadata from file %d\n",
                     fd.value);
@@ -98,7 +98,7 @@ bool Index::insert(const char *data, RecordID id) {
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
-    IndexNode *node = (IndexNode *)PF::loadRaw(handle);
+    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
 
     // First insert the record.
     IndexEntry entry;
@@ -144,7 +144,7 @@ RecordID Index::find(const char *data) {
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
-    IndexNode *node = (IndexNode *)PF::loadRaw(handle);
+    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
     return node->entry[index].record;
 }
 
@@ -154,7 +154,7 @@ std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *value) {
 
     for (;;) {
         PageHandle handle = PF::getHandle(fd, currentNode);
-        IndexNode *node = (IndexNode *)PF::loadRaw(handle);
+        IndexNode *node = PF::loadRaw<IndexNode *>(handle);
 
         int nextChild = node->numEntry;
 
@@ -188,7 +188,7 @@ Index::NodeIndex Index::createNewLeafNode(int parent) {
     // The index starts from 1!
     NodeIndex index = meta.numNode;
     PageHandle handle = getHandle(index);
-    IndexNode *node = (IndexNode *)PF::loadRaw(handle);
+    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
     node->numChildren = 0;
     node->numEntry = 0;
     node->parent = parent;
@@ -222,7 +222,7 @@ int Index::insertEntry(IndexNode *node, const IndexEntry &entry) {
 
 void Index::checkOverflowFrom(Index::NodeIndex index) {
     PageHandle nodeHandle = getHandle(index);
-    IndexNode *node = (IndexNode *)PF::loadRaw(nodeHandle);
+    IndexNode *node = PF::loadRaw<IndexNode *>(nodeHandle);
 
     if (node->numEntry <= MAX_NUM_ENTRY_PER_NODE) {
         return;
@@ -240,7 +240,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     // Split the node.
     NodeIndex siblingIndex = createNewLeafNode(node->parent);
     PageHandle siblingHandle = getHandle(siblingIndex);
-    IndexNode *siblingNode = (IndexNode *)PF::loadRaw(siblingHandle);
+    IndexNode *siblingNode = PF::loadRaw<IndexNode *>(siblingHandle);
 
     // Move the "right" entries to the sibling node.
     siblingNode->numEntry = node->numEntry - victimIndex - 1;
@@ -259,7 +259,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
         // FIXME: This requires lots of IO.
         for (int i = 0; i < siblingNode->numChildren; i++) {
             PageHandle childHandle = getHandle(siblingNode->children[i]);
-            IndexNode *childNode = (IndexNode *)PF::loadRaw(childHandle);
+            IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
             childNode->parent = siblingIndex;
             PF::modify(childHandle);
         }
@@ -276,7 +276,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     if (node->parent == IndexNode::NULL_NODE) {
         NodeIndex newRootIndex = createNewLeafNode(IndexNode::NULL_NODE);
         PageHandle newRootHandle = getHandle(newRootIndex);
-        IndexNode *newRootNode = (IndexNode *)PF::loadRaw(newRootHandle);
+        IndexNode *newRootNode = PF::loadRaw<IndexNode *>(newRootHandle);
         newRootNode->numEntry = 1;
         newRootNode->numChildren = 2;
         newRootNode->entry[0] = victimEntry;
@@ -301,7 +301,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
 
     // The parent node exists.
     PageHandle parentHandle = PF::getHandle(fd, node->parent);
-    IndexNode *parentNode = (IndexNode *)PF::loadRaw(parentHandle);
+    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
     int insertIndex = insertEntry(parentNode, victimEntry);
 
     // Update the children of the parent node.
@@ -343,7 +343,7 @@ void Index::dump() {
         q.pop();
 
         PageHandle handle = getHandle(index);
-        IndexNode *node = (IndexNode *)PF::loadRaw(handle);
+        IndexNode *node = PF::loadRaw<IndexNode *>(handle);
 
         printf("Node %d: ", index);
         for (int i = 0; i < node->numEntry; i++) {
