@@ -50,5 +50,4 @@ $(OBJ_DIR):
 .PHONY: clean
 clean:
 	- $(MAKE) -C ../SimpleDB clean
-	- $(MAKE) -C ../googletest/build clean
 	- rm -r $(BIN_DIR) $(OBJ_DIR)

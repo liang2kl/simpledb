@@ -68,6 +68,17 @@ DECLARE_ERROR(InvalidOperator, IteratorErrorBase, "Invalid operator");
 DECLARE_ERROR(InvalidRegex, IteratorErrorBase,
               "Invalid input regular expression");
 
+// ==== Index Error ====
+DECLARE_ERROR_CLASS(Index, BaseError, "Index error");
+
+DECLARE_ERROR(InvalidIndexMeta, IndexErrorBase, "Invalid index meta");
+DECLARE_ERROR(ReadIndex, IndexErrorBase, "Fail to read index");
+DECLARE_ERROR(CreateIndex, IndexErrorBase, "Fail to create index");
+DECLARE_ERROR(InvalidIndexType, IndexErrorBase, "Invalid index column type");
+DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
+              "The index is not initialized yet");
+DECLARE_ERROR(IndexExists, IndexErrorBase, "The index is already existed");
+
 #undef DECLARE_ERROR
 
 }  // namespace Error

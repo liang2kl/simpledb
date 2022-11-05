@@ -26,8 +26,18 @@ const int16_t COLUMN_BITMAP_ALL = 0xFF;
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
 const uint16_t PAGE_META_CANARY = 0xDBDB;
+const uint16_t INDEX_META_CANARY = 0xDADA;
+
+const int INDEX_SLOT_SIZE = 420;
+const int MAX_NUM_CHILD_PER_NODE = 20;
+const int MIN_NUM_CHILD_PER_NODE = (MAX_NUM_CHILD_PER_NODE + 1) / 2;
+const int MAX_NUM_ENTRY_PER_NODE = MAX_NUM_CHILD_PER_NODE - 1;
+static_assert((MAX_NUM_CHILD_PER_NODE - 1) * INDEX_SLOT_SIZE <= PAGE_SIZE);
 
 const float EQUAL_PRECISION = std::numeric_limits<float>::epsilon();
+
+// ==== Index ====
+const int INDEX_SIZE = 4;
 
 }  // namespace SimpleDB
 

@@ -84,6 +84,7 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
     }
 
     // Check if the page is in the cache.
+    // TODO: Optimization.
     auto &cacheMap = activeCacheMapVec[fd];
     auto iter = cacheMap.find(page);
     if (iter != cacheMap.end()) {

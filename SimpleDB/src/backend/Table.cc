@@ -10,6 +10,11 @@
 
 namespace SimpleDB {
 
+const RecordID RecordID::NULL_RECORD = {-1, -1};
+bool RecordID::operator==(const RecordID &rhs) const {
+    return page == rhs.page && slot == rhs.slot;
+}
+
 Table::~Table() { close(); }
 
 void Table::open(const std::string &file) {

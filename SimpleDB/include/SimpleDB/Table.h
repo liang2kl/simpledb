@@ -58,6 +58,9 @@ static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 struct RecordID {
     int page;
     int slot;
+
+    bool operator==(const RecordID &rhs) const;
+    static const RecordID NULL_RECORD;
 };
 
 // A Table holds the metadata of a certain table, which should be unique

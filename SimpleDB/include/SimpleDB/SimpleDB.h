@@ -3,6 +3,7 @@
 
 #include "Error.h"
 #include "FileDescriptor.h"
+#include "Index.h"
 #include "Logger.h"
 #include "Macros.h"
 #include "PageFile.h"

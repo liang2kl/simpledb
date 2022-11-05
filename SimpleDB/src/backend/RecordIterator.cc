@@ -5,6 +5,7 @@
 
 #include "Logger.h"
 #include "Table.h"
+#include "internal/Comparer.h"
 
 namespace SimpleDB {
 
@@ -46,69 +47,6 @@ int RecordIterator::iterate(Columns bufColumns, CompareConditions conditions,
 
     return numReturns;
 }
-
-// === Internal classes only for comparision ===
-class _String {
-public:
-    _String(const char *data) : str(data) {}
-    bool operator==(const _String &rhs) const {
-        return strcmp(str, rhs.str) == 0;
-    }
-    bool operator!=(const _String &rhs) const {
-        return strcmp(str, rhs.str) != 0;
-    }
-    bool operator<(const _String &rhs) const {
-        return strcmp(str, rhs.str) < 0;
-    }
-    bool operator<=(const _String &rhs) const {
-        return strcmp(str, rhs.str) <= 0;
-    }
-    bool operator>(const _String &rhs) const {
-        return strcmp(str, rhs.str) > 0;
-    }
-    bool operator>=(const _String &rhs) const {
-        return strcmp(str, rhs.str) >= 0;
-    }
-
-private:
-    const char *str;
-};
-
-class _Int {
-public:
-    _Int(const char *data) : value(*(int *)data) {}
-    bool operator==(const _Int &rhs) const { return value == rhs.value; }
-    bool operator!=(const _Int &rhs) const { return value != rhs.value; }
-    bool operator<(const _Int &rhs) const { return value < rhs.value; }
-    bool operator<=(const _Int &rhs) const { return value <= rhs.value; }
-    bool operator>(const _Int &rhs) const { return value > rhs.value; }
-    bool operator>=(const _Int &rhs) const { return value >= rhs.value; }
-
-private:
-    int value;
-};
-
-class _Float {
-public:
-    _Float(const char *data) : value(*(float *)data) {}
-    bool operator==(const _Float &rhs) const {
-        return std::fabs(value - rhs.value) <= EQUAL_PRECISION;
-    }
-    bool operator!=(const _Float &rhs) const {
-        return std::fabs(value - rhs.value) <= EQUAL_PRECISION;
-    }
-    bool operator<(const _Float &rhs) const { return value < rhs.value; }
-    bool operator<=(const _Float &rhs) const {
-        return *this < rhs || *this == rhs;
-    }
-    bool operator>(const _Float &rhs) const { return value > rhs.value; }
-    bool operator>=(const _Float &rhs) const {
-        return *this > rhs || *this == rhs;
-    }
-
-private:
-    float value;
-};
 
 using _Comparer = bool (*)(CompareOp, const char *, const char *);
 
@@ -211,13 +149,13 @@ bool RecordIterator::validate(const Columns columns,
 
         switch (column.type) {
             case DataType::INT:
-                comparer = _comparer<_Int>;
+                comparer = _comparer<Internal::_Int>;
                 break;
             case DataType::FLOAT:
-                comparer = _comparer<_Float>;
+                comparer = _comparer<Internal::_Float>;
                 break;
             case DataType::VARCHAR:
-                comparer = _comparer<_String>;
+                comparer = _comparer<Internal::_String>;
                 break;
         }
 
