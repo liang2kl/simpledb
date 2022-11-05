@@ -113,20 +113,19 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
         assert(cache != nullptr);
     } else {
         // The cache is full. Select the last recently used page to replace.
-        cache = activeCache.removeTail();
-        assert(cache != nullptr);
-
-        // Also remove from the map!
-        cacheMap.erase(page);
+        PageCache *lastCache = activeCache.last();
+        assert(lastCache != nullptr);
 
         Logger::log(VERBOSE,
                     "CacheManager: replace cache of page %d of file %d for "
                     "page %d of file %d\n",
-                    cache->meta.page, cache->meta.fd.value, page, fd.value);
+                    lastCache->meta.page, lastCache->meta.fd.value, page,
+                    fd.value);
 
-        // Write back the original cache. Don't remove from list again as it has
-        // already done.
-        writeBack(cache, /*removeFromList=*/false);
+        // Write back the original cache (the freed cache will be in the
+        // `freeCache` list).
+        writeBack(lastCache);
+        cache = freeCache.removeTail();
     }
 
     // Now we can claim this cache slot.
@@ -198,7 +197,7 @@ void CacheManager::modify(const PageHandle &handle) {
     cache->dirty = true;
 }
 
-void CacheManager::writeBack(PageCache *cache, bool removeFromList) {
+void CacheManager::writeBack(PageCache *cache) {
     // As we are dealing with a valid pointer to the cache, we assume that the
     // descriptor is valid.
     Logger::log(VERBOSE, "CacheManager: write back page %d of file %d\n",
@@ -210,9 +209,7 @@ void CacheManager::writeBack(PageCache *cache, bool removeFromList) {
 
     // Discard the cache and add it back to the free list.
     activeCacheMapVec[cache->meta.fd].erase(cache->meta.page);
-    if (removeFromList) {
-        activeCache.remove(cache->nodeInActiveCache);
-    }
+    activeCache.remove(cache->nodeInActiveCache);
     freeCache.insertHead(cache);
     // Don't forget to bump the generation number, as the previous cache is no
     // longer valid.

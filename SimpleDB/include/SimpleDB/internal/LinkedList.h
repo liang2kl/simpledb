@@ -40,6 +40,13 @@ public:
         return remove(tail->next);
     }
 
+    T *last() {
+        if (head == tail) {
+            return nullptr;
+        }
+        return tail->next->data;
+    }
+
     T *remove(Node *node) {
         node->prev->next = node->next;
         if (node != head) {

@@ -104,7 +104,7 @@ private:
     bool closed = false;
 
     // Write the cache back to the disk if it is dirty, and remove the cache.
-    void writeBack(PageCache *cache, bool removeFromList = true);
+    void writeBack(PageCache *cache);
 
     // Get the cache for certain page. Claim a slot (and load from disk) if it
     // is not cached.
