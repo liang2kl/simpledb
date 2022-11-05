@@ -72,7 +72,7 @@ TEST_F(IndexTest, TestInsertGet) {
     // Create a set of random entries.
     std::set<int> keys;
 
-    while (keys.size() < 500 * MAX_NUM_ENTRY_PER_NODE) {
+    while (keys.size() < 50 * MAX_NUM_ENTRY_PER_NODE) {
         keys.insert(rand());
     }
 
@@ -88,6 +88,11 @@ TEST_F(IndexTest, TestInsertGet) {
         ASSERT_NO_THROW(succeed =
                             index.insert((const char *)&key, entry.second));
         EXPECT_TRUE(succeed);
+
+        // Test duplidate keys.
+        ASSERT_NO_THROW(succeed =
+                            index.insert((const char *)&key, entry.second));
+        EXPECT_FALSE(succeed);
     }
 
     reloadIndex();
@@ -102,5 +107,3 @@ TEST_F(IndexTest, TestInsertGet) {
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);
 }
-
-TEST_F(IndexTest, TestInsertDuplicateKey) {}
