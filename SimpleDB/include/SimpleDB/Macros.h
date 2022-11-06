@@ -27,6 +27,7 @@ const int16_t COLUMN_BITMAP_ALL = 0xFF;
 const uint16_t TABLE_META_CANARY = 0xDDBB;
 const uint16_t PAGE_META_CANARY = 0xDBDB;
 const uint16_t INDEX_META_CANARY = 0xDADA;
+const uint16_t EMPTY_INDEX_PAGE_CANARY = 0xDCDC;
 
 const int INDEX_SLOT_SIZE = 420;
 const int MAX_NUM_CHILD_PER_NODE = 20;

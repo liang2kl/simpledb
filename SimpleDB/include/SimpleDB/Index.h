@@ -31,6 +31,7 @@ private:
         uint16_t headCanary = INDEX_META_CANARY;
         int numNode;
         int numEntry;
+        int firstFreePage;
         NodeIndex rootNode;
         DataType type;
         ColumnSizeType size;
@@ -43,6 +44,12 @@ private:
 
         bool eq(const char *value, DataType type) const;
         bool gt(const char *value, DataType type) const;
+    };
+
+    struct EmptyPageMeta {
+        uint16_t headCanary = EMPTY_INDEX_PAGE_CANARY;
+        int nextPage;
+        uint16_t tailCanary = EMPTY_INDEX_PAGE_CANARY;
     };
 
     struct IndexNode {
@@ -81,6 +88,7 @@ private:
     inline PageHandle getHandle(NodeIndex index) {
         return PF::getHandle(fd, index);
     }
+    void release(NodeIndex index);
 
 #ifdef _DEBUG
     void dump();

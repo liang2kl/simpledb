@@ -64,6 +64,7 @@ void Index::create(const std::string &file, ColumnMeta column) {
     meta.size = column.size;
     meta.numNode = 0;
     meta.numEntry = 0;
+    meta.firstFreePage = 1;
 
     // Create root node.
     NodeIndex index = createNewLeafNode(IndexNode::NULL_NODE);
@@ -132,10 +133,7 @@ bool Index::remove(const char *key) {
                 key[1], key[2], key[3]);
     checkInit();
 
-    auto result = findNode(key);
-    NodeIndex nodeIndex = std::get<0>(result);
-    int index = std::get<1>(result);
-    bool found = std::get<2>(result);
+    auto [nodeIndex, index, found] = findNode(key);
 
     if (!found) {
         return false;
@@ -154,7 +152,7 @@ bool Index::remove(const char *key) {
             targetNodeIndex = targetNode->children[0];
             targetNode = PF::loadRaw<IndexNode *>(getHandle(targetNodeIndex));
         }
-        // Swap the entries.
+        // Swap the entries (we don't actually care about the target entry).
         node->entry[index] = targetNode->entry[0];
         PF::markDirty(handle);
 
@@ -175,7 +173,7 @@ bool Index::remove(const char *key) {
     checkUnderflowFrom(nodeIndex);
 
     // Mark dirty.
-    PF::markDirty(getHandle(node->index));
+    PF::markDirty(getHandle(nodeIndex));
 
     meta.numEntry--;
     flushMeta();
@@ -190,10 +188,7 @@ RecordID Index::find(const char *key) {
 
     // TODO: Pin the root node.
 
-    auto result = findNode(key);
-    NodeIndex nodeIndex = std::get<0>(result);
-    int index = std::get<1>(result);
-    bool found = std::get<2>(result);
+    auto [nodeIndex, index, found] = findNode(key);
 
     if (!found) {
         return RecordID::NULL_RECORD;
@@ -239,11 +234,23 @@ std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *key) {
 
 Index::NodeIndex Index::createNewLeafNode(int parent) {
     meta.numNode++;
+
+    // Get and update the free page.
+    NodeIndex index = meta.firstFreePage;
+    PageHandle handle = PF::getHandle(fd, index);
+    EmptyPageMeta *pageMeta = PF::loadRaw<EmptyPageMeta *>(handle);
+
+    if (pageMeta->headCanary == EMPTY_INDEX_PAGE_CANARY &&
+        pageMeta->tailCanary == EMPTY_INDEX_PAGE_CANARY) {
+        // A valid empty page meta.
+        meta.firstFreePage = pageMeta->nextPage;
+    } else {
+        // Just bump the `nextFreePage`.
+        meta.firstFreePage++;
+    }
+
     flushMeta();
 
-    // The index starts from 1!
-    NodeIndex index = meta.numNode;
-    PageHandle handle = getHandle(index);
     IndexNode *node = PF::loadRaw<IndexNode *>(handle);
     node->numChildren = 0;
     node->numEntry = 0;
@@ -495,15 +502,39 @@ void Index::checkUnderflowFrom(NodeIndex index) {
         // Collapse with the left sibling.
         collapse(parentNode->children[indexInParent - 1], index,
                  indexInParent - 1);
-        return;
-    }
-
-    assert(parentHandle.validate());
-    assert(nodeHandle.validate());
-
-    if (indexInParent < parentNode->numChildren - 1) {
+    } else if (indexInParent < parentNode->numChildren - 1) {
         // Collapse with the right sibling.
         collapse(index, parentNode->children[indexInParent + 1], indexInParent);
+    } else {
+        // The parent only have one child (thus having no entry). Do some
+        // compression.
+
+        // All the ANCESTORS of this node should be empty.
+        for (;;) {
+            assert(parentNode->numEntry == 0);
+
+            NodeIndex currentIndex = parentNode->index;
+            if (parentNode->parent == IndexNode::NULL_NODE) {
+                release(currentIndex);
+                break;
+            }
+
+            parentHandle = getHandle(parentNode->parent);
+            parentNode = PF::loadRaw<IndexNode *>(parentHandle);
+            release(currentIndex);
+        }
+
+        // Now the parent is the root node, and the child node becomes the new
+        // root.
+        meta.rootNode = index;
+        meta.numNode--;
+        node->parent = IndexNode::NULL_NODE;
+
+        nodeHandle = PF::renew(nodeHandle);
+
+        PF::markDirty(nodeHandle);
+        flushMeta();
+
         return;
     }
 
@@ -558,14 +589,27 @@ void Index::collapse(NodeIndex left, NodeIndex right, int parentEntryIndex) {
     }
     leftNode->numEntry += rightNode->numEntry;
 
-    // TODO: Release the page of the deleted node.
+    // Release the page of the deleted node.
+    release(right);
 
     // Mark dirty.
     PF::markDirty(leftHandle);
     PF::markDirty(rightHandle);
     PF::markDirty(parentHandle);
+}
 
-    return;
+void Index::release(NodeIndex index) {
+    PageHandle handle = getHandle(index);
+    EmptyPageMeta newMeta;
+    newMeta.nextPage = meta.firstFreePage;
+
+    EmptyPageMeta *pageMeta = PF::loadRaw<EmptyPageMeta *>(handle);
+    *pageMeta = newMeta;
+
+    meta.firstFreePage = index;
+
+    PF::markDirty(handle);
+    flushMeta();
 }
 
 void Index::flushMeta() {
