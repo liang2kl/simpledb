@@ -96,9 +96,11 @@ TEST_F(CacheManagerTest, TestPageExchange) {
 
     PageHandle handle = manager->getHandle(fd, 5);
     EXPECT_EQ(manager->activeCache.head->data->id, 5);
+    EXPECT_EQ(manager->freeCache.size(), 0);
 
     PageHandle handle1 = manager->getHandle(fd, NUM_BUFFER_PAGE);
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 1);
+    EXPECT_EQ(manager->freeCache.size(), 0);
 
     // At this time, the cache of page 0 should be written back, thus
     // invalidating the handle.

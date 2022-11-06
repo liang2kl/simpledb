@@ -72,7 +72,7 @@ TEST_F(IndexTest, TestInsertGet) {
     // Create a set of random entries.
     std::set<int> keys;
 
-    while (keys.size() < 5000 * MAX_NUM_ENTRY_PER_NODE) {
+    while (keys.size() < 50 * MAX_NUM_ENTRY_PER_NODE) {
         keys.insert(rand());
     }
 
