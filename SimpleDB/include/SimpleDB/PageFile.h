@@ -43,8 +43,8 @@ inline P loadRaw(const PageHandle &handle) {
     return reinterpret_cast<P>(loadRaw(handle));
 }
 
-inline void modify(const PageHandle &handle) {
-    FileCoordinator::shared.modify(handle);
+inline void markDirty(const PageHandle &handle) {
+    FileCoordinator::shared.markDirty(handle);
 }
 
 }  // namespace PF

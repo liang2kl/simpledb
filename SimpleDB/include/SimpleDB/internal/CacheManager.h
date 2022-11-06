@@ -38,7 +38,7 @@ public:
     // Mark the page as dirty, should be called after every write to the buffer.
     // The handle must be validated via validate() before calling this function,
     // otherwise InvalidPageHandleError might be thrown.
-    void modify(const PageHandle &handle);
+    void markDirty(const PageHandle &handle);
 
     // Write the cache back to the disk if it is dirty, and remove the cache. If
     // the cache does not exist, do nothing. The handle must be validated via

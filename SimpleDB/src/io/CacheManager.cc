@@ -181,7 +181,7 @@ char *CacheManager::loadRaw(const PageHandle &handle) {
     return handle.cache->buf;
 }
 
-void CacheManager::modify(const PageHandle &handle) {
+void CacheManager::markDirty(const PageHandle &handle) {
     PageCache *cache = handle.cache;
 
     if (!handle.validate()) {

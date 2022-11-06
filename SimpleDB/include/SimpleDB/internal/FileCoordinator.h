@@ -29,7 +29,7 @@ public:
     inline char *loadRaw(const PageHandle &handle) {
         return cacheManager->loadRaw(handle);
     }
-    void modify(const PageHandle &handle);
+    void markDirty(const PageHandle &handle);
 
 #ifndef TESTING
 private:

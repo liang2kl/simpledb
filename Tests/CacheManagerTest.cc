@@ -58,7 +58,7 @@ TEST_F(CacheManagerTest, TestReadWritePage) {
     cacheBuf[0] = c;
 
     EXPECT_FALSE(handle.cache->dirty);
-    EXPECT_NO_THROW(manager->modify(handle));
+    EXPECT_NO_THROW(manager->markDirty(handle));
     EXPECT_TRUE(handle.cache->dirty);
 
     EXPECT_EQ(handle.cache->buf[0], c);
@@ -87,7 +87,7 @@ TEST_F(CacheManagerTest, TestPageExchange) {
     for (int i = 0; i < NUM_BUFFER_PAGE; i++) {
         PageHandle handle;
         ASSERT_NO_THROW(handle = manager->getHandle(fd, i));
-        ASSERT_NO_THROW(manager->modify(handle));
+        ASSERT_NO_THROW(manager->markDirty(handle));
         handles.push_back(handle);
     }
 

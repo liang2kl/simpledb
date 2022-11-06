@@ -29,7 +29,7 @@ TEST_F(FileCoordinatorTest, TestCoordinator) {
     PageHandle handle = coordinator.getHandle(fd, 2);
 
     memcpy(coordinator.load(&handle), buf, PAGE_SIZE);
-    ASSERT_NO_THROW(coordinator.modify(handle));
+    ASSERT_NO_THROW(coordinator.markDirty(handle));
 
     ASSERT_NO_THROW(coordinator.closeFile(fd));
     ASSERT_NO_THROW(fd = coordinator.openFile(filePath));

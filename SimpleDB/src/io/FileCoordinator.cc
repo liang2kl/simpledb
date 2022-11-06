@@ -41,8 +41,8 @@ char *FileCoordinator::load(PageHandle *handle) {
     return cacheManager->loadRaw(*handle);
 }
 
-void FileCoordinator::modify(const PageHandle &handle) {
-    cacheManager->modify(handle);
+void FileCoordinator::markDirty(const PageHandle &handle) {
+    cacheManager->markDirty(handle);
 }
 
 // PageHandle FileCoordinator

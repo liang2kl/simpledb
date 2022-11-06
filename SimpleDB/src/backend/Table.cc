@@ -149,13 +149,13 @@ void Table::create(const std::string &file, const std::string &name,
 void Table::flushMeta() {
     PageHandle handle = PF::getHandle(fd, 0);
     memcpy(PF::loadRaw(handle), &meta, sizeof(TableMeta));
-    PF::modify(handle);
+    PF::markDirty(handle);
 }
 
 void Table::flushPageMeta(int page, const PageMeta &meta) {
     PageHandle handle = PF::getHandle(fd, page);
     memcpy(PF::loadRaw(handle), &meta, sizeof(PageMeta));
-    PF::modify(handle);
+    PF::markDirty(handle);
 }
 
 void Table::get(RecordID id, Columns columns, ColumnBitmap columnBitmap) {
@@ -193,7 +193,7 @@ RecordID Table::insert(Columns columns) {
     serialize(columns, start, COLUMN_BITMAP_ALL);
 
     // Mark the page as dirty.
-    PF::modify(*handle);
+    PF::markDirty(*handle);
 
     // We don't need to flush meta here.
 
@@ -221,7 +221,7 @@ void Table::update(RecordID id, Columns columns, ColumnBitmap bitmap) {
     serialize(columns, start, bitmap);
 
     // Mark dirty.
-    PF::modify(*handle);
+    PF::markDirty(*handle);
 }
 
 void Table::remove(RecordID id) {
@@ -488,7 +488,7 @@ RecordID Table::getEmptySlot() {
 
         // Mark the page as dirty.
         assert(handle->validate());
-        PF::modify(*handle);
+        PF::markDirty(*handle);
 
         return {page, index};
     }

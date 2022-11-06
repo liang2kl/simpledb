@@ -117,7 +117,7 @@ bool Index::insert(const char *data, RecordID id) {
     if (!handle.validate()) {
         handle = PF::getHandle(fd, nodeIndex);
     }
-    PF::modify(handle);
+    PF::markDirty(handle);
 
     return true;
 }
@@ -194,7 +194,7 @@ Index::NodeIndex Index::createNewLeafNode(int parent) {
     node->parent = parent;
     node->index = index;
 
-    PF::modify(handle);
+    PF::markDirty(handle);
 
     return index;
 }
@@ -261,7 +261,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
             PageHandle childHandle = getHandle(siblingNode->children[i]);
             IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
             childNode->parent = siblingIndex;
-            PF::modify(childHandle);
+            PF::markDirty(childHandle);
         }
 
 #ifdef _DEBUG
@@ -288,9 +288,9 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
         siblingNode->parent = newRootIndex;
 
         // Mark dirty.
-        PF::modify(siblingHandle);
-        PF::modify(nodeHandle);
-        PF::modify(newRootHandle);
+        PF::markDirty(siblingHandle);
+        PF::markDirty(nodeHandle);
+        PF::markDirty(newRootHandle);
 
         // And the meta...
         meta.rootNode = newRootIndex;
@@ -312,9 +312,9 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     parentNode->numChildren++;
 
     // Mark dirty.
-    PF::modify(siblingHandle);
-    PF::modify(nodeHandle);
-    PF::modify(parentHandle);
+    PF::markDirty(siblingHandle);
+    PF::markDirty(nodeHandle);
+    PF::markDirty(parentHandle);
 
     // Check if the parent node overflows recursively.
     checkOverflowFrom(node->parent);
@@ -323,7 +323,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
 void Index::flushMeta() {
     PageHandle handle = PF::getHandle(fd, 0);
     memcpy(PF::loadRaw(handle), &meta, sizeof(IndexMeta));
-    PF::modify(handle);
+    PF::markDirty(handle);
 }
 
 void Index::checkInit() {
