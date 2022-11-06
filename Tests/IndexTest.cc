@@ -17,7 +17,10 @@ protected:
         std::filesystem::create_directory("tmp");
         srand(0);
     }
-    void TearDown() override { std::filesystem::remove_all("tmp"); }
+    void TearDown() override {
+        index.close();
+        std::filesystem::remove_all("tmp");
+    }
 
     Index index;
 

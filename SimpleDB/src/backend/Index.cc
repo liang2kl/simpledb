@@ -82,6 +82,7 @@ void Index::close() {
     Logger::log(VERBOSE, "Index: closing index\n");
 
     PF::close(fd);
+    initialized = false;
     // TODO: More cleanup
 }
 

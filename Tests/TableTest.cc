@@ -11,7 +11,10 @@ using namespace SimpleDB;
 class TableTest : public ::testing::Test {
 protected:
     void SetUp() override { std::filesystem::create_directory("tmp"); }
-    void TearDown() override { std::filesystem::remove_all("tmp"); }
+    void TearDown() override {
+        table.close();
+        std::filesystem::remove_all("tmp");
+    }
 
     Table table;
 

@@ -15,7 +15,10 @@ protected:
         std::filesystem::create_directory("tmp");
         initTable();
     }
-    void TearDown() override { std::filesystem::remove_all("tmp"); }
+    void TearDown() override {
+        table.close();
+        std::filesystem::remove_all("tmp");
+    }
 
     Table table;
 
