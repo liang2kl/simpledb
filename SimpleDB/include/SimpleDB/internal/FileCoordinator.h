@@ -30,6 +30,7 @@ public:
         return cacheManager->loadRaw(handle);
     }
     void markDirty(const PageHandle &handle);
+    PageHandle renew(const PageHandle &handle);
 
 #ifndef TESTING
 private:

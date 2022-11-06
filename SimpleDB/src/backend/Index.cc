@@ -7,6 +7,8 @@
 
 namespace SimpleDB {
 
+Index::~Index() { close(); }
+
 void Index::open(const std::string &file) {
     Logger::log(VERBOSE, "Index: initializing index from %s\n", file.c_str());
 
@@ -61,6 +63,7 @@ void Index::create(const std::string &file, ColumnMeta column) {
     meta.type = column.type;
     meta.size = column.size;
     meta.numNode = 0;
+    meta.numEntry = 0;
 
     // Create root node.
     NodeIndex index = createNewLeafNode(IndexNode::NULL_NODE);
@@ -81,13 +84,15 @@ void Index::close() {
     // TODO: More cleanup
 }
 
-bool Index::insert(const char *data, RecordID id) {
-    Logger::log(VERBOSE, "Index: inserting index at page %d, slot %d\n",
-                id.page, id.slot);
+bool Index::insert(const char *key, RecordID id) {
+    Logger::log(VERBOSE,
+                "Index: inserting index (key: %hhx-%hhx-%hhx-%hhx) at page %d, "
+                "slot %d\n",
+                key[0], key[1], key[2], key[3], id.page, id.slot);
 
     checkInit();
 
-    auto result = findNode(data);
+    auto result = findNode(key);
     NodeIndex nodeIndex = std::get<0>(result);
     int index = std::get<1>(result);
     bool found = std::get<2>(result);
@@ -102,8 +107,7 @@ bool Index::insert(const char *data, RecordID id) {
 
     // First insert the record.
     IndexEntry entry;
-    memcpy(entry.value, data, 4);  // FIXME: Hard code size.
-    entry.type = meta.type;
+    memcpy(entry.key, key, 4);  // FIXME: Hard code size.
     entry.record = id;
 
     // Insert the record into the node.
@@ -114,27 +118,79 @@ bool Index::insert(const char *data, RecordID id) {
     checkOverflowFrom(nodeIndex);
 
     // Renew the handle and mark dirty.
-    if (!handle.validate()) {
-        handle = PF::getHandle(fd, nodeIndex);
-    }
+    handle = PF::renew(handle);
     PF::markDirty(handle);
+
+    meta.numEntry++;
+    flushMeta();
 
     return true;
 }
 
-void Index::remove(RecordID id) {
-    Logger::log(VERBOSE, "Index: removing record at page %d, slot %d\n",
-                id.page, id.slot);
+bool Index::remove(const char *key) {
+    Logger::log(VERBOSE, "Index: removing record %hhx-%hhx-%hhx-%hhx\n", key[0],
+                key[1], key[2], key[3]);
     checkInit();
+
+    auto result = findNode(key);
+    NodeIndex nodeIndex = std::get<0>(result);
+    int index = std::get<1>(result);
+    bool found = std::get<2>(result);
+
+    if (!found) {
+        return false;
+    }
+
+    PageHandle handle = PF::getHandle(fd, nodeIndex);
+    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
+
+    // Remove the entry.
+    // First, move the entry to the leaf node.
+    if (!node->isLeaf()) {
+        NodeIndex targetNodeIndex = node->children[index + 1];
+        PageHandle targetHandle = getHandle(targetNodeIndex);
+        IndexNode *targetNode = PF::loadRaw<IndexNode *>(targetHandle);
+        while (!targetNode->isLeaf()) {
+            targetNodeIndex = targetNode->children[0];
+            targetNode = PF::loadRaw<IndexNode *>(getHandle(targetNodeIndex));
+        }
+        // Swap the entries.
+        node->entry[index] = targetNode->entry[0];
+        PF::markDirty(handle);
+
+        node = targetNode;
+        nodeIndex = targetNodeIndex;
+        index = 0;
+    }
+
+    assert(node->isLeaf());
+
+    // Remove the entry.
+    for (int i = index; i < node->numEntry - 1; i++) {
+        node->entry[i] = node->entry[i + 1];
+    }
+    node->numEntry--;
+
+    // Solve underflow.
+    checkUnderflowFrom(nodeIndex);
+
+    // Mark dirty.
+    PF::markDirty(getHandle(node->index));
+
+    meta.numEntry--;
+    flushMeta();
+
+    return true;
 }
 
-RecordID Index::find(const char *data) {
-    Logger::log(VERBOSE, "Index: finding record\n");
+RecordID Index::find(const char *key) {
+    Logger::log(VERBOSE, "Index: finding record %hhx-%hhx-%hhx-%hhx\n", key[0],
+                key[1], key[2], key[3]);
     checkInit();
 
     // TODO: Pin the root node.
 
-    auto result = findNode(data);
+    auto result = findNode(key);
     NodeIndex nodeIndex = std::get<0>(result);
     int index = std::get<1>(result);
     bool found = std::get<2>(result);
@@ -148,7 +204,7 @@ RecordID Index::find(const char *data) {
     return node->entry[index].record;
 }
 
-std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *value) {
+std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *key) {
     // Start from the root node.
     int currentNode = meta.rootNode;
 
@@ -159,11 +215,11 @@ std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *value) {
         int nextChild = node->numEntry;
 
         for (int i = 0; i < node->numEntry; i++) {
-            if (node->entry[i] == value) {
+            if (node->entry[i].eq(key, meta.type)) {
                 // Found the exact node.
                 return {currentNode, i, true};
             }
-            if (node->entry[i] > value) {
+            if (node->entry[i].gt(key, meta.type)) {
                 nextChild = i;
                 break;
             }
@@ -203,7 +259,7 @@ int Index::insertEntry(IndexNode *node, const IndexEntry &entry) {
     // Find the insert position.
     int index = node->numEntry;
     for (int i = 0; i < node->numEntry; i++) {
-        if (node->entry[i] > entry.value) {
+        if (node->entry[i].gt(entry.key, meta.type)) {
             index = i;
             break;
         }
@@ -316,8 +372,200 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     PF::markDirty(nodeHandle);
     PF::markDirty(parentHandle);
 
-    // Check if the parent node overflows recursively.
+    // Check recursively if the parent node overflows.
     checkOverflowFrom(node->parent);
+}
+
+void Index::checkUnderflowFrom(NodeIndex index) {
+    PageHandle nodeHandle = getHandle(index);
+    IndexNode *node = PF::loadRaw<IndexNode *>(nodeHandle);
+
+    if (node->numEntry >= MIN_NUM_ENTRY_PER_NODE ||
+        node->parent == IndexNode::NULL_NODE) {
+        return;
+    }
+
+    // Find the index of the node in the parent node.
+    PageHandle parentHandle = getHandle(node->parent);
+    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
+    int indexInParent = -1;
+    for (int i = 0; i < parentNode->numChildren; i++) {
+        if (parentNode->children[i] == index) {
+            indexInParent = i;
+            break;
+        }
+    }
+
+    assert(indexInParent >= 0);
+
+    if (indexInParent > 0) {
+        // Got a left sibling.
+        PageHandle leftSiblingHandle =
+            getHandle(parentNode->children[indexInParent - 1]);
+        IndexNode *leftSiblingNode =
+            PF::loadRaw<IndexNode *>(leftSiblingHandle);
+
+        if (leftSiblingNode->numEntry > MIN_NUM_ENTRY_PER_NODE) {
+            // Transfer an entry from the parent to the node.
+            insertEntry(node, parentNode->entry[indexInParent - 1]);
+            // Transfer an entry from the left sibling to the parent.
+            parentNode->entry[indexInParent - 1] =
+                leftSiblingNode->entry[leftSiblingNode->numEntry - 1];
+            leftSiblingNode->numEntry--;
+
+            // Transfer the rightmost child of the left sibling to the node.
+            if (!leftSiblingNode->isLeaf()) {
+                // First, shift the children of the node.
+                for (int i = node->numChildren; i > 0; i--) {
+                    node->children[i] = node->children[i - 1];
+                }
+                node->children[0] =
+                    leftSiblingNode->children[leftSiblingNode->numChildren - 1];
+                node->numChildren++;
+                leftSiblingNode->numChildren--;
+                // Update the parent of the child.
+                PageHandle childHandle = getHandle(node->children[0]);
+                IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
+                childNode->parent = node->index;
+                PF::markDirty(childHandle);
+            }
+
+            // Mark dirty.
+            PF::markDirty(leftSiblingHandle);
+            PF::markDirty(nodeHandle);
+            PF::markDirty(parentHandle);
+
+            return;
+        }
+    }
+
+    assert(parentHandle.validate());
+    assert(nodeHandle.validate());
+
+    if (indexInParent < parentNode->numChildren - 1) {
+        // Got a right sibling.
+        PageHandle rightSiblingHandle =
+            getHandle(parentNode->children[indexInParent + 1]);
+        IndexNode *rightSiblingNode =
+            PF::loadRaw<IndexNode *>(rightSiblingHandle);
+
+        if (rightSiblingNode->numEntry > MIN_NUM_ENTRY_PER_NODE) {
+            // Transfer an entry from the parent to the node.
+            insertEntry(node, parentNode->entry[indexInParent]);
+            // Transfer an entry from the right sibling to the parent.
+            parentNode->entry[indexInParent] = rightSiblingNode->entry[0];
+            // Shift the entries of the right sibling.
+            for (int i = 0; i < rightSiblingNode->numEntry - 1; i++) {
+                rightSiblingNode->entry[i] = rightSiblingNode->entry[i + 1];
+            }
+            rightSiblingNode->numEntry--;
+
+            // Transfer the leftmost child of the right sibling to the node.
+            if (!rightSiblingNode->isLeaf()) {
+                node->children[node->numChildren] =
+                    rightSiblingNode->children[0];
+                node->numChildren++;
+                // Shift the children of the right sibling.
+                for (int i = 0; i < rightSiblingNode->numChildren - 1; i++) {
+                    rightSiblingNode->children[i] =
+                        rightSiblingNode->children[i + 1];
+                }
+                rightSiblingNode->numChildren--;
+                // Update the parent of the child.
+                PageHandle childHandle =
+                    getHandle(node->children[node->numChildren - 1]);
+                IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
+                childNode->parent = node->index;
+                PF::markDirty(childHandle);
+            }
+
+            // Mark dirty.
+            PF::markDirty(nodeHandle);
+            PF::markDirty(parentHandle);
+            PF::markDirty(rightSiblingHandle);
+
+            return;
+        }
+    }
+
+    assert(parentHandle.validate());
+    assert(nodeHandle.validate());
+
+    if (indexInParent > 0) {
+        // Collapse with the left sibling.
+        collapse(parentNode->children[indexInParent - 1], index,
+                 indexInParent - 1);
+        return;
+    }
+
+    assert(parentHandle.validate());
+    assert(nodeHandle.validate());
+
+    if (indexInParent < parentNode->numChildren - 1) {
+        // Collapse with the right sibling.
+        collapse(index, parentNode->children[indexInParent + 1], indexInParent);
+        return;
+    }
+
+    assert(parentHandle.validate());
+    assert(nodeHandle.validate());
+
+    checkUnderflowFrom(node->parent);
+}
+
+void Index::collapse(NodeIndex left, NodeIndex right, int parentEntryIndex) {
+    PageHandle leftHandle = getHandle(left);
+    IndexNode *leftNode = PF::loadRaw<IndexNode *>(leftHandle);
+
+    PageHandle rightHandle = getHandle(right);
+    IndexNode *rightNode = PF::loadRaw<IndexNode *>(rightHandle);
+
+    PageHandle parentHandle = getHandle(leftNode->parent);
+    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
+
+    // Remove the entry from the parent.
+    IndexEntry entry = parentNode->entry[parentEntryIndex];
+    for (int i = parentEntryIndex; i < parentNode->numEntry - 1; i++) {
+        parentNode->entry[i] = parentNode->entry[i + 1];
+    }
+    parentNode->numEntry--;
+
+    // Insert it into the left sibling.
+    insertEntry(leftNode, entry);
+
+    // Remove the right node as a child of the parent.
+    for (int i = parentEntryIndex + 1; i < parentNode->numChildren - 1; i++) {
+        parentNode->children[i] = parentNode->children[i + 1];
+    }
+    parentNode->numChildren--;
+
+    // Merge the children of the right node into the left sibling.
+    for (int i = 0; i < rightNode->numChildren; i++) {
+        leftNode->children[leftNode->numChildren + i] = rightNode->children[i];
+        // Update the parent of the child.
+        // FIXME: This requires lots of IO.
+        PageHandle childHandle =
+            getHandle(leftNode->children[leftNode->numChildren + i]);
+        IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
+        childNode->parent = leftNode->index;
+        PF::markDirty(childHandle);
+    }
+    leftNode->numChildren += rightNode->numChildren;
+
+    // Merge the entries of the right node into the left sibling.
+    for (int i = 0; i < rightNode->numEntry; i++) {
+        leftNode->entry[leftNode->numEntry + i] = rightNode->entry[i];
+    }
+    leftNode->numEntry += rightNode->numEntry;
+
+    // TODO: Release the page of the deleted node.
+
+    // Mark dirty.
+    PF::markDirty(leftHandle);
+    PF::markDirty(rightHandle);
+    PF::markDirty(parentHandle);
+
+    return;
 }
 
 void Index::flushMeta() {
@@ -347,7 +595,7 @@ void Index::dump() {
 
         printf("Node %d: ", index);
         for (int i = 0; i < node->numEntry; i++) {
-            printf("%d ", *(int *)(node->entry[i].value));
+            printf("%d ", *(int *)(node->entry[i].key));
         }
         printf("( %d : ", node->parent);
 
@@ -361,21 +609,10 @@ void Index::dump() {
 #endif
 
 // ==== IndexEntry ====
-bool Index::IndexEntry::operator<(const char *value) const {
+bool Index::IndexEntry::gt(const char *value, DataType type) const {
     switch (type) {
         case INT:
-            return *(int *)(this->value) < *(int *)value;
-        case FLOAT:
-            return Internal::_Float(value) < Internal::_Float(value);
-        default:
-            assert(false);
-    }
-}
-
-bool Index::IndexEntry::operator>(const char *value) const {
-    switch (type) {
-        case INT:
-            return *(int *)(this->value) > *(int *)value;
+            return *(int *)key > *(int *)value;
         case FLOAT:
             return Internal::_Float(value) > Internal::_Float(value);
         default:
@@ -383,23 +620,15 @@ bool Index::IndexEntry::operator>(const char *value) const {
     }
 }
 
-bool Index::IndexEntry::operator==(const char *value) const {
+bool Index::IndexEntry::eq(const char *value, DataType type) const {
     switch (type) {
         case INT:
-            return *(int *)(this->value) == *(int *)value;
+            return *(int *)key == *(int *)value;
         case FLOAT:
             return Internal::_Float(value) == Internal::_Float(value);
         default:
             assert(false);
     }
-}
-
-bool Index::IndexEntry::operator>=(const char *value) const {
-    return !operator<(value);
-}
-
-bool Index::IndexEntry::operator<=(const char *value) const {
-    return !operator>(value);
 }
 
 }  // namespace SimpleDB

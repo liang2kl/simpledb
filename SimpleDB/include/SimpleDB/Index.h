@@ -15,13 +15,14 @@ private:
 
 public:
     Index() = default;
+    ~Index();
     void open(const std::string &file);
     void create(const std::string &file, ColumnMeta column);
     void close();
 
-    bool insert(const char *data, RecordID id);
-    void remove(RecordID id);
-    RecordID find(const char *data);
+    bool insert(const char *key, RecordID id);
+    bool remove(const char *key);
+    RecordID find(const char *key);
 
 #ifndef TESTING
 private:
@@ -29,6 +30,7 @@ private:
     struct IndexMeta {
         uint16_t headCanary = INDEX_META_CANARY;
         int numNode;
+        int numEntry;
         NodeIndex rootNode;
         DataType type;
         ColumnSizeType size;
@@ -36,15 +38,11 @@ private:
     };
 
     struct IndexEntry {
-        char value[4];
-        DataType type;  // FIXME: This is redundant.
+        char key[4];
         RecordID record;
 
-        bool operator<(const char *value) const;
-        bool operator>(const char *value) const;
-        bool operator==(const char *value) const;
-        bool operator>=(const char *value) const;
-        bool operator<=(const char *value) const;
+        bool eq(const char *value, DataType type) const;
+        bool gt(const char *value, DataType type) const;
     };
 
     struct IndexNode {
@@ -75,8 +73,11 @@ private:
 
     std::tuple<NodeIndex, int, bool> findNode(const char *value);
     NodeIndex createNewLeafNode(int parent);
+    // Insert the entry WITHOUT checking the constraints.
     int insertEntry(IndexNode *node, const IndexEntry &entry);
     void checkOverflowFrom(NodeIndex index);
+    void checkUnderflowFrom(NodeIndex index);
+    void collapse(NodeIndex left, NodeIndex right, int parentEntryIndex);
     inline PageHandle getHandle(NodeIndex index) {
         return PF::getHandle(fd, index);
     }

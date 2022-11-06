@@ -32,7 +32,10 @@ const int INDEX_SLOT_SIZE = 420;
 const int MAX_NUM_CHILD_PER_NODE = 20;
 const int MIN_NUM_CHILD_PER_NODE = (MAX_NUM_CHILD_PER_NODE + 1) / 2;
 const int MAX_NUM_ENTRY_PER_NODE = MAX_NUM_CHILD_PER_NODE - 1;
+const int MIN_NUM_ENTRY_PER_NODE = MIN_NUM_CHILD_PER_NODE - 1;
 static_assert((MAX_NUM_CHILD_PER_NODE - 1) * INDEX_SLOT_SIZE <= PAGE_SIZE);
+static_assert(MAX_NUM_CHILD_PER_NODE + MAX_NUM_ENTRY_PER_NODE + 3 <=
+              NUM_BUFFER_PAGE);
 
 const float EQUAL_PRECISION = std::numeric_limits<float>::epsilon();
 

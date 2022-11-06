@@ -45,6 +45,8 @@ void FileCoordinator::markDirty(const PageHandle &handle) {
     cacheManager->markDirty(handle);
 }
 
-// PageHandle FileCoordinator
+PageHandle FileCoordinator::renew(const PageHandle &handle) {
+    return cacheManager->renew(handle);
+}
 
 }  // namespace SimpleDB

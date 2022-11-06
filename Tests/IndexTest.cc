@@ -45,10 +45,13 @@ protected:
 };
 
 TEST_F(IndexTest, TestUninitializeAccess) {
-    EXPECT_THROW(index.insert(nullptr, {0, 0}),
+    int key = 1;
+    EXPECT_THROW(index.insert((const char *)&key, {0, 0}),
                  Error::IndexNotInitializedError);
-    EXPECT_THROW(index.remove({0, 0}), Error::IndexNotInitializedError);
-    EXPECT_THROW(index.find(nullptr), Error::IndexNotInitializedError);
+    EXPECT_THROW(index.remove((const char *)&key),
+                 Error::IndexNotInitializedError);
+    EXPECT_THROW(index.find((const char *)&key),
+                 Error::IndexNotInitializedError);
 }
 
 TEST_F(IndexTest, TestCreateNewIndex) {
@@ -67,12 +70,13 @@ TEST_F(IndexTest, TestInitFromInvalidFile) {
 }
 
 TEST_F(IndexTest, TestInsertGet) {
+    DisableLogGuard _;
     initIndex();
 
     // Create a set of random entries.
     std::set<int> keys;
 
-    while (keys.size() < 50 * MAX_NUM_ENTRY_PER_NODE) {
+    while (keys.size() < 1000 * MAX_NUM_ENTRY_PER_NODE) {
         keys.insert(rand());
     }
 
@@ -82,27 +86,76 @@ TEST_F(IndexTest, TestInsertGet) {
         entries.push_back({key, {rand(), rand()}});
     }
 
-    for (auto entry : entries) {
-        int key = entry.first;
+    std::shuffle(entries.begin(), entries.end(), std::mt19937(0));
+
+    for (int i = 0; i < entries.size(); i++) {
+        auto [key, rid] = entries[i];
         bool succeed;
-        ASSERT_NO_THROW(succeed =
-                            index.insert((const char *)&key, entry.second));
+        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
         EXPECT_TRUE(succeed);
+        EXPECT_EQ(index.meta.numEntry, i + 1);
 
         // Test duplidate keys.
-        ASSERT_NO_THROW(succeed =
-                            index.insert((const char *)&key, entry.second));
+        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
         EXPECT_FALSE(succeed);
     }
 
     reloadIndex();
 
     // Validate the entries.
+    std::shuffle(entries.begin(), entries.end(), std::mt19937(0));
+
     for (auto entry : entries) {
         int key = entry.first;
         RecordID rid;
         ASSERT_NO_THROW(rid = index.find((const char *)&key));
         EXPECT_EQ(rid, entry.second);
+    }
+
+    FileCoordinator::shared.cacheManager->discardAll(index.fd);
+}
+
+TEST_F(IndexTest, TestRemove) {
+    DisableLogGuard _;
+    initIndex();
+
+    // Create a set of random entries.
+    std::set<int> keys;
+
+    while (keys.size() < 1000 * MAX_NUM_ENTRY_PER_NODE) {
+        keys.insert(rand());
+    }
+
+    std::vector<std::pair<int, RecordID>> entries;
+
+    for (auto key : keys) {
+        entries.push_back({key, {rand(), rand()}});
+    }
+
+    std::shuffle(entries.begin(), entries.end(), std::mt19937(0));
+
+    for (auto entry : entries) {
+        int key = entry.first;
+        RecordID rid = entry.second;
+        bool succeed;
+        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
+        EXPECT_TRUE(succeed);
+    }
+
+    // Remove the entries.
+    std::shuffle(entries.begin(), entries.end(), std::mt19937(0));
+
+    for (int i = 0; i < entries.size(); i++) {
+        auto [key, rid] = entries[i];
+
+        bool succeed;
+        ASSERT_NO_THROW(succeed = index.remove((const char *)&key));
+        ASSERT_TRUE(succeed);
+        EXPECT_EQ(index.meta.numEntry, entries.size() - i - 1);
+
+        // Test remove non-exist key.
+        ASSERT_NO_THROW(succeed = index.remove((const char *)&key));
+        ASSERT_FALSE(succeed);
     }
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);

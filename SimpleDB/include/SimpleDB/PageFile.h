@@ -47,6 +47,10 @@ inline void markDirty(const PageHandle &handle) {
     FileCoordinator::shared.markDirty(handle);
 }
 
+inline PageHandle renew(const PageHandle &handle) {
+    return FileCoordinator::shared.renew(handle);
+}
+
 }  // namespace PF
 }  // namespace SimpleDB
 
