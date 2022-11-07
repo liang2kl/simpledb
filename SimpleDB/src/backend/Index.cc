@@ -86,7 +86,7 @@ void Index::close() {
     // TODO: More cleanup
 }
 
-bool Index::insert(const char *key, RecordID id) {
+void Index::insert(const char *key, RecordID id) {
     Logger::log(VERBOSE,
                 "Index: inserting index (key: %hhx-%hhx-%hhx-%hhx) at page %d, "
                 "slot %d\n",
@@ -101,7 +101,7 @@ bool Index::insert(const char *key, RecordID id) {
 
     if (found) {
         // The record already exists.
-        return false;
+        throw Error::IndexKeyExistsError();
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
@@ -125,11 +125,9 @@ bool Index::insert(const char *key, RecordID id) {
 
     meta.numEntry++;
     flushMeta();
-
-    return true;
 }
 
-bool Index::remove(const char *key) {
+void Index::remove(const char *key) {
     Logger::log(VERBOSE, "Index: removing record %hhx-%hhx-%hhx-%hhx\n", key[0],
                 key[1], key[2], key[3]);
     checkInit();
@@ -137,7 +135,7 @@ bool Index::remove(const char *key) {
     auto [nodeIndex, index, found] = findNode(key);
 
     if (!found) {
-        return false;
+        throw Error::IndexKeyNotExistsError();
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
@@ -178,8 +176,6 @@ bool Index::remove(const char *key) {
 
     meta.numEntry--;
     flushMeta();
-
-    return true;
 }
 
 RecordID Index::find(const char *key) {

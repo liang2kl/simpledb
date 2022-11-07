@@ -20,8 +20,8 @@ public:
     void create(const std::string &file, ColumnMeta column);
     void close();
 
-    bool insert(const char *key, RecordID id);
-    bool remove(const char *key);
+    void insert(const char *key, RecordID id);
+    void remove(const char *key);
     RecordID find(const char *key);
 
 #ifndef TESTING

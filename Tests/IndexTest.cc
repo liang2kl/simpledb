@@ -94,12 +94,12 @@ TEST_F(IndexTest, TestInsertGet) {
     for (int i = 0; i < entries.size(); i++) {
         auto [key, rid] = entries[i];
         bool succeed;
-        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
-        EXPECT_TRUE(succeed);
+        ASSERT_NO_THROW(index.insert((const char *)&key, rid));
         EXPECT_EQ(index.meta.numEntry, i + 1);
 
         // Test duplidate keys.
-        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
+        ASSERT_THROW(index.insert((const char *)&key, rid),
+                     Error::IndexKeyExistsError);
         EXPECT_FALSE(succeed);
     }
 
@@ -140,9 +140,7 @@ TEST_F(IndexTest, TestRemove) {
     for (auto entry : entries) {
         int key = entry.first;
         RecordID rid = entry.second;
-        bool succeed;
-        ASSERT_NO_THROW(succeed = index.insert((const char *)&key, rid));
-        EXPECT_TRUE(succeed);
+        ASSERT_NO_THROW(index.insert((const char *)&key, rid));
     }
 
     // Remove the entries.
@@ -151,14 +149,12 @@ TEST_F(IndexTest, TestRemove) {
     for (int i = 0; i < entries.size(); i++) {
         auto [key, rid] = entries[i];
 
-        bool succeed;
-        ASSERT_NO_THROW(succeed = index.remove((const char *)&key));
-        ASSERT_TRUE(succeed);
+        ASSERT_NO_THROW(index.remove((const char *)&key));
         EXPECT_EQ(index.meta.numEntry, entries.size() - i - 1);
 
         // Test remove non-exist key.
-        ASSERT_NO_THROW(succeed = index.remove((const char *)&key));
-        ASSERT_FALSE(succeed);
+        ASSERT_THROW(index.remove((const char *)&key),
+                     Error::IndexKeyNotExistsError);
     }
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);

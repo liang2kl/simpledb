@@ -103,8 +103,10 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
                 "FileManager: fail to read page of file %s: seek to page "
                 "%d failed: %s\n",
                 file.fileName.c_str(), page, strerror(errno));
+            throw Error::ReadFileError();
+        } else {
+            return;
         }
-        throw Error::ReadFileError();
     }
 
     size_t readSize = fread(data, 1, PAGE_SIZE, fd);
@@ -115,8 +117,10 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
                 "FileManager: fail to read page of file %s: read page %d "
                 "failed (read size %lu)\n",
                 file.fileName.c_str(), page, readSize);
+            throw Error::ReadFileError();
+        } else {
+            return;
         }
-        throw Error::ReadFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: read page %d from file %s\n", page,

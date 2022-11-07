@@ -133,11 +133,7 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
 
     // Read the page from disk as it is not cached. Note that the page might not
     // exist yet, so we must tolerate the error.
-    try {
-        fileManager->readPage(fd, page, cache->buf, true);
-    } catch (Error::ReadFileError) {
-        // Do nothing...
-    }
+    fileManager->readPage(fd, page, cache->buf, true);
 
     // Now add this active cache to the map and the linked list.
     cacheMap[page] = cache;

@@ -77,7 +77,8 @@ DECLARE_ERROR(CreateIndex, IndexErrorBase, "Fail to create index");
 DECLARE_ERROR(InvalidIndexType, IndexErrorBase, "Invalid index column type");
 DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
               "The index is not initialized yet");
-DECLARE_ERROR(IndexExists, IndexErrorBase, "The index is already existed");
+DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "The index is already existed");
+DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
 
 #undef DECLARE_ERROR
 
