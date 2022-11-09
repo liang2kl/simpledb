@@ -142,7 +142,6 @@ void Table::create(const std::string &file, const std::string &name,
         throw Error::InvalidColumnSizeError();
     }
 
-    flushMeta();
     initialized = true;
 }
 
@@ -248,7 +247,6 @@ void Table::remove(RecordID id) {
         // The page now will have an empty slot. Add it to the free list.
         pageMeta->nextFree = meta.firstFree;
         meta.firstFree = id.page;
-        flushMeta();
     }
 
     // Mark the slot as unoccupied.
@@ -267,6 +265,8 @@ void Table::close() {
         return;
     }
     Logger::log(VERBOSE, "Table: closing table\n");
+
+    flushMeta();
 
     PF::close(fd);
     for (auto &iter : pageHandleMap) {
@@ -447,7 +447,6 @@ RecordID Table::getEmptySlot() {
         flushPageMeta(meta.firstFree, pageMeta);
 
         meta.numUsedPages++;
-        flushMeta();
         // The firstFree of table remain unchanged.
 
         return {meta.firstFree, 1};
@@ -483,7 +482,6 @@ RecordID Table::getEmptySlot() {
         if (pageMeta->occupied == SLOT_FULL_MASK) {
             // This page is full, modify meta.
             meta.firstFree = pageMeta->nextFree;
-            flushMeta();
         }
 
         // Mark the page as dirty.

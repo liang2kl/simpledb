@@ -70,8 +70,6 @@ void Index::create(const std::string &file, ColumnMeta column) {
     NodeIndex index = createNewLeafNode(IndexNode::NULL_NODE);
     meta.rootNode = index;
 
-    flushMeta();
-
     initialized = true;
 }
 
@@ -79,7 +77,10 @@ void Index::close() {
     if (!initialized) {
         return;
     }
+
     Logger::log(VERBOSE, "Index: closing index\n");
+
+    flushMeta();
 
     PF::close(fd);
     initialized = false;
@@ -124,7 +125,6 @@ void Index::insert(const char *key, RecordID id) {
     PF::markDirty(handle);
 
     meta.numEntry++;
-    flushMeta();
 }
 
 void Index::remove(const char *key) {
@@ -175,7 +175,6 @@ void Index::remove(const char *key) {
     PF::markDirty(getHandle(nodeIndex));
 
     meta.numEntry--;
-    flushMeta();
 }
 
 RecordID Index::find(const char *key) {
@@ -245,8 +244,6 @@ Index::NodeIndex Index::createNewLeafNode(int parent) {
         // Just bump the `nextFreePage`.
         meta.firstFreePage++;
     }
-
-    flushMeta();
 
     IndexNode *node = PF::loadRaw<IndexNode *>(handle);
     node->numChildren = 0;
@@ -354,7 +351,6 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
 
         // And the meta...
         meta.rootNode = newRootIndex;
-        flushMeta();
 
         return;
     }
@@ -530,7 +526,6 @@ void Index::checkUnderflowFrom(NodeIndex index) {
         nodeHandle = PF::renew(nodeHandle);
 
         PF::markDirty(nodeHandle);
-        flushMeta();
 
         return;
     }
@@ -606,7 +601,6 @@ void Index::release(NodeIndex index) {
     meta.firstFreePage = index;
 
     PF::markDirty(handle);
-    flushMeta();
 }
 
 void Index::flushMeta() {
