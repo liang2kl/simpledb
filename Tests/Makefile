@@ -19,6 +19,8 @@ LIBS = -L../SimpleDB/lib -lSimpleDB-Test -L../googletest/build/lib -lgtest
 TEST_SRC = $(shell find $(SRC_DIR) -name '*.cc')
 TEST_OBJS = $(foreach file,$(TEST_SRC),$(OBJ_DIR)/$(notdir $(basename $(file))).o)
 
+HEADERS = $(shell find $(SRC_DIR) ../SimpleDB/include/SimpleDB -name '*.h')
+
 export TESTING = true
 export DEBUG = true
 
@@ -30,7 +32,7 @@ test: $(BIN_DIR)/$(TEST_TARGET)
 $(BIN_DIR)/$(TEST_TARGET): $(GTEST_LIB) $(TEST_OBJS) | $(DB_LIB) $(BIN_DIR) $(OBJ_DIR)
 	$(CC) $(CXXFLAGS) $(LIBS) $(TEST_OBJS) -o $@
 
-$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc $(HEADERS) | $(DB_LIB) $(OBJ_DIR)
 	$(CC) $(INCLUDE) $(CXXFLAGS) -c $< -o $@
 
 .PHONY: $(DB_LIB)

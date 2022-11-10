@@ -49,7 +49,7 @@ $(PARSER_LIB):
 	$(MAKE) -C $(PARSER_DIR) -j
 
 define make-goal
-$1obj/%$(OBJ_SUFFIX): $1%.cc $(HEADERS)
+$1obj/%$(OBJ_SUFFIX): $1%.cc $(HEADERS) | $(PARSER_LIB) 
 	@mkdir -p $1/obj
 	$(CC) $(INCLUDE) $(CXXFLAGS) $(FLAGS) -c $$< -o $$@
 endef

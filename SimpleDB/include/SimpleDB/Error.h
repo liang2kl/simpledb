@@ -2,21 +2,30 @@
 #define _SIMPLEDB_BASE_ERROR_H
 
 #include <exception>
+#include <string>
 
 namespace SimpleDB {
 
 struct BaseError : std::exception {
-    virtual const char* what() const noexcept { return "Base error"; }
+    BaseError(std::string description) : description(description) {}
+    virtual const char* what() const noexcept { return description.c_str(); }
+
+private:
+    std::string description;
 };
 
-#define DECLARE_ERROR_CLASS(ErrorClass, BaseClass, description)           \
-    struct ErrorClass##ErrorBase : BaseClass {                            \
-        virtual const char* what() const noexcept { return description; } \
+#define DECLARE_ERROR_CLASS(ErrorClass, BaseClass, description) \
+    struct ErrorClass##ErrorBase : BaseError {                  \
+        ErrorClass##ErrorBase(std::string _description)         \
+            : BaseError(_description) {}                        \
+        ErrorClass##ErrorBase() : BaseError(description) {}     \
     };
 
-#define DECLARE_ERROR(ErrorType, BaseClass, description)                  \
-    struct ErrorType##Error : BaseClass {                                 \
-        virtual const char* what() const noexcept { return description; } \
+#define DECLARE_ERROR(ErrorType, BaseClass, description)                   \
+    struct ErrorType##Error : BaseClass {                                  \
+        ErrorType##Error(std::string _description)                         \
+            : BaseClass(std::string(description) + ": " + _description) {} \
+        ErrorType##Error() : BaseClass(description) {}                     \
     };
 
 // Internal errors.
@@ -84,9 +93,22 @@ DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
 DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "The index is already existed");
 DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
 
-#undef DECLARE_ERROR
-
 }  // namespace Internal
+
+// Exposed errors.
+namespace Error {
+
+DECLARE_ERROR_CLASS(Execution, BaseError, "Fail to execute SQL");
+DECLARE_ERROR(Syntax, ExecutionErrorBase, "Syntax error");
+DECLARE_ERROR(Unknown, ExecutionErrorBase, "Unknown exception");
+DECLARE_ERROR(Internal, ExecutionErrorBase, "Internal error");
+DECLARE_ERROR(IncompatableValue, ExecutionErrorBase,
+              "Incompatable value error");
+
+}  // namespace Error
+
+#undef DECLARE_ERROR
+#undef DECLARE_ERROR_CLASS
 
 }  // namespace SimpleDB
 

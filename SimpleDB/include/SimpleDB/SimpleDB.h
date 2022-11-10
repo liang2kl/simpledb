@@ -1,6 +1,7 @@
 #ifndef _SIMPLEDB_SIMPLEDB_H
 #define _SIMPLEDB_SIMPLEDB_H
 
+#include "DBMS.h"
 #include "Error.h"
 #include "FileDescriptor.h"
 #include "Index.h"
