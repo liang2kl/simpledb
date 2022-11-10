@@ -72,7 +72,7 @@ static bool _comparer(CompareOp op, const char *lhs, const char *rhs) {
                         "RecordIterator: internal error: invalid compare op %d "
                         "for _comparer<T>\n",
                         op);
-            throw Error::UnexpedtedOperatorError();
+            throw Internal::UnexpedtedOperatorError();
     }
 }
 
@@ -87,7 +87,7 @@ static bool _nullComparer(CompareOp op, const Column &column) {
                         "RecordIterator: internal error: invalid compare op %d "
                         "for IS_NULL or NOT_NULL comparision\n",
                         op);
-            throw Error::UnexpedtedOperatorError();
+            throw Internal::UnexpedtedOperatorError();
     }
 }
 
@@ -99,7 +99,7 @@ static bool _regexComparer(CompareOp op, const Column &column,
                     "RecordIterator: internal error: invalid compare op %d "
                     "for LIKE comparision\n",
                     op);
-        throw Error::UnexpedtedOperatorError();
+        throw Internal::UnexpedtedOperatorError();
     }
 #endif
     try {
@@ -108,7 +108,7 @@ static bool _regexComparer(CompareOp op, const Column &column,
     } catch (std::regex_error &e) {
         Logger::log(ERROR, "RecordIterator: invalid input regex \"%s\"\n",
                     regexStr);
-        throw Error::InvalidRegexError();
+        throw Internal::InvalidRegexError();
     }
 }
 
@@ -119,7 +119,7 @@ bool RecordIterator::validate(const Columns columns,
     for (auto &condition : conditions) {
         int columnIndex = table->getColumnIndex(condition.columnName);
         if (columnIndex < 0) {
-            throw Error::InvalidColumnNameError();
+            throw Internal::InvalidColumnNameError();
         }
 
         Column &column = columns[columnIndex];
@@ -140,7 +140,7 @@ bool RecordIterator::validate(const Columns columns,
                             "VARCHAR column, but column %s is of type "
                             "%d\n",
                             condition.columnName, column.type);
-                throw Error::InvalidOperatorError();
+                throw Internal::InvalidOperatorError();
             }
             return _regexComparer(condition.op, column, condition.value);
         }

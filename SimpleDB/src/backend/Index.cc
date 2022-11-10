@@ -26,7 +26,7 @@ void Index::open(const std::string &file) {
     } catch (BaseError) {
         Logger::log(ERROR, "Index: fail to read index metadata from file %d\n",
                     fd.value);
-        throw Error::ReadIndexError();
+        throw Internal::ReadIndexError();
     }
 
     if (meta.headCanary != INDEX_META_CANARY ||
@@ -35,7 +35,7 @@ void Index::open(const std::string &file) {
                     "Index: fail to read index metadata from file %d: "
                     "invalid canary values\n",
                     fd.value);
-        throw Error::ReadIndexError();
+        throw Internal::ReadIndexError();
     }
 
     initialized = true;
@@ -45,19 +45,19 @@ void Index::create(const std::string &file, ColumnMeta column) {
     try {
         PF::create(file);
         fd = PF::open(file);
-    } catch (Error::FileExistsError) {
+    } catch (Internal::FileExistsError) {
         Logger::log(
             WARNING,
             "Index: creating an empty index to file %s that already exists\n",
             file.c_str());
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
-        throw Error::CreateIndexError();
+        throw Internal::CreateIndexError();
     }
 
     if (meta.type == VARCHAR) {
         Logger::log(ERROR, "Index: index on varchar is not supported\n");
-        throw Error::InvalidIndexTypeError();
+        throw Internal::InvalidIndexTypeError();
     }
 
     meta.type = column.type;
@@ -102,7 +102,7 @@ void Index::insert(const char *key, RecordID id) {
 
     if (found) {
         // The record already exists.
-        throw Error::IndexKeyExistsError();
+        throw Internal::IndexKeyExistsError();
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
@@ -135,7 +135,7 @@ void Index::remove(const char *key) {
     auto [nodeIndex, index, found] = findNode(key);
 
     if (!found) {
-        throw Error::IndexKeyNotExistsError();
+        throw Internal::IndexKeyNotExistsError();
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
@@ -612,7 +612,7 @@ void Index::flushMeta() {
 void Index::checkInit() {
     if (!initialized) {
         Logger::log(ERROR, "Index: not initialized yet\n");
-        throw Error::IndexNotInitializedError();
+        throw Internal::IndexNotInitializedError();
     }
 }
 

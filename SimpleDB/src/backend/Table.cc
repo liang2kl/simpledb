@@ -37,7 +37,7 @@ void Table::open(const std::string &file) {
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to read table metadata from file %d\n",
                     fd.value);
-        throw Error::ReadTableError();
+        throw Internal::ReadTableError();
     }
 
     // Check the vadality of the meta.
@@ -47,7 +47,7 @@ void Table::open(const std::string &file) {
                     "Table: fail to read table metadata from file %d: "
                     "invalid canary values\n",
                     fd.value);
-        throw Error::ReadTableError();
+        throw Internal::ReadTableError();
     }
 
     // Initialize name mapping.
@@ -75,21 +75,21 @@ void Table::create(const std::string &file, const std::string &name,
             ERROR,
             "Table: fail to create table: too many columns: %d, max %d\n",
             numColumn, MAX_COLUMNS);
-        throw Error::TooManyColumnsError();
+        throw Internal::TooManyColumnsError();
     }
 
     try {
         // Create and open the file.
         PF::create(file);
         fd = PF::open(file);
-    } catch (Error::FileExistsError) {
+    } catch (Internal::FileExistsError) {
         Logger::log(
             WARNING,
             "Table: creating an empty table to file %s that already exists\n",
             file.c_str());
     } catch (BaseError) {
         Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
-        throw Error::CreateTableError();
+        throw Internal::CreateTableError();
     }
 
     if (name.size() > MAX_TABLE_NAME_LEN) {
@@ -97,7 +97,7 @@ void Table::create(const std::string &file, const std::string &name,
             ERROR,
             "Table: fail to create table to %s: table name %s too long\n",
             file.c_str(), name.c_str());
-        throw Error::CreateTableError();
+        throw Internal::CreateTableError();
     }
 
     meta.firstFree = 1;
@@ -118,14 +118,14 @@ void Table::create(const std::string &file, const std::string &name,
                         "larger than "
                         "maximum size %d\n",
                         i, columns[i].size, MAX_COLUMN_SIZE);
-            throw Error::InvalidColumnSizeError();
+            throw Internal::InvalidColumnSizeError();
         }
 
         if (columnNameMap.find(columns[i].name) != columnNameMap.end()) {
             Logger::log(ERROR,
                         "Table: insert failed: duplicate column name %s\n",
                         columns[i].name);
-            throw Error::DuplicateColumnNameError();
+            throw Internal::DuplicateColumnNameError();
         }
 
         meta.columns[i] = columns[i];
@@ -139,7 +139,7 @@ void Table::create(const std::string &file, const std::string &name,
                     "Table: total size of columns is %d, which is larger than "
                     "maximum size %d\n",
                     totalSize, RECORD_SLOT_SIZE - int(sizeof(RecordMeta)));
-        throw Error::InvalidColumnSizeError();
+        throw Internal::InvalidColumnSizeError();
     }
 
     initialized = true;
@@ -171,7 +171,7 @@ void Table::get(RecordID id, Columns columns, ColumnBitmap columnBitmap) {
             ERROR,
             "Table: fail to get record: page %d slot %d is not occupied\n",
             id.page, id.slot);
-        throw Error::InvalidSlotError();
+        throw Internal::InvalidSlotError();
     }
 
     char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
@@ -213,7 +213,7 @@ void Table::update(RecordID id, Columns columns, ColumnBitmap bitmap) {
             ERROR,
             "Table: fail to update record: page %d slot %d is not occupied\n",
             id.page, id.slot);
-        throw Error::InvalidSlotError();
+        throw Internal::InvalidSlotError();
     }
 
     char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
@@ -237,7 +237,7 @@ void Table::remove(RecordID id) {
             ERROR,
             "Table: fail to remove record: page %d slot %d is not occupied\n",
             id.page, id.slot);
-        throw Error::InvalidSlotError();
+        throw Internal::InvalidSlotError();
     }
 
     PageMeta *pageMeta = PF::loadRaw<PageMeta *>(*handle);
@@ -289,7 +289,7 @@ void Table::getColumnName(int index, char *name) {
     if (index < 0 || index >= meta.numColumn) {
         Logger::log(ERROR, "Table: column index %d out of range [0, %d)\n",
                     index, meta.numColumn);
-        throw Error::InvalidColumnIndexError();
+        throw Internal::InvalidColumnIndexError();
     }
     strcpy(name, meta.columns[index].name);
 }
@@ -315,7 +315,7 @@ PageHandle *Table::getHandle(int page) {
 void Table::checkInit() {
     if (!initialized) {
         Logger::log(ERROR, "Table: not initialized yet\n");
-        throw Error::TableNotInitializedError();
+        throw Internal::TableNotInitializedError();
     }
 }
 
@@ -345,7 +345,7 @@ void Table::deserialize(const char *srcData, Columns destObjects,
                             "Table: internal error: column %s is not nullable, "
                             "but a null value is found\n",
                             meta.columns[i].name);
-                throw Error::NullValueFoundInNotNullColumnError();
+                throw Internal::NullValueFoundInNotNullColumnError();
             }
 #endif
             column.isNull = true;
@@ -382,13 +382,13 @@ void Table::serialize(const Columns srcObjects, char *destData,
                         "Table: column type mismatch when serializing data of "
                         "column %d: expected %d, actual %d\n",
                         i, meta.columns[i].type, column.type);
-            throw Error::ColumnSerializationError();
+            throw Internal::ColumnSerializationError();
         } else if (column.size != meta.columns[i].size) {
             Logger::log(ERROR,
                         "Table: column size mismatch when serializing data of "
                         "column %d: expected %d, actual %d\n",
                         i, meta.columns[i].size, column.size);
-            throw Error::ColumnSerializationError();
+            throw Internal::ColumnSerializationError();
         }
 
         if (column.isNull) {
@@ -397,7 +397,7 @@ void Table::serialize(const Columns srcObjects, char *destData,
                             "Table: column %s is not nullable, but a null "
                             "value is given\n",
                             meta.columns[i].name);
-                throw Error::NullValueGivenForNotNullColumnError();
+                throw Internal::NullValueGivenForNotNullColumnError();
             }
             recordMeta->nullBitmap |= (1L << i);
         } else {
@@ -428,7 +428,7 @@ void Table::validateSlot(int page, int slot) {
             "Table: page/slot pair (%d, %d) is not valid, must be in range [0, "
             "%d) X [1, %d)\n",
             page, slot, meta.numUsedPages, NUM_SLOT_PER_PAGE);
-        throw Error::InvalidSlotError();
+        throw Internal::InvalidSlotError();
     }
 }
 
@@ -464,7 +464,7 @@ RecordID Table::getEmptySlot() {
                         "Table: page %d meta corrupted: head canary %d, tail "
                         "canary %d\n",
                         page, pageMeta->headCanary, pageMeta->tailCanary);
-            throw Error::InvalidPageMetaError();
+            throw Internal::InvalidPageMetaError();
         }
 
         int index = ffs(int(~pageMeta->occupied) & SLOT_OCCUPY_MASK);
@@ -472,7 +472,7 @@ RecordID Table::getEmptySlot() {
         if (index == 0) {
             Logger::log(
                 ERROR, "Table: page %d is full but not marked as full\n", page);
-            throw Error::InvalidPageMetaError();
+            throw Internal::InvalidPageMetaError();
         }
 
         index--;
@@ -526,7 +526,7 @@ Column::Column(const char *data, int maxLength) {
                     "Column: fail to create varchar column: length %d exceeds "
                     "maximum length %d\n",
                     maxLength, MAX_VARCHAR_LEN);
-        throw Error::InvalidColumnSizeError();
+        throw Internal::InvalidColumnSizeError();
     }
 
     size = maxLength;

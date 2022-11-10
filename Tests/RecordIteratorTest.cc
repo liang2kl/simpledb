@@ -271,7 +271,7 @@ TEST_F(RecordIteratorTest, TestLikeOp) {
     regex = "[1-9";
     conditions[0].value = regex;
     EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
-                 Error::InvalidRegexError);
+                 Internal::InvalidRegexError);
 }
 
 TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
@@ -284,7 +284,7 @@ TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
 
     Column readColumns[4];
     EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
-                 Error::InvalidOperatorError);
+                 Internal::InvalidOperatorError);
 }
 
 TEST_F(RecordIteratorTest, TestIndexedScan) {

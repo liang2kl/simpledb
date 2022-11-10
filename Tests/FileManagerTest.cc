@@ -79,7 +79,7 @@ TEST_F(FileManagerTest, TestExceedFiles) {
     char filePath[] = "tmp/file-overflow";
 
     ASSERT_NO_THROW(manager.createFile(filePath));
-    EXPECT_THROW(manager.openFile(filePath), Error::OpenFileExceededError)
+    EXPECT_THROW(manager.openFile(filePath), Internal::OpenFileExceededError)
         << "Open files exceeded but not thrown";
     ASSERT_NO_THROW(manager.deleteFile(filePath));
 }
@@ -91,13 +91,13 @@ TEST_F(FileManagerTest, TestInvalidFileDescriptor) {
 
     for (int fdValue = -1; fdValue <= FileManager::MAX_OPEN_FILES; fdValue++) {
         FileDescriptor fd(fdValue);
-        EXPECT_THROW(manager.closeFile(fd), Error::InvalidDescriptorError)
+        EXPECT_THROW(manager.closeFile(fd), Internal::InvalidDescriptorError)
             << "Close file with invalid descriptor but not thrown";
         EXPECT_THROW(manager.readPage(fd, 0, buf),
-                     Error::InvalidDescriptorError)
+                     Internal::InvalidDescriptorError)
             << "Read page with invalid descriptor but not thrown";
         EXPECT_THROW(manager.writePage(fd, 0, buf),
-                     Error::InvalidDescriptorError)
+                     Internal::InvalidDescriptorError)
             << "Write page with invalid descriptor but not thrown";
     }
 }
@@ -111,6 +111,7 @@ TEST_F(FileManagerTest, TestInvalidPageNumber) {
 
     char buf[PAGE_SIZE];
 
-    EXPECT_THROW(manager.readPage(fd, -1, buf), Error::InvalidPageNumberError);
+    EXPECT_THROW(manager.readPage(fd, -1, buf),
+                 Internal::InvalidPageNumberError);
     ASSERT_NO_THROW(manager.deleteFile(filePath));
 }

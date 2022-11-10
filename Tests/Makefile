@@ -8,7 +8,8 @@ SRC_DIR = .
 BIN_DIR = bin
 OBJ_DIR = obj
 
-INCLUDE = -I../SimpleDB/include -I../SimpleDB/include/SimpleDB -I../googletest/googletest/include
+INCLUDE = -I../SimpleDB/include -I../SimpleDB/include/SimpleDB \
+	-I../googletest/googletest/include -I../SQLParser/include -I../SQLParser/include/antlr4-runtime
 
 DB_LIB = ../SimpleDB/lib/libSimpleDB-Test.a
 GTEST_LIB = ../googletest/build/lib/libgtest.a

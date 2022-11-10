@@ -45,11 +45,12 @@ protected:
 };
 
 TEST_F(TableTest, TestUninitializeAccess) {
-    EXPECT_THROW(table.get({0, 0}, nullptr), Error::TableNotInitializedError);
-    EXPECT_THROW(table.insert(nullptr), Error::TableNotInitializedError);
+    EXPECT_THROW(table.get({0, 0}, nullptr),
+                 Internal::TableNotInitializedError);
+    EXPECT_THROW(table.insert(nullptr), Internal::TableNotInitializedError);
     EXPECT_THROW(table.update({0, 0}, nullptr),
-                 Error::TableNotInitializedError);
-    EXPECT_THROW(table.remove({0, 0}), Error::TableNotInitializedError);
+                 Internal::TableNotInitializedError);
+    EXPECT_THROW(table.remove({0, 0}), Internal::TableNotInitializedError);
 }
 
 TEST_F(TableTest, TestCreateNewTable) {
@@ -69,7 +70,7 @@ TEST_F(TableTest, TestCloseReset) {
 TEST_F(TableTest, TestInitFromInvalidFile) {
     const char *fileName = "tmp/invalid_file";
     PF::create(fileName);
-    EXPECT_THROW(table.open(fileName), Error::ReadTableError);
+    EXPECT_THROW(table.open(fileName), Internal::ReadTableError);
 }
 
 TEST_F(TableTest, TestInitWithDuplicateColumnName) {
@@ -78,7 +79,7 @@ TEST_F(TableTest, TestInitWithDuplicateColumnName) {
         {.type = INT, .size = 4, .name = "int_val"},
     };
     EXPECT_THROW(table.create("tmp/table", tableName, 2, columnMetas),
-                 Error::DuplicateColumnNameError);
+                 Internal::DuplicateColumnNameError);
 }
 
 TEST_F(TableTest, TestInsertGet) {
@@ -133,7 +134,7 @@ TEST_F(TableTest, TestRemove) {
 
     ASSERT_NO_THROW(table.remove(id));
     EXPECT_FALSE(table.occupied(handle, id.slot));
-    EXPECT_THROW(table.get(id, nullptr), Error::InvalidSlotError);
+    EXPECT_THROW(table.get(id, nullptr), Internal::InvalidSlotError);
 }
 
 TEST_F(TableTest, TestReleasePage) {
@@ -165,9 +166,9 @@ TEST_F(TableTest, TestColumnName) {
     }
 
     EXPECT_THROW(table.getColumnName(-1, readName),
-                 Error::InvalidColumnIndexError);
+                 Internal::InvalidColumnIndexError);
     EXPECT_THROW(table.getColumnName(numColumn, readName),
-                 Error::InvalidColumnIndexError);
+                 Internal::InvalidColumnIndexError);
 }
 
 TEST_F(TableTest, TestInvalidVarcharSize) {
@@ -176,7 +177,7 @@ TEST_F(TableTest, TestInvalidVarcharSize) {
     };
 
     EXPECT_THROW(table.create("tmp/table", tableName, 1, columnMetas),
-                 Error::InvalidColumnSizeError);
+                 Internal::InvalidColumnSizeError);
 }
 
 TEST_F(TableTest, TestMaxVarcharSize) {

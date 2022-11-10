@@ -24,11 +24,11 @@ ANTLR_BUILD_DIR = antlr4/runtime/Cpp/build
 ANTLR_RUNTIME_LIB = $(ANTLR_BUILD_DIR)/runtime/libantlr4-runtime.a
 ANTLR_INCLUDE_DIR = $(ANTLR_BUILD_DIR)/usr/local/include
 
-ANTLR_SOURCES = $(SRC_DIR)/SQLLexer.cpp $(SRC_DIR)/SQLParser.cpp \
-	$(SRC_DIR)/SQLVisitor.cpp $(SRC_DIR)/SQLBaseVisitor.cpp
+ANTLR_SOURCES = $(SRC_DIR)/SqlLexer.cpp $(SRC_DIR)/SqlParser.cpp \
+	$(SRC_DIR)/SqlVisitor.cpp $(SRC_DIR)/SqlBaseVisitor.cpp
 
-ANTLR_HEADERS = $(SRC_DIR)/SQLLexer.h $(SRC_DIR)/SQLParser.h \
-	$(SRC_DIR)/SQLVisitor.h $(SRC_DIR)/SQLBaseVisitor.h
+ANTLR_HEADERS = $(SRC_DIR)/SqlLexer.h $(SRC_DIR)/SqlParser.h \
+	$(SRC_DIR)/SqlVisitor.h $(SRC_DIR)/SqlBaseVisitor.h
 
 # Sources
 SRC_FILES = $(sort $(shell find $(SRC_DIR) -type f -name "*.cpp") $(ANTLR_SOURCES))

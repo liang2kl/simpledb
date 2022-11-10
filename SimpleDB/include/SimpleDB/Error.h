@@ -9,7 +9,6 @@ struct BaseError : std::exception {
     virtual const char* what() const noexcept { return "Base error"; }
 };
 
-namespace Error {
 #define DECLARE_ERROR_CLASS(ErrorClass, BaseClass, description)           \
     struct ErrorClass##ErrorBase : BaseClass {                            \
         virtual const char* what() const noexcept { return description; } \
@@ -20,8 +19,13 @@ namespace Error {
         virtual const char* what() const noexcept { return description; } \
     };
 
+// Internal errors.
+namespace Internal {
+
+DECLARE_ERROR_CLASS(Internal, BaseError, "Internal error");
+
 // ==== I/O Error ====
-DECLARE_ERROR_CLASS(IO, BaseError, "I/O error");
+DECLARE_ERROR_CLASS(IO, InternalErrorBase, "I/O error");
 
 DECLARE_ERROR(OpenFile, IOErrorBase, "Fail to open file");
 DECLARE_ERROR(CreateFile, IOErrorBase, "Fail to create file");
@@ -37,7 +41,7 @@ DECLARE_ERROR(OpenFileExceeded, IOErrorBase,
 DECLARE_ERROR(InvalidPageHandle, IOErrorBase, "Invalid page handle");
 
 // ==== Table Operation Error ====
-DECLARE_ERROR_CLASS(Table, BaseError, "Table operation error");
+DECLARE_ERROR_CLASS(Table, InternalErrorBase, "Table operation error");
 
 DECLARE_ERROR(ReadTable, TableErrorBase, "Fail to read table");
 DECLARE_ERROR(CreateTable, TableErrorBase, "Fail to create table");
@@ -60,7 +64,7 @@ DECLARE_ERROR(NullValueGivenForNotNullColumn, TableErrorBase,
               "Null value given for not null column");
 
 // ==== Iterator Error ====
-DECLARE_ERROR_CLASS(Iterator, BaseError, "Iterator error");
+DECLARE_ERROR_CLASS(Iterator, InternalErrorBase, "Iterator error");
 
 DECLARE_ERROR(InvalidColumnName, IteratorErrorBase, "Invalid column name");
 DECLARE_ERROR(UnexpedtedOperator, IteratorErrorBase, "Unexpected operator");
@@ -69,7 +73,7 @@ DECLARE_ERROR(InvalidRegex, IteratorErrorBase,
               "Invalid input regular expression");
 
 // ==== Index Error ====
-DECLARE_ERROR_CLASS(Index, BaseError, "Index error");
+DECLARE_ERROR_CLASS(Index, InternalErrorBase, "Index error");
 
 DECLARE_ERROR(InvalidIndexMeta, IndexErrorBase, "Invalid index meta");
 DECLARE_ERROR(ReadIndex, IndexErrorBase, "Fail to read index");
@@ -82,7 +86,7 @@ DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
 
 #undef DECLARE_ERROR
 
-}  // namespace Error
+}  // namespace Internal
 
 }  // namespace SimpleDB
 

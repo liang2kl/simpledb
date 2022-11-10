@@ -13,7 +13,7 @@ void FileManager::createFile(const std::string &fileName) {
     if (std::filesystem::exists(fileName)) {
         Logger::log(ERROR, "FileManager: file %s already exists\n",
                     fileName.c_str());
-        throw Error::FileExistsError();
+        throw Internal::FileExistsError();
     }
 
     FILE *fd = fopen(fileName.c_str(), "a");
@@ -21,7 +21,7 @@ void FileManager::createFile(const std::string &fileName) {
     if (fd == nullptr) {
         Logger::log(ERROR, "FileManager: failed to create file %s\n",
                     fileName.c_str());
-        throw Error::CreateFileError();
+        throw Internal::CreateFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: created file %s\n", fileName.c_str());
@@ -34,7 +34,7 @@ FileDescriptor FileManager::openFile(const std::string &fileName) {
     if (fd == nullptr) {
         Logger::log(ERROR, "FileManager: failed to open file %s\n",
                     fileName.c_str());
-        throw Error::OpenFileError();
+        throw Internal::OpenFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: opened file %s\n", fileName.c_str());
@@ -46,7 +46,7 @@ void FileManager::closeFile(FileDescriptor descriptor) {
         Logger::log(ERROR,
                     "FileManager: fail to close file: invalid descriptor %d\n",
                     descriptor.value);
-        throw Error::InvalidDescriptorError();
+        throw Internal::InvalidDescriptorError();
     }
 
     OpenedFile &file = openedFiles[descriptor];
@@ -57,7 +57,7 @@ void FileManager::closeFile(FileDescriptor descriptor) {
     if (err) {
         Logger::log(ERROR, "FileManager: fail to close file %s: %s\n",
                     file.fileName.c_str(), strerror(errno));
-        throw Error::CloseFileError();
+        throw Internal::CloseFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: closed file %s\n",
@@ -70,7 +70,7 @@ void FileManager::deleteFile(const std::string &fileName) {
     if (err) {
         Logger::log(ERROR, "FileManager: fail to delete file %s: %s\n",
                     fileName.c_str(), strerror(errno));
-        throw Error::DeleteFileError();
+        throw Internal::DeleteFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: deleted file %s\n", fileName.c_str());
@@ -82,14 +82,14 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
         Logger::log(ERROR,
                     "FileManager: fail to read page: invalid descriptor %d\n",
                     descriptor.value);
-        throw Error::InvalidDescriptorError();
+        throw Internal::InvalidDescriptorError();
     }
 
     if (page < 0) {
         Logger::log(ERROR,
                     "FileManager: fail to read page: invalid page number %d\n",
                     page);
-        throw Error::InvalidPageNumberError();
+        throw Internal::InvalidPageNumberError();
     }
 
     const OpenedFile &file = openedFiles[descriptor];
@@ -103,7 +103,7 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
                 "FileManager: fail to read page of file %s: seek to page "
                 "%d failed: %s\n",
                 file.fileName.c_str(), page, strerror(errno));
-            throw Error::ReadFileError();
+            throw Internal::ReadFileError();
         } else {
             return;
         }
@@ -117,7 +117,7 @@ void FileManager::readPage(FileDescriptor descriptor, int page, char *data,
                 "FileManager: fail to read page of file %s: read page %d "
                 "failed (read size %lu)\n",
                 file.fileName.c_str(), page, readSize);
-            throw Error::ReadFileError();
+            throw Internal::ReadFileError();
         } else {
             return;
         }
@@ -132,14 +132,14 @@ void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
         Logger::log(ERROR,
                     "FileManager: fail to write page: invalid descriptor %d\n",
                     descriptor.value);
-        throw Error::InvalidDescriptorError();
+        throw Internal::InvalidDescriptorError();
     }
 
     if (page < 0) {
         Logger::log(ERROR,
                     "FileManager: fail to write page: invalid page number %d\n",
                     page);
-        throw Error::InvalidPageNumberError();
+        throw Internal::InvalidPageNumberError();
     }
 
     const OpenedFile &file = openedFiles[descriptor];
@@ -151,7 +151,7 @@ void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
                     "FileManager: fail to write page of file %s: seek to page "
                     "%d failed: %s\n",
                     file.fileName.c_str(), page, strerror(errno));
-        throw Error::WriteFileError();
+        throw Internal::WriteFileError();
     }
 
     size_t writeSize = fwrite(data, 1, PAGE_SIZE, fd);
@@ -160,7 +160,7 @@ void FileManager::writePage(FileDescriptor descriptor, int page, char *data) {
             ERROR,
             "FileManager: fail to write page %d of file %s (write size: %lu)\n",
             page, file.fileName.c_str(), writeSize);
-        throw Error::WriteFileError();
+        throw Internal::WriteFileError();
     }
 
     Logger::log(VERBOSE, "FileManager: wrote page %d to file %s\n", page,
@@ -179,7 +179,7 @@ FileDescriptor FileManager::genNewDescriptor(FILE *fd,
 
     if (index == 0) {
         Logger::log(ERROR, "FileManager: Number of opened files exceeded.\n");
-        throw Error::OpenFileExceededError();
+        throw Internal::OpenFileExceededError();
     }
 
     // ffsll returns a 1-based index.

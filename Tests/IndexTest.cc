@@ -50,11 +50,11 @@ protected:
 TEST_F(IndexTest, TestUninitializeAccess) {
     int key = 1;
     EXPECT_THROW(index.insert((const char *)&key, {0, 0}),
-                 Error::IndexNotInitializedError);
+                 Internal::IndexNotInitializedError);
     EXPECT_THROW(index.remove((const char *)&key),
-                 Error::IndexNotInitializedError);
+                 Internal::IndexNotInitializedError);
     EXPECT_THROW(index.find((const char *)&key),
-                 Error::IndexNotInitializedError);
+                 Internal::IndexNotInitializedError);
 }
 
 TEST_F(IndexTest, TestCreateNewIndex) {
@@ -69,7 +69,7 @@ TEST_F(IndexTest, TestCreateNewIndex) {
 TEST_F(IndexTest, TestInitFromInvalidFile) {
     const char *fileName = "tmp/invalid_file";
     PF::create(fileName);
-    EXPECT_THROW(index.open(fileName), Error::ReadIndexError);
+    EXPECT_THROW(index.open(fileName), Internal::ReadIndexError);
 }
 
 TEST_F(IndexTest, TestInsertGet) {
@@ -99,7 +99,7 @@ TEST_F(IndexTest, TestInsertGet) {
 
         // Test duplidate keys.
         ASSERT_THROW(index.insert((const char *)&key, rid),
-                     Error::IndexKeyExistsError);
+                     Internal::IndexKeyExistsError);
         EXPECT_FALSE(succeed);
     }
 
@@ -154,7 +154,7 @@ TEST_F(IndexTest, TestRemove) {
 
         // Test remove non-exist key.
         ASSERT_THROW(index.remove((const char *)&key),
-                     Error::IndexKeyNotExistsError);
+                     Internal::IndexKeyNotExistsError);
     }
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);

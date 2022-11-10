@@ -27,7 +27,7 @@ void CacheManager::onCloseFile(FileDescriptor fd) {
             ERROR,
             "CacheManager: fail on closing file: invalid file descriptor: %d",
             fd.value);
-        throw Error::InvalidDescriptorError();
+        throw Internal::InvalidDescriptorError();
     }
 
     auto &map = activeCacheMapVec[fd];
@@ -72,7 +72,7 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
                     "descriptor: %d\n",
                     fd.value);
 
-        throw Error::InvalidDescriptorError();
+        throw Internal::InvalidDescriptorError();
     }
 
     if (page < 0) {
@@ -80,7 +80,7 @@ CacheManager::PageCache *CacheManager::getPageCache(FileDescriptor fd,
             ERROR,
             "CacheManager: fail to get page cache: invalid page number %d\n",
             page);
-        throw Error::InvalidPageNumberError();
+        throw Internal::InvalidPageNumberError();
     }
 
     // Check if the page is in the cache.
@@ -171,7 +171,7 @@ char *CacheManager::load(const PageHandle &handle) {
 char *CacheManager::loadRaw(const PageHandle &handle) {
 #ifdef _DEBUG
     if (!handle.validate()) {
-        throw Error::InvalidPageHandleError();
+        throw Internal::InvalidPageHandleError();
     }
 #endif
     return handle.cache->buf;
@@ -187,7 +187,7 @@ void CacheManager::markDirty(const PageHandle &handle) {
             "possible outdated page handle: current generation %d, got %d\n",
             cache->meta.fd.value, cache->meta.page, cache->generation,
             handle.generation);
-        throw Error::InvalidPageHandleError();
+        throw Internal::InvalidPageHandleError();
     }
 
     cache->dirty = true;
@@ -222,7 +222,7 @@ void CacheManager::writeBack(const PageHandle &handle) {
             "possible outdated page handle: current generation %d, got %d\n",
             cache->meta.fd.value, cache->meta.page, cache->generation,
             handle.generation);
-        throw Error::InvalidPageHandleError();
+        throw Internal::InvalidPageHandleError();
     }
 
     writeBack(cache);
