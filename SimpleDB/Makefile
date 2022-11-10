@@ -21,6 +21,7 @@ export TESTING
 CC = g++
 CXXFLAGS += -std=c++17
 AR = ar
+MAKE = make
 
 SRC_DIR = src
 LIB_DIR = lib
@@ -32,16 +33,16 @@ PARSER_INCLUDE_DIR = $(PARSER_DIR)/include
 SRC_FILES = $(shell find $(SRC_DIR) -type f -name "*.cc")
 OBJS = $(foreach file,$(SRC_FILES),$(dir $(file))obj/$(notdir $(basename $(file)))$(OBJ_SUFFIX))
 HEADERS = $(shell find $(INCLUDE_DIR) -name '*.h')
-INCLUDE = -I$(INCLUDE_DIR) -I$(PARSER_INCLUDE_DIR)
+INCLUDE = -I$(INCLUDE_DIR) -I$(PARSER_INCLUDE_DIR) -I$(PARSER_INCLUDE_DIR)/antlr4-runtime
 
 SUB_DIRS = $(sort $(foreach src,$(SRC_FILES),$(dir $(src))))
 
 all: $(LIB_DIR)/$(LIB_TARGET)
 
-$(LIB_DIR)/$(LIB_TARGET): $(OBJS) $(PARSER_LIB) | $(LIB_DIR)
+$(LIB_DIR)/$(LIB_TARGET): $(OBJS) | $(PARSER_LIB) $(LIB_DIR)
 	$(AR) rcs $@.tmp $(OBJS)
 	libtool -static -o $@ $(PARSER_LIB) $@.tmp
-	@-rm $@.tmp
+	rm $@.tmp
 
 .PHONY: $(PARSER_LIB)
 $(PARSER_LIB):

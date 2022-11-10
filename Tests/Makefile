@@ -26,7 +26,7 @@ all: $(BIN_DIR)/$(TEST_TARGET)
 test: $(BIN_DIR)/$(TEST_TARGET)
 	@$(BIN_DIR)/$(TEST_TARGET)
 
-$(BIN_DIR)/$(TEST_TARGET): $(DB_LIB) $(GTEST_LIB) $(TEST_OBJS) | $(BIN_DIR) $(OBJ_DIR)
+$(BIN_DIR)/$(TEST_TARGET): $(GTEST_LIB) $(TEST_OBJS) | $(DB_LIB) $(BIN_DIR) $(OBJ_DIR)
 	$(CC) $(CXXFLAGS) $(LIBS) $(TEST_OBJS) -o $@
 
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cc | $(OBJ_DIR)
