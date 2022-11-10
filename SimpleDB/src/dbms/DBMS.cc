@@ -2,9 +2,10 @@
 
 #include <SQLParser/SqlLexer.h>
 
-#include "Logger.h"
+#include "internal/Logger.h"
 
 using namespace SQLParser;
+using namespace SimpleDB::Internal;
 
 namespace SimpleDB {
 

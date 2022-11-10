@@ -3,12 +3,11 @@
 
 #include "DBMS.h"
 #include "Error.h"
-#include "FileDescriptor.h"
-#include "Index.h"
-#include "Logger.h"
-#include "Macros.h"
-#include "PageFile.h"
-#include "PageHandle.h"
-#include "Table.h"
+#include "internal/Logger.h"
+
+#ifdef TESTING
+#include "internal/Index.h"
+#include "internal/PageFile.h"
+#endif
 
 #endif

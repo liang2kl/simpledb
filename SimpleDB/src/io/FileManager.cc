@@ -5,9 +5,10 @@
 #include <filesystem>
 #include <iostream>
 
-#include "Logger.h"
+#include "internal/Logger.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 void FileManager::createFile(const std::string &fileName) {
     if (std::filesystem::exists(fileName)) {
@@ -190,4 +191,5 @@ FileDescriptor FileManager::genNewDescriptor(FILE *fd,
     return FileDescriptor(index);
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB

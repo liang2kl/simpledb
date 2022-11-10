@@ -5,10 +5,11 @@
 #include <vector>
 
 #include "Error.h"
-#include "FileDescriptor.h"
-#include "Macros.h"
+#include "internal/FileDescriptor.h"
+#include "internal/Macros.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 class FileManager {
 public:
@@ -41,6 +42,7 @@ private:
     FileDescriptor genNewDescriptor(FILE *fd, const std::string &fileName);
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

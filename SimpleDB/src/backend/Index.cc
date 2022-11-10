@@ -1,11 +1,12 @@
-#include "Index.h"
+#include "internal/Index.h"
 
 #include <queue>
 
-#include "Logger.h"
 #include "internal/Comparer.h"
+#include "internal/Logger.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 Index::~Index() { close(); }
 
@@ -666,4 +667,5 @@ bool Index::IndexEntry::eq(const char *value, DataType type) const {
     }
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB

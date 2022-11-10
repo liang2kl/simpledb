@@ -8,6 +8,7 @@
 #include "Util.h"
 
 using namespace SimpleDB;
+using namespace SimpleDB::Internal;
 
 class RecordIteratorTest : public ::testing::Test {
 protected:

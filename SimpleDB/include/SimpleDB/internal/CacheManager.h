@@ -8,6 +8,7 @@
 #include "internal/LinkedList.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 // Forward declaration.
 struct PageHandle;
@@ -111,6 +112,7 @@ private:
     PageCache *getPageCache(FileDescriptor fd, int page) noexcept(false);
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

@@ -2,6 +2,7 @@
 #define _SIMPLEDB_FILE_DESCRIPTOR
 
 namespace SimpleDB {
+namespace Internal {
 
 // The type for an external, transparent file descriptor. It's actually an
 // integer, but we wrap it for type checking.
@@ -17,5 +18,6 @@ bool inline operator==(const FileDescriptor &lhs, const FileDescriptor &rhs) {
     return lhs.value == rhs.value;
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB
 #endif

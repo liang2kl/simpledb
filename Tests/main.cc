@@ -3,6 +3,6 @@
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
-    SimpleDB::Logger::setLogLevel(SimpleDB::SILENT);
+    SimpleDB::Internal::Logger::setLogLevel(SimpleDB::Internal::SILENT);
     return RUN_ALL_TESTS();
 }

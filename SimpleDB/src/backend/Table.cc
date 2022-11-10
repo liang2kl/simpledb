@@ -1,14 +1,15 @@
-#include "Table.h"
+#include "internal/Table.h"
 
 #include <string.h>
 
 #include <cmath>
 
-#include "Logger.h"
-#include "Macros.h"
-#include "PageFile.h"
+#include "internal/Logger.h"
+#include "internal/Macros.h"
+#include "internal/PageFile.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 const RecordID RecordID::NULL_RECORD = {-1, -1};
 bool RecordID::operator==(const RecordID &rhs) const {
@@ -536,4 +537,5 @@ Column::Column(const char *data, int maxLength) {
     this->data[copiedSize] = '\0';
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB

@@ -5,7 +5,7 @@
 
 #include <cmath>
 
-#include "Macros.h"
+#include "internal/Macros.h"
 
 namespace SimpleDB {
 namespace Internal {

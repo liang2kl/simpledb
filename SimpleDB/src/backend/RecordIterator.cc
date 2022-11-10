@@ -1,13 +1,14 @@
-#include "RecordIterator.h"
+#include "internal/RecordIterator.h"
 
 #include <cmath>
 #include <regex>
 
-#include "Logger.h"
-#include "Table.h"
 #include "internal/Comparer.h"
+#include "internal/Logger.h"
+#include "internal/Table.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 RecordIterator::RecordIterator(Table *table) : table(table) {}
 
@@ -167,4 +168,5 @@ bool RecordIterator::validate(const Columns columns,
     return true;
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB

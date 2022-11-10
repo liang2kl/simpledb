@@ -1,6 +1,9 @@
 #ifndef _SIMPLEDB_LINKED_LIST_H
 #define _SIMPLEDB_LINKED_LIST_H
 
+namespace SimpleDB {
+namespace Internal {
+
 template <typename T>
 class LinkedList {
 public:
@@ -72,4 +75,6 @@ private:
     int _size = 0;
 };
 
+}  // namespace Internal
+}  // namespace SimpleDB
 #endif

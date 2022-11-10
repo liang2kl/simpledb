@@ -1,9 +1,11 @@
-#include "Logger.h"
+#include "internal/Logger.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 
 namespace SimpleDB {
+namespace Internal {
+
 LogLevel Logger::displayMinLevel = NOTICE;
 FILE *Logger::errorStream = stderr;
 
@@ -18,4 +20,5 @@ void Logger::log(LogLevel level, const char *fmt, ...) {
     va_end(argList);
 }
 
+}  // namespace Internal
 }  // namespace SimpleDB

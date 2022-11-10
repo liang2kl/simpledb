@@ -10,6 +10,7 @@
 #include "Util.h"
 
 using namespace SimpleDB;
+using namespace SimpleDB::Internal;
 
 class IndexTest : public ::testing::Test {
 protected:

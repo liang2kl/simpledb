@@ -4,6 +4,7 @@
 #include "internal/CacheManager.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 // A handle of a page cache used to access a page.
 struct PageHandle {
@@ -26,6 +27,7 @@ public:
     CacheManager::PageCache *cache;
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

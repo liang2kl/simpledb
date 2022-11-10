@@ -4,8 +4,8 @@
 #include <string>
 
 #include "Error.h"
-#include "Macros.h"
-#include "Table.h"
+#include "internal/Macros.h"
+#include "internal/Table.h"
 
 namespace SimpleDB {
 namespace Internal {

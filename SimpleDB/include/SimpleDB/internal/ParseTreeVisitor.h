@@ -7,10 +7,12 @@ namespace SimpleDB {
 
 class DBMS;
 
+namespace Internal {
+
 class ParseTreeVisitor : public SQLParser::SqlBaseVisitor {
 public:
     ParseTreeVisitor() = default;
-    ParseTreeVisitor(DBMS *dbms);
+    ParseTreeVisitor(::SimpleDB::DBMS *dbms);
 
     virtual std::any visitCreate_db(
         SQLParser::SqlParser::Create_dbContext *ctx) override;
@@ -33,6 +35,7 @@ private:
     DBMS *dbms;
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

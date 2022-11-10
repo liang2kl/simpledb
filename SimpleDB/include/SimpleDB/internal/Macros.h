@@ -4,6 +4,8 @@
 #include <limits>
 
 namespace SimpleDB {
+namespace Internal {
+
 const int PAGE_SIZE = 8192;
 const int NUM_BUFFER_PAGE = 1024;
 
@@ -43,6 +45,7 @@ const float EQUAL_PRECISION = std::numeric_limits<float>::epsilon();
 // ==== Index ====
 const int INDEX_SIZE = 4;
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

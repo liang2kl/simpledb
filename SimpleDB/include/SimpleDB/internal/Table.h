@@ -6,11 +6,12 @@
 #include <map>
 #include <utility>
 
-#include "Macros.h"
-#include "RecordIterator.h"
 #include "internal/FileCoordinator.h"
+#include "internal/Macros.h"
+#include "internal/RecordIterator.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 using ColumnSizeType = uint32_t;
 
@@ -171,5 +172,6 @@ private:
     void validateSlot(int page, int slot);
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 #endif

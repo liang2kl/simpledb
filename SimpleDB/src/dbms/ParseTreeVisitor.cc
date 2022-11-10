@@ -7,7 +7,9 @@ using namespace SQLParser;
 using namespace SimpleDB::Internal;
 
 namespace SimpleDB {
-ParseTreeVisitor::ParseTreeVisitor(DBMS *dbms) : dbms(dbms) {}
+namespace Internal {
+
+ParseTreeVisitor::ParseTreeVisitor(::SimpleDB::DBMS *dbms) : dbms(dbms) {}
 
 std::any ParseTreeVisitor::visitCreate_db(SqlParser::Create_dbContext *ctx) {
     visitChildren(ctx);
@@ -116,4 +118,5 @@ std::any ParseTreeVisitor::visitDescribe_table(
     return std::any();
 }
 
-}  // namespace SimpleDB
+}  // namespace Internal
+}

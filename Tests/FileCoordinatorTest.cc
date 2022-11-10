@@ -6,6 +6,7 @@
 #include <filesystem>
 
 using namespace SimpleDB;
+using namespace SimpleDB::Internal;
 
 class FileCoordinatorTest : public ::testing::Test {
 protected:

@@ -4,10 +4,11 @@
 #include <string>
 #include <tuple>
 
-#include "PageFile.h"
-#include "Table.h"
+#include "internal/PageFile.h"
+#include "internal/Table.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 class Index {
 private:
@@ -95,6 +96,7 @@ private:
 #endif
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

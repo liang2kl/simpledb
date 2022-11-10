@@ -5,13 +5,13 @@
 
 #include <string>
 
-#include "Table.h"
 #include "internal/ParseTreeVisitor.h"
+#include "internal/Table.h"
 
 namespace SimpleDB {
 
 class DBMS {
-    friend class ParseTreeVisitor;
+    friend class Internal::ParseTreeVisitor;
 
 public:
     DBMS();
@@ -22,7 +22,7 @@ public:
     void executeSQL(std::istream &stream);
 
 private:
-    ParseTreeVisitor visitor;
+    Internal::ParseTreeVisitor visitor;
     SQLParser::SqlParser::ProgramContext *parse(std::istream &stream);
 
     void createDatabase(const std::string &dbName);
@@ -32,7 +32,7 @@ private:
 
     void showTables();
     void createTable(const std::string &tableName,
-                     const std::vector<ColumnMeta> &columns);
+                     const std::vector<Internal::ColumnMeta> &columns);
     void dropTable(const std::string &tableName);
     void describeTable(const std::string &tableName);
 };

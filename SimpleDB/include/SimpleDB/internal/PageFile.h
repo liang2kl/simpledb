@@ -4,6 +4,8 @@
 #include "internal/FileCoordinator.h"
 
 namespace SimpleDB {
+namespace Internal {
+
 // The PageFile interfaces.
 namespace PF {
 
@@ -52,6 +54,7 @@ inline PageHandle renew(const PageHandle &handle) {
 }
 
 }  // namespace PF
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

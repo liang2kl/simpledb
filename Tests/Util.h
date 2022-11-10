@@ -5,17 +5,17 @@
 
 struct DisableLogGuard {
     DisableLogGuard() {
-        level = SimpleDB::Logger::getLogLevel();
-        SimpleDB::Logger::setLogLevel(SimpleDB::SILENT);
+        level = SimpleDB::Internal::Logger::getLogLevel();
+        SimpleDB::Internal::Logger::setLogLevel(SimpleDB::Internal::SILENT);
     }
 
-    ~DisableLogGuard() { SimpleDB::Logger::setLogLevel(level); }
+    ~DisableLogGuard() { SimpleDB::Internal::Logger::setLogLevel(level); }
 
 private:
-    SimpleDB::LogLevel level;
+    SimpleDB::Internal::LogLevel level;
 };
 
-void compareColumns(SimpleDB::Column *columns, SimpleDB::Column *readColumns,
+void compareColumns(SimpleDB::Internal::Column *columns, SimpleDB::Internal::Column *readColumns,
                     int num);
 
 #endif

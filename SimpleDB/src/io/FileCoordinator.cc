@@ -1,7 +1,9 @@
 #include "internal/FileCoordinator.h"
 
-#include "PageHandle.h"
+#include "internal/PageHandle.h"
+
 namespace SimpleDB {
+namespace Internal {
 
 FileCoordinator FileCoordinator::shared = FileCoordinator();
 
@@ -49,4 +51,5 @@ PageHandle FileCoordinator::renew(const PageHandle &handle) {
     return cacheManager->renew(handle);
 }
 
-}  // namespace SimpleDB
+}  // namespace Internal
+}

@@ -4,6 +4,7 @@
 #include <stdio.h>
 
 namespace SimpleDB {
+namespace Internal {
 
 enum LogLevel { VERBOSE, DEBUG, NOTICE, WARNING, ERROR, SILENT };
 
@@ -27,5 +28,6 @@ private:
     static FILE* errorStream;
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 #endif

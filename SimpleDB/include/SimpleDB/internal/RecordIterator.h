@@ -5,6 +5,7 @@
 #include <vector>
 
 namespace SimpleDB {
+namespace Internal {
 
 // Forward declaration.
 class Table;
@@ -58,6 +59,7 @@ private:
     bool validate(const Columns columns, const CompareConditions &conditions);
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

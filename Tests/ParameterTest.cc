@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 using namespace SimpleDB;
+using namespace SimpleDB::Internal;
 
 TEST(ParameterTest, TestSlotOccupyMask) {
     for (int i = 1; i < NUM_SLOT_PER_PAGE; i++) {

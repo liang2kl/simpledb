@@ -1,12 +1,13 @@
 #ifndef _SIMPLEDB_FILE_COORDINATOR_H
 #define _SIMPLEDB_FILE_COORDINATOR_H
 
-#include "FileDescriptor.h"
-#include "PageHandle.h"
 #include "internal/CacheManager.h"
+#include "internal/FileDescriptor.h"
 #include "internal/FileManager.h"
+#include "internal/PageHandle.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 // A proxy class to coordinate page access in FileManager and CacheManger, which
 // should be the only interface to access the storage. It is not responsible for
@@ -41,6 +42,7 @@ private:
     CacheManager *cacheManager;
 };
 
+}  // namespace Internal
 }  // namespace SimpleDB
 
 #endif

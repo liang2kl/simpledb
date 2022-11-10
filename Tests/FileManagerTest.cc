@@ -7,6 +7,7 @@
 #include "Util.h"
 
 using namespace SimpleDB;
+using namespace SimpleDB::Internal;
 
 class FileManagerTest : public ::testing::Test {
 protected:

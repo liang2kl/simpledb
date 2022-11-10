@@ -4,10 +4,11 @@
 
 #include <cassert>
 
-#include "Logger.h"
-#include "PageHandle.h"
+#include "internal/Logger.h"
+#include "internal/PageHandle.h"
 
 namespace SimpleDB {
+namespace Internal {
 
 CacheManager::CacheManager(FileManager *fileManager) {
     this->fileManager = fileManager;
@@ -265,4 +266,6 @@ void CacheManager::discardAll() {
     }
 }
 #endif
+
+}  // namespace Internal
 }  // namespace SimpleDB
