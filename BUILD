@@ -32,6 +32,6 @@ alias(
 test_suite(
     name = "test_all",
     tests = [
-        "//Tests:simpledb_test"
+        "//SimpleDBTest:simpledb_test"
     ],
 )
