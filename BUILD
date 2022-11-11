@@ -29,6 +29,11 @@ alias(
     actual = "//SQLParser:sqlparser",
 )
 
+alias(
+    name = "simpledb_service",
+    actual = "//SimpleDBService:simpledb_service",
+)
+
 test_suite(
     name = "test_all",
     tests = [

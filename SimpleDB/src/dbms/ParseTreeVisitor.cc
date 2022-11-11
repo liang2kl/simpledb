@@ -114,7 +114,7 @@ std::any ParseTreeVisitor::visitDescribe_table(
     SqlParser::Describe_tableContext *ctx) {
     visitChildren(ctx);
 
-    dbms->describeTable(ctx->Identifier()->getText());
+    // dbms->describeTable(ctx->Identifier()->getText());
     return std::any();
 }
 

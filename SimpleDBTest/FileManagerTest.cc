@@ -6,6 +6,10 @@
 
 #include "Util.h"
 
+#ifdef PAGE_SIZE
+#undef PAGE_SIZE
+#endif
+
 using namespace SimpleDB;
 using namespace SimpleDB::Internal;
 

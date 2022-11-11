@@ -1,0 +1,89 @@
+syntax = "proto3";
+package SimpleDB.Service;
+
+service Query {
+  rpc ExecuteSQLProgram (ExecutionRequest) returns (ExecutionBatchResponse);
+}
+
+message ExecutionRequest {
+  string sql = 1;
+}
+
+message ExecutionBatchResponse {
+  repeated ExecutionResponse responses = 1;
+}
+
+message ExecutionResponse {
+  oneof response {
+    ExecutionResult result = 1;
+    ExecutionError error = 2;
+  }
+  Stats stats = 3;
+}
+
+message Stats {
+    int32 elapse = 1;
+}
+
+message ExecutionResult {
+  oneof data {
+    PlainResult plain = 1;
+    QueryResult query = 2;
+    ShowTableResult showTable = 3;
+    ShowDatabasesResult showDatabases = 4;
+  }
+}
+
+message ExecutionError {
+  enum Type {
+    ERR_UNSPECIFIED = 0;
+    ERR_INTERNAL = 1;
+    ERR_UNKNOWN = 2;
+    ERR_INCOMPATIBLE_VALUE = 3;
+  }
+  string message = 1;
+  Type type = 2;
+}
+
+message PlainResult {
+  string msg = 1;
+}
+
+// Query result: result for queries.
+message QueryResult {
+  repeated QueryColumn columns = 1;
+  repeated QueryRow rows = 2;
+}
+
+message QueryColumn {
+  enum Type {
+    TYPE_UNSPECIFIED = 0;
+    TYPE_INT = 1;
+    TYPE_FLOAT = 2;
+    TYPE_VARCHAR = 3;
+  }
+  string name = 1;
+  Type type = 2;
+}
+
+message QueryRow {
+  repeated QueryValue values = 1;
+}
+
+message QueryValue {
+  oneof value {
+    int32 int_value = 1;
+    float float_value = 2;
+    string varchar_value = 3;
+  }
+}
+
+// SHOW TABLE result.
+message ShowTableResult {
+  repeated string tables = 1;
+}
+
+// SHOW DATABASAES result.
+message ShowDatabasesResult {
+  repeated string databases = 1;
+}

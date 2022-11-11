@@ -10,6 +10,10 @@
 using namespace SimpleDB;
 using namespace SimpleDB::Internal;
 
+#ifdef PAGE_SIZE
+#undef PAGE_SIZE
+#endif
+
 class FileCoordinatorTest : public ::testing::Test {
 protected:
     void SetUp() override { std::filesystem::create_directory("tmp"); }
