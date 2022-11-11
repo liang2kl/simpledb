@@ -20,6 +20,5 @@ cc_library(
     srcs = [":antlr-sources"],
     hdrs = [":antlr-sources"],
     deps = ["//:antlr4-runtime"],
-    copts = ["-std=c++17"],
     visibility = ["//visibility:public"]
 )

@@ -7,7 +7,7 @@ cc_test(
     copts = ["-std=c++17"],
     deps = [
         "@googletest//:gtest",
-        "//SimpleDB:simpledb-test",
+        "//:simpledb-test",
     ],
     visibility = ["//visibility:public"],
 )

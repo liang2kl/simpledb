@@ -98,14 +98,12 @@ TEST_F(IndexTest, TestInsertGet) {
 
     for (int i = 0; i < entries.size(); i++) {
         auto [key, rid] = entries[i];
-        bool succeed;
         ASSERT_NO_THROW(index.insert((const char *)&key, rid));
         EXPECT_EQ(index.meta.numEntry, i + 1);
 
         // Test duplidate keys.
         ASSERT_THROW(index.insert((const char *)&key, rid),
                      Internal::IndexKeyExistsError);
-        EXPECT_FALSE(succeed);
     }
 
     reloadIndex();

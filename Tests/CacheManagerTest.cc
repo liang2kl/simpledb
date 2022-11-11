@@ -97,11 +97,11 @@ TEST_F(CacheManagerTest, TestPageExchange) {
     // Validate LRU algorithm.
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 0);
 
-    PageHandle handle = manager->getHandle(fd, 5);
+    manager->getHandle(fd, 5);
     EXPECT_EQ(manager->activeCache.head->data->id, 5);
     EXPECT_EQ(manager->freeCache.size(), 0);
 
-    PageHandle handle1 = manager->getHandle(fd, NUM_BUFFER_PAGE);
+    manager->getHandle(fd, NUM_BUFFER_PAGE);
     EXPECT_EQ(manager->activeCache.tail->next->data->id, 1);
     EXPECT_EQ(manager->freeCache.size(), 0);
 
@@ -117,7 +117,6 @@ TEST_F(CacheManagerTest, TestLeak) {
     DisableLogGuard guard;
 
     const char filePath[] = "tmp/file";
-    char buf[PAGE_SIZE];
 
     fileManager->createFile(filePath);
     FileDescriptor fd = fileManager->openFile(filePath);

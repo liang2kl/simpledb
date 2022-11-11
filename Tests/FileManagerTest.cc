@@ -22,7 +22,7 @@ TEST_F(FileManagerTest, TestCreateRemoveFile) {
 
     for (int i = 0; i < FileManager::MAX_OPEN_FILES; i++) {
         char filePath[50];
-        sprintf(filePath, "tmp/file-%d", i);
+        snprintf(filePath, 10, "tmp/file-%d", i);
         // Remove files before testing.
         std::filesystem::remove(filePath);
 
@@ -70,11 +70,11 @@ TEST_F(FileManagerTest, TestExceedFiles) {
 
     for (int i = 0; i < FileManager::MAX_OPEN_FILES; i++) {
         char filePath[50];
-        sprintf(filePath, "tmp/file-%d", i);
+        snprintf(filePath, 10, "tmp/file-%d", i);
         std::filesystem::remove(filePath);
 
         manager.createFile(filePath);
-        FileDescriptor fd = manager.openFile(filePath);
+        manager.openFile(filePath);
     }
 
     char filePath[] = "tmp/file-overflow";

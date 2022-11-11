@@ -129,7 +129,6 @@ TEST_F(RecordIteratorTest, TestCompareFloat) {
         std::make_tuple(LT, atof("-1.0"), testColumns1)};
 
     for (auto &pair : pairs) {
-        CompareOp op = std::get<0>(pair);
         float value = std::get<1>(pair);
         Column *testColumn = std::get<2>(pair);
 
@@ -182,9 +181,6 @@ TEST_F(RecordIteratorTest, TestCompareVarchar) {
 }
 
 TEST_F(RecordIteratorTest, TestNullField) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-
     CompareConditions conditions = CompareConditions(2);
     int value = 1;
     conditions[0] =
