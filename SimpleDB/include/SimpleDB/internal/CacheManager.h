@@ -14,7 +14,7 @@ namespace Internal {
 struct PageHandle;
 
 class CacheManager {
-    friend class PageHandle;
+    friend struct PageHandle;
 
 public:
     CacheManager(FileManager *fileManager);
@@ -53,14 +53,14 @@ public:
     // Write back all pages and destroy the cache manager.
     void close();
 
-#ifdef TESTING
+#if TESTING
     // ==== Testing-only methods ====
     void discard(FileDescriptor fd, int page);
     void discardAll(FileDescriptor fd);
     void discardAll();
 #endif
 
-#ifndef TESTING
+#if !TESTING
 private:
 #endif
     FileManager *fileManager;

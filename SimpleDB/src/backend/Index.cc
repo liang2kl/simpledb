@@ -98,7 +98,6 @@ void Index::insert(const char *key, RecordID id) {
 
     auto result = findNode(key);
     NodeIndex nodeIndex = std::get<0>(result);
-    int index = std::get<1>(result);
     bool found = std::get<2>(result);
 
     if (found) {

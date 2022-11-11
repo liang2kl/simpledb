@@ -1,7 +1,6 @@
 #include "DBMS.h"
 
-#include <SQLParser/SqlLexer.h>
-
+#include "SQLParser/SqlLexer.h"
 #include "internal/Logger.h"
 
 using namespace SQLParser;
@@ -37,24 +36,24 @@ void DBMS::executeSQL(std::istream &stream) {
         visitor.visitProgram(program);
     } catch (Error::ExecutionErrorBase &e) {
         // Normal exception.
-        Logger::log(DEBUG, "DBMS: exception caught during execution: %s\n",
+        Logger::log(DEBUG_, "DBMS: exception caught during execution: %s\n",
                     e.what());
         throw;
     } catch (Internal::InternalErrorBase &e) {
         // Uncaught internal exception.
-        Logger::log(DEBUG,
+        Logger::log(DEBUG_,
                     "DBMS: uncaught internal exception during execution: %s\n",
                     e.what());
         throw Error::InternalError(e.what());
     } catch (std::exception &e) {
         // Unknown error.
-        Logger::log(DEBUG,
+        Logger::log(DEBUG_,
                     "DBMS: unknown exception caught during execution: %s\n",
                     e.what());
         throw Error::UnknownError(e.what());
     } catch (...) {
         // Unknown error.
-        Logger::log(DEBUG, "DBMS: unknown exception caught during execution");
+        Logger::log(DEBUG_, "DBMS: unknown exception caught during execution");
         throw Error::UnknownError();
     }
 }

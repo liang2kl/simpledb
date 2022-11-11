@@ -6,7 +6,7 @@
 namespace SimpleDB {
 namespace Internal {
 
-enum LogLevel { VERBOSE, DEBUG, NOTICE, WARNING, ERROR, SILENT };
+enum LogLevel { VERBOSE, DEBUG_, NOTICE, WARNING, ERROR, SILENT };
 
 static const char* logLevelNames[] = {"VERBOSE", "DEBUG", "NOTICE",
                                       "WARNING", "ERROR", "SILENT"};

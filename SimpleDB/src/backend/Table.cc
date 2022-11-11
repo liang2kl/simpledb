@@ -340,7 +340,7 @@ void Table::deserialize(const char *srcData, Columns destObjects,
 
         if (recordMeta->nullBitmap & (1L << i)) {
             // The column is null.
-#ifdef _DEBUG
+#ifdef DEBUG
             if (!meta.columns[i].nullable) {
                 Logger::log(ERROR,
                             "Table: internal error: column %s is not nullable, "

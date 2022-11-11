@@ -5,7 +5,8 @@
 #include "Error.h"
 #include "internal/Logger.h"
 
-#ifdef TESTING
+// The latter is just for code highliging.
+#if TESTING
 #include "internal/Index.h"
 #include "internal/PageFile.h"
 #endif

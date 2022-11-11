@@ -29,7 +29,7 @@ public:
     // Check if the file descriptor is valid.
     bool validate(FileDescriptor fd);
 
-#ifndef TESTING
+#if !TESTING
 private:
 #endif
     struct OpenedFile {

@@ -33,7 +33,7 @@ public:
     void markDirty(const PageHandle &handle);
     PageHandle renew(const PageHandle &handle);
 
-#ifndef TESTING
+#if !TESTING
 private:
 #endif
     FileCoordinator();

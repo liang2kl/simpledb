@@ -49,7 +49,7 @@ public:
     int iterate(Columns bufColumns, CompareConditions conditions,
                 GetNextRecordFunc getNext, IteratorFunc callback);
 
-#ifdef TESTING
+#if TESTING
     RecordIterator() = default;
 #endif
 

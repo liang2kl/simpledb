@@ -1,4 +1,3 @@
-#define TESTING
 #include <SimpleDB/SimpleDB.h>
 #include <gtest/gtest.h>
 

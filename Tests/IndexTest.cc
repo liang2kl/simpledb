@@ -1,5 +1,9 @@
-#define TESTING
-#define _DEBUG
+#ifndef TESTING
+#define TESTING 1
+#endif
+#ifndef DEBUG
+#define DEBUG 1
+#endif
 #include <SimpleDB/SimpleDB.h>
 #include <gtest/gtest.h>
 

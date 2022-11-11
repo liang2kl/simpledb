@@ -67,7 +67,7 @@ public:
 
     inline int size() { return _size; };
 
-#ifndef TESTING
+#if !TESTING
 private:
 #endif
     Node *head;

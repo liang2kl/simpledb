@@ -1,10 +1,9 @@
 #ifndef _SIMPLEDB_DBMS_H
 #define _SIMPLEDB_DBMS_H
 
-#include <SQLParser/SqlParser.h>
-
 #include <string>
 
+#include "SQLParser/SqlParser.h"
 #include "internal/ParseTreeVisitor.h"
 #include "internal/Table.h"
 
@@ -23,7 +22,6 @@ public:
 
 private:
     Internal::ParseTreeVisitor visitor;
-    SQLParser::SqlParser::ProgramContext *parse(std::istream &stream);
 
     void createDatabase(const std::string &dbName);
     void dropDatabase(const std::string &dbName);

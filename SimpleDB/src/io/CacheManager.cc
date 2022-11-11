@@ -159,7 +159,7 @@ PageHandle CacheManager::renew(const PageHandle &handle) {
 
 char *CacheManager::load(const PageHandle &handle) {
     if (!handle.validate()) {
-        Logger::log(DEBUG,
+        Logger::log(DEBUG_,
                     "CacheManager: trying to read data with an outdated page "
                     "handle for page %d of file %d\n",
                     handle.cache->meta.page, handle.cache->meta.fd.value);
@@ -170,7 +170,7 @@ char *CacheManager::load(const PageHandle &handle) {
 }
 
 char *CacheManager::loadRaw(const PageHandle &handle) {
-#ifdef _DEBUG
+#ifdef DEBUG
     if (!handle.validate()) {
         throw Internal::InvalidPageHandleError();
     }
@@ -229,7 +229,7 @@ void CacheManager::writeBack(const PageHandle &handle) {
     writeBack(cache);
 }
 
-#ifdef TESTING
+#if TESTING
 // ==== Testing-only methods ====
 void CacheManager::discard(FileDescriptor fd, int page) {
     auto &cacheMap = activeCacheMapVec[fd];

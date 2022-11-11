@@ -16,13 +16,13 @@ public:
     PageHandle() = default;
     bool validate() const { return cache->generation == generation; }
 
-#ifndef TESTING
+#if !TESTING
 private:
 #else
 public:
 #endif
     PageHandle(CacheManager::PageCache *cache)
-        : cache(cache), generation(cache->generation) {}
+        : generation(cache->generation), cache(cache) {}
     int generation = -1;
     CacheManager::PageCache *cache;
 };

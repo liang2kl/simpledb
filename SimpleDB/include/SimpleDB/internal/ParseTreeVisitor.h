@@ -1,7 +1,7 @@
 #ifndef _SIMPLEDB_PARSE_TREE_VISITOR_H
 #define _SIMPLEDB_PARSE_TREE_VISITOR_H
 
-#include <SQLParser/SqlBaseVisitor.h>
+#include "SQLParser/SqlBaseVisitor.h"
 
 namespace SimpleDB {
 

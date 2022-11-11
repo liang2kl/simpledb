@@ -103,7 +103,7 @@ public:
 
     RecordIterator getIterator() { return RecordIterator(this); }
 
-#ifndef TESTING
+#if !TESTING
 private:
 #endif
     struct TableMeta {

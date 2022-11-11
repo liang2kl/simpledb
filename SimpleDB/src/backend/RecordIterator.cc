@@ -94,7 +94,7 @@ static bool _nullComparer(CompareOp op, const Column &column) {
 
 static bool _regexComparer(CompareOp op, const Column &column,
                            const char *regexStr) {
-#ifdef _DEBUG
+#ifdef DEBUG
     if (op != LIKE) {
         Logger::log(ERROR,
                     "RecordIterator: internal error: invalid compare op %d "
