@@ -1,10 +1,12 @@
 #include "Util.h"
 
+#include <SimpleDB/internal/RecordScanner.h>
 #include <gtest/gtest.h>
 
-void compareColumns(SimpleDB::Internal::Column *columns,
-                    SimpleDB::Internal::Column *readColumns, int num) {
-    for (int i = 0; i < num; i++) {
+void compareColumns(const SimpleDB::Internal::Columns &columns,
+                    const SimpleDB::Internal::Columns &readColumns) {
+    ASSERT_EQ(readColumns.size(), columns.size());
+    for (int i = 0; i < columns.size(); i++) {
         EXPECT_EQ(columns[i].type, readColumns[i].type);
         EXPECT_EQ(columns[i].size, readColumns[i].size);
         if (columns[i].isNull) {
@@ -14,13 +16,14 @@ void compareColumns(SimpleDB::Internal::Column *columns,
             EXPECT_FALSE(readColumns[i].isNull);
         }
         if (columns[i].type == SimpleDB::Internal::VARCHAR) {
-            EXPECT_EQ(memcmp(columns[i].data, readColumns[i].data,
-                             strlen(columns[i].data)),
+            EXPECT_EQ(memcmp(columns[i].data.stringValue,
+                             readColumns[i].data.stringValue,
+                             strlen(columns[i].data.stringValue)),
                       0);
         } else {
-            EXPECT_EQ(
-                memcmp(columns[i].data, readColumns[i].data, columns[i].size),
-                0);
+            EXPECT_EQ(memcmp(columns[i].data.stringValue,
+                             readColumns[i].data.stringValue, columns[i].size),
+                      0);
         }
     }
 }

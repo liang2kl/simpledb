@@ -1,3 +1,4 @@
+#include <SimpleDB/internal/RecordScanner.h>
 #ifndef TESTING
 #define TESTING 1
 #endif
@@ -36,8 +37,8 @@ protected:
 
     const char *testVarChar = "Hello, world";
 
-    Column testColumns[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                             Column::nullIntColumn()};
+    Columns testColumns = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                           Column::nullIntColumn()};
 
     const char *tableName = "table_name";
 
@@ -48,10 +49,9 @@ protected:
 };
 
 TEST_F(TableTest, TestUninitializeAccess) {
-    EXPECT_THROW(table.get({0, 0}, nullptr),
-                 Internal::TableNotInitializedError);
-    EXPECT_THROW(table.insert(nullptr), Internal::TableNotInitializedError);
-    EXPECT_THROW(table.update({0, 0}, nullptr),
+    EXPECT_THROW(table.get({0, 0}), Internal::TableNotInitializedError);
+    EXPECT_THROW(table.insert(Columns()), Internal::TableNotInitializedError);
+    EXPECT_THROW(table.update({0, 0}, Columns()),
                  Internal::TableNotInitializedError);
     EXPECT_THROW(table.remove({0, 0}), Internal::TableNotInitializedError);
 }
@@ -94,9 +94,9 @@ TEST_F(TableTest, TestInsertGet) {
             RecordID id;
             ASSERT_NO_THROW(id = table.insert(testColumns));
 
-            Column readColumns[4];
-            ASSERT_NO_THROW(table.get(id, readColumns));
-            compareColumns(testColumns, readColumns, numColumn);
+            Columns readColumns;
+            ASSERT_NO_THROW(readColumns = table.get(id));
+            compareColumns(testColumns, readColumns);
 
             // Check if the meta is flushed.
             PageHandle handle = PF::getHandle(table.fd, id.page);
@@ -112,7 +112,7 @@ TEST_F(TableTest, TestUpdate) {
 
     // Partial update.
     ColumnBitmap bitmap = 0b1101;
-    Column newColumns[3] = {
+    Columns newColumns = {
         Column(2), Column("Thank you!", 100),
         Column(4)  // Not null now
     };
@@ -122,9 +122,9 @@ TEST_F(TableTest, TestUpdate) {
 
     ASSERT_NO_THROW(table.update(id, newColumns, bitmap));
 
-    Column readColumns[3];
+    Columns readColumns;
     ASSERT_NO_THROW(table.get(id, readColumns, bitmap));
-    compareColumns(newColumns, readColumns, 3);
+    compareColumns(newColumns, readColumns);
 }
 
 TEST_F(TableTest, TestRemove) {
@@ -137,7 +137,7 @@ TEST_F(TableTest, TestRemove) {
 
     ASSERT_NO_THROW(table.remove(id));
     EXPECT_FALSE(table.occupied(handle, id.slot));
-    EXPECT_THROW(table.get(id, nullptr), Internal::InvalidSlotError);
+    EXPECT_THROW(table.get(id), Internal::InvalidSlotError);
 }
 
 TEST_F(TableTest, TestReleasePage) {
@@ -193,7 +193,7 @@ TEST_F(TableTest, TestMaxVarcharSize) {
         {.type = VARCHAR, .size = MAX_VARCHAR_LEN, .name = "val"},
     };
 
-    Column columns[1] = {
+    Columns columns = {
         Column(varchar, MAX_VARCHAR_LEN),
     };
 
@@ -202,11 +202,11 @@ TEST_F(TableTest, TestMaxVarcharSize) {
     ASSERT_NO_THROW(table.create("tmp/table", tableName, 1, columnMetas));
     ASSERT_NO_THROW(id = table.insert(columns));
 
-    Column readColumn[1];
-    ASSERT_NO_THROW(table.get(id, readColumn));
+    Columns readColumns;
+    ASSERT_NO_THROW(table.get(id, readColumns));
 
     // Terminate this to compare.
     varchar[MAX_VARCHAR_LEN] = '\0';
 
-    EXPECT_EQ(strcmp(readColumn[0].data, varchar), 0);
+    EXPECT_EQ(strcmp(readColumns[0].data.stringValue, varchar), 0);
 }

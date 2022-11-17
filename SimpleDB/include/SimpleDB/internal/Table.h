@@ -5,10 +5,11 @@
 
 #include <map>
 #include <utility>
+#include <vector>
 
 #include "internal/FileCoordinator.h"
 #include "internal/Macros.h"
-#include "internal/RecordIterator.h"
+#include "internal/RecordScanner.h"
 
 namespace SimpleDB {
 namespace Internal {
@@ -21,11 +22,17 @@ enum DataType {
     VARCHAR  // length-variable string
 };
 
+union ColumnValue {
+    int intValue;
+    float floatValue;
+    char stringValue[MAX_COLUMN_SIZE];
+};
+
 struct Column {
     DataType type;
     ColumnSizeType size;
     bool isNull = false;
-    char data[MAX_COLUMN_SIZE];
+    ColumnValue data;
 
     // Initialize a null column.
     static Column nullColumn(DataType type, ColumnSizeType size);
@@ -51,7 +58,7 @@ struct ColumnMeta {
     char defaultValue[MAX_COLUMN_SIZE];
 };
 
-using Columns = Column *;
+using Columns = std::vector<Column>;
 using ColumnBitmap = int16_t;
 
 static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
@@ -61,6 +68,7 @@ struct RecordID {
     int slot;
 
     bool operator==(const RecordID &rhs) const;
+    bool operator!=(const RecordID &rhs) const;
     static const RecordID NULL_RECORD;
 };
 
@@ -68,7 +76,7 @@ struct RecordID {
 // thourghout the program, and be stored in memory once created for the sake of
 // metadata reading/writing performance.
 class Table {
-    friend class RecordIterator;
+    friend class RecordScanner;
 
 public:
     // The metadata is not initialized in this constructor.
@@ -83,14 +91,16 @@ public:
                 ColumnMeta *columns) noexcept(false);
 
     // Get record.
-    void get(RecordID id, Columns columns,
+    [[nodiscard]] Columns get(RecordID id,
+                              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
+    void get(RecordID id, Columns &columns,
              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
-    RecordID insert(Columns columns);
+    RecordID insert(const Columns &columns);
 
     // Update record.
-    void update(RecordID id, Columns columns,
+    void update(RecordID id, const Columns &columns,
                 ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Remove record.
@@ -101,7 +111,7 @@ public:
     int getColumnIndex(const char *name);
     void getColumnName(int index, char *name);
 
-    RecordIterator getIterator() { return RecordIterator(this); }
+    RecordScanner getScanner() { return RecordScanner(this); }
 
 #if !TESTING
 private:
@@ -158,9 +168,9 @@ private:
 
     PageHandle *getHandle(int page);
 
-    void deserialize(const char *srcData, Columns destObjects,
+    void deserialize(const char *srcData, Columns &destObjects,
                      ColumnBitmap columnBitmap);
-    void serialize(const Columns srcObjects, char *destData, ColumnBitmap map);
+    void serialize(const Columns &srcObjects, char *destData, ColumnBitmap map);
 
     // Must ensure that the handle is valid.
     bool occupied(const PageHandle &handle, int slot);

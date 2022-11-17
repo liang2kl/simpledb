@@ -15,7 +15,7 @@ private:
     SimpleDB::Internal::LogLevel level;
 };
 
-void compareColumns(SimpleDB::Internal::Column *columns, SimpleDB::Internal::Column *readColumns,
-                    int num);
+void compareColumns(const SimpleDB::Internal::Columns &columns,
+                    const SimpleDB::Internal::Columns &readColumns);
 
 #endif

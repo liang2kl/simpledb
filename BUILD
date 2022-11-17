@@ -20,11 +20,6 @@ alias(
     actual = "//SimpleDBService:simpledb_service",
 )
 
-alias(
-    name = "simpledb_proto",
-    actual = "//SimpleDBService:simpledb_proto",
-)
-
 test_suite(
     name = "test_all",
     tests = [

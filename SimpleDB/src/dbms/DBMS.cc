@@ -1,6 +1,6 @@
 #include "DBMS.h"
 
-#include <SimpleDB/internal/RecordIterator.h>
+#include <SimpleDB/internal/RecordScanner.h>
 
 #include <any>
 #include <filesystem>
@@ -86,13 +86,12 @@ std::vector<Service::ExecutionResult> DBMS::executeSQL(std::istream &stream) {
 
 PlainResult DBMS::createDatabase(const std::string &dbName) {
     // TODO: Add index to system table.
-    Column columns[sizeof(databaseSystemTableColumns) / sizeof(ColumnMeta)];
-    CompareConditions conditions = CompareConditions(1);
+    CompareConditions conditions(1);
     conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
                                      CompareOp::EQ, dbName.c_str());
 
-    bool found = databaseSystemTable.getIterator().iterate(
-        columns, conditions, [&](int) { return false; });
+    bool found = databaseSystemTable.getScanner().findFirst(conditions).first !=
+                 RecordID::NULL_RECORD;
 
     if (found) {
         throw Error::DatabaseExistsError(dbName);
@@ -109,8 +108,8 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
     }
 
     // Append to the system table
-    Column column = Column(dbName.c_str(), MAX_VARCHAR_LEN);
-    databaseSystemTable.insert(&column);
+    Columns columns = {Column(dbName.c_str(), MAX_VARCHAR_LEN)};
+    databaseSystemTable.insert(columns);
 
     PlainResult result;
     result.set_msg("OK");

@@ -3,6 +3,7 @@
 #include <string.h>
 
 #include <cmath>
+#include <cstdio>
 
 #include "internal/Logger.h"
 #include "internal/Macros.h"
@@ -15,6 +16,7 @@ const RecordID RecordID::NULL_RECORD = {-1, -1};
 bool RecordID::operator==(const RecordID &rhs) const {
     return page == rhs.page && slot == rhs.slot;
 }
+bool RecordID::operator!=(const RecordID &rhs) const { return !(*this == rhs); }
 
 Table::~Table() { close(); }
 
@@ -158,7 +160,7 @@ void Table::flushPageMeta(int page, const PageMeta &meta) {
     PF::markDirty(handle);
 }
 
-void Table::get(RecordID id, Columns columns, ColumnBitmap columnBitmap) {
+void Table::get(RecordID id, Columns &columns, ColumnBitmap columnBitmap) {
     Logger::log(VERBOSE, "Table: get record from page %d slot %d\n", id.page,
                 id.slot);
 
@@ -179,7 +181,13 @@ void Table::get(RecordID id, Columns columns, ColumnBitmap columnBitmap) {
     deserialize(start, columns, columnBitmap);
 }
 
-RecordID Table::insert(Columns columns) {
+Columns Table::get(RecordID id, ColumnBitmap columnBitmap) {
+    Columns columns;
+    get(id, columns, columnBitmap);
+    return columns;
+}
+
+RecordID Table::insert(const Columns &columns) {
     checkInit();
 
     // Find an empty slot.
@@ -200,7 +208,7 @@ RecordID Table::insert(Columns columns) {
     return id;
 }
 
-void Table::update(RecordID id, Columns columns, ColumnBitmap bitmap) {
+void Table::update(RecordID id, const Columns &columns, ColumnBitmap bitmap) {
     Logger::log(VERBOSE, "Table: updating record from page %d slot %d\n",
                 id.page, id.slot);
 
@@ -320,13 +328,14 @@ void Table::checkInit() {
     }
 }
 
-void Table::deserialize(const char *srcData, Columns destObjects,
+void Table::deserialize(const char *srcData, Columns &destObjects,
                         ColumnBitmap bitmap) {
     // First, fetch record meta.
     RecordMeta *recordMeta = (RecordMeta *)srcData;
     srcData += sizeof(RecordMeta);
 
-    // Actual index of `destObjects`.
+    destObjects.resize(meta.numColumn);
+
     int index = 0;
     for (int i = 0; i < meta.numColumn; i++) {
         if ((bitmap & (ColumnBitmap(1) << i)) == 0) {
@@ -353,19 +362,24 @@ void Table::deserialize(const char *srcData, Columns destObjects,
         } else {
             // We must copy the data here as we are directly using the buffer,
             // which can be invalidated.
-            memcpy(column.data, srcData, column.size);
+            memcpy(column.data.stringValue, srcData, column.size);
             column.isNull = false;
             if (column.type == VARCHAR) {
-                column.data[column.size] = '\0';
+                column.data.stringValue[column.size] = '\0';
             }
         }
 
         srcData += meta.columns[i].size;
         index++;
-    }
+    };
+
+    destObjects.resize(index);
+#if DEBUG
+    assert(destObjects.size() == index);
+#endif
 }
 
-void Table::serialize(const Columns srcObjects, char *destData,
+void Table::serialize(const Columns &srcObjects, char *destData,
                       ColumnBitmap bitmap) {
     RecordMeta *recordMeta = (RecordMeta *)destData;
     destData += sizeof(RecordMeta);
@@ -403,7 +417,7 @@ void Table::serialize(const Columns srcObjects, char *destData,
             recordMeta->nullBitmap |= (1L << i);
         } else {
             recordMeta->nullBitmap &= ~(1L << i);
-            memcpy(destData, column.data, column.size);
+            memcpy(destData, column.data.stringValue, column.size);
             if (column.type == VARCHAR) {
                 destData[column.size] = '\0';
             }
@@ -512,13 +526,13 @@ Column Column::nullVarcharColumn(ColumnSizeType size) {
 Column::Column(int data) {
     size = 4;
     type = INT;
-    *(int *)this->data = data;
+    this->data.intValue = data;
 }
 
 Column::Column(float data) {
     size = 4;
     type = FLOAT;
-    *(float *)this->data = data;
+    this->data.floatValue = data;
 }
 
 Column::Column(const char *data, int maxLength) {
@@ -533,8 +547,8 @@ Column::Column(const char *data, int maxLength) {
     size = maxLength;
     type = VARCHAR;
     size_t copiedSize = std::min(strlen(data), size_t(maxLength));
-    memcpy(this->data, data, copiedSize);
-    this->data[copiedSize] = '\0';
+    memcpy(this->data.stringValue, data, copiedSize);
+    this->data.stringValue[copiedSize] = '\0';
 }
 
 }  // namespace Internal

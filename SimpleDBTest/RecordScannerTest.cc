@@ -1,4 +1,5 @@
 #include <SimpleDB/SimpleDB.h>
+#include <SimpleDB/internal/Table.h>
 #include <gtest/gtest.h>
 
 #include <filesystem>
@@ -9,7 +10,7 @@
 using namespace SimpleDB;
 using namespace SimpleDB::Internal;
 
-class RecordIteratorTest : public ::testing::Test {
+class RecordScannerTest : public ::testing::Test {
 protected:
     void SetUp() override {
         std::filesystem::create_directory("tmp");
@@ -38,26 +39,23 @@ protected:
     void initTable() {
         ASSERT_NO_THROW(
             table.create("tmp/table", tableName, numColumn, columnMetas));
-        iter = table.getIterator();
+        iter = table.getScanner();
     }
 
-    RecordIterator iter;
+    RecordScanner iter;
 };
 
-TEST_F(RecordIteratorTest, TestCompareInt) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(5), Column(-1.1F),
-                              Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns2[4] = {Column(3), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
+TEST_F(RecordScannerTest, TestCompareInt) {
+    Columns testColumns0 = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(5), Column(-1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns2 = {Column(3), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
     ASSERT_NO_THROW(table.insert(testColumns1));
     ASSERT_NO_THROW(table.insert(testColumns2));
-
-    Column readColumns[4];
 
     CompareConditions conditions = CompareConditions(1);
 
@@ -66,10 +64,11 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
     conditions[0] =
         CompareCondition(columnMetas[0].name, EQ, (const char *)(&value));
 
-    int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns0, readColumns, 4);
-        return true;
-    });
+    int numRecords = iter.iterate(
+        conditions, [&](int, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns0, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 
     // GT.
@@ -77,18 +76,19 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
     conditions[0] =
         CompareCondition(columnMetas[0].name, GT, (const char *)(&value));
 
-    numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns1, readColumns, 4);
-        return true;
-    });
+    numRecords = iter.iterate(conditions,
+                              [&](int, RecordID, const Columns &readColumns) {
+                                  compareColumns(testColumns1, readColumns);
+                                  return true;
+                              });
     EXPECT_EQ(numRecords, 1);
 
     // Emptyset.
     value = 10;
     conditions[0] =
         CompareCondition(columnMetas[0].name, GE, (const char *)(&value));
-    numRecords =
-        iter.iterate(readColumns, conditions, [](int) { return true; });
+    numRecords = iter.iterate(
+        conditions, [](int, RecordID, const Columns &) { return true; });
     EXPECT_EQ(numRecords, 0);
 
     // Two constraints (GE, LT).
@@ -99,29 +99,27 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
     conditions[1] =
         CompareCondition(columnMetas[0].name, LT, (const char *)(&value2));
 
-    numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns2, readColumns, 4);
-        return true;
-    });
+    numRecords = iter.iterate(
+        conditions, [&](int index, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns2, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 }
 
-TEST_F(RecordIteratorTest, TestCompareFloat) {
-    Column testColumns0[4] = {Column(0), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(0), Column(-1.1F),
-                              Column(testVarChar, 100),
-                              Column::nullIntColumn()};
+TEST_F(RecordScannerTest, TestCompareFloat) {
+    Columns testColumns0 = {Column(0), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(0), Column(-1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
     ASSERT_NO_THROW(table.insert(testColumns1));
 
-    Column readColumns[4];
-
     CompareConditions conditions = CompareConditions(1);
 
     // EQ and GE.
-    std::vector<std::tuple<CompareOp, float, Column *>> pairs = {
+    std::vector<std::tuple<CompareOp, float, Columns>> pairs = {
         std::make_tuple(EQ, atof("1.1"), testColumns0),
         std::make_tuple(GE, atof("1.1"), testColumns0),
         std::make_tuple(GE, atof("1.0"), testColumns0),
@@ -133,26 +131,27 @@ TEST_F(RecordIteratorTest, TestCompareFloat) {
 
     for (auto &pair : pairs) {
         float value = std::get<1>(pair);
-        Column *testColumn = std::get<2>(pair);
+        const Columns &testColumn = std::get<2>(pair);
 
         conditions[0] = CompareCondition(columnMetas[1].name, std::get<0>(pair),
                                          (const char *)(&value));
 
-        int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-            compareColumns(testColumn, readColumns, 4);
-            return true;
-        });
+        int numRecords = iter.iterate(
+            conditions, [&](int index, RecordID, const Columns &readColumns) {
+                compareColumns(testColumn, readColumns);
+                return true;
+            });
         EXPECT_EQ(numRecords, 1);
     }
 }
 
-TEST_F(RecordIteratorTest, TestCompareVarchar) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column("aaabbb", 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(5), Column(-1.0F), Column("b", 100),
-                              Column::nullIntColumn()};
-    Column testColumns2[4] = {Column(1), Column(1.1F), Column("aaaaaa", 100),
-                              Column::nullIntColumn()};
+TEST_F(RecordScannerTest, TestCompareVarchar) {
+    Columns testColumns0 = {Column(1), Column(1.1F), Column("aaabbb", 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(5), Column(-1.0F), Column("b", 100),
+                            Column::nullIntColumn()};
+    Columns testColumns2 = {Column(1), Column(1.1F), Column("aaaaaa", 100),
+                            Column::nullIntColumn()};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
     ASSERT_NO_THROW(table.insert(testColumns1));
@@ -163,31 +162,33 @@ TEST_F(RecordIteratorTest, TestCompareVarchar) {
     char compareStr[100] = "aaabbb";
     conditions[0] = CompareCondition(columnMetas[2].name, EQ, compareStr);
 
-    Column readColumns[4];
-    int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns0, readColumns, 4);
-        return true;
-    });
+    int numRecords = iter.iterate(
+        conditions, [&](int index, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns0, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 
     // GT.
     conditions[0].op = GT;
-    numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns1, readColumns, 4);
-        return true;
-    });
+    numRecords = iter.iterate(
+        conditions, [&](int index, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns1, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 
     // LT.
     conditions[0].op = LT;
-    numRecords = iter.iterate(readColumns, conditions, [&](int index) {
-        compareColumns(testColumns2, readColumns, 4);
-        return true;
-    });
+    numRecords = iter.iterate(
+        conditions, [&](int index, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns2, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 }
 
-TEST_F(RecordIteratorTest, TestNullField) {
+TEST_F(RecordScannerTest, TestNullField) {
     CompareConditions conditions = CompareConditions(2);
     int value = 1;
     conditions[0] =
@@ -196,17 +197,17 @@ TEST_F(RecordIteratorTest, TestNullField) {
         CompareCondition(columnMetas[3].name, EQ, (const char *)(&value));
 
     Column readColumns[4];
-    int numRecords =
-        iter.iterate(readColumns, conditions, [&](int) { return true; });
+    int numRecords = iter.iterate(
+        conditions, [&](int, RecordID, const Columns &) { return true; });
 
     EXPECT_EQ(numRecords, 0);
 }
 
-TEST_F(RecordIteratorTest, TestNullOp) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column(1)};
+TEST_F(RecordScannerTest, TestNullOp) {
+    Columns testColumns0 = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                            Column(1)};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
     ASSERT_NO_THROW(table.insert(testColumns1));
@@ -215,23 +216,25 @@ TEST_F(RecordIteratorTest, TestNullOp) {
     conditions[0] = CompareCondition(columnMetas[3].name, IS_NULL, nullptr);
 
     Column readColumns[4];
-    int numRecords = iter.iterate(readColumns, conditions, [&](int) {
-        compareColumns(testColumns0, readColumns, 4);
-        return true;
-    });
+    int numRecords = iter.iterate(
+        conditions, [&](int, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns0, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 
     conditions[0].op = NOT_NULL;
-    numRecords = iter.iterate(readColumns, conditions, [&](int) {
-        compareColumns(testColumns1, readColumns, 4);
-        return true;
-    });
+    numRecords = iter.iterate(conditions,
+                              [&](int, RecordID, const Columns &readColumns) {
+                                  compareColumns(testColumns1, readColumns);
+                                  return true;
+                              });
     EXPECT_EQ(numRecords, 1);
 }
 
-TEST_F(RecordIteratorTest, TestNullValue) {
-    Column testColumns0[4] = {Column(1), Column(1.1F),
-                              Column::nullVarcharColumn(100), Column(2)};
+TEST_F(RecordScannerTest, TestNullValue) {
+    Columns testColumns0 = {Column(1), Column(1.1F),
+                            Column::nullVarcharColumn(100), Column(2)};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
 
@@ -247,17 +250,17 @@ TEST_F(RecordIteratorTest, TestNullValue) {
             CompareCondition(columnMetas[2].name, testCase.first, nullptr);
 
         Column readColumns[4];
-        int numRecords =
-            iter.iterate(readColumns, conditions, [&](int) { return true; });
+        int numRecords = iter.iterate(
+            conditions, [&](int, RecordID, const Columns &) { return true; });
         EXPECT_EQ(numRecords, testCase.second);
     }
 }
 
-TEST_F(RecordIteratorTest, TestLikeOp) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column("123451", 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(1), Column(1.1F), Column("012314", 100),
-                              Column(1)};
+TEST_F(RecordScannerTest, TestLikeOp) {
+    Columns testColumns0 = {Column(1), Column(1.1F), Column("123451", 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(1), Column(1.1F), Column("012314", 100),
+                            Column(1)};
 
     ASSERT_NO_THROW(table.insert(testColumns0));
     ASSERT_NO_THROW(table.insert(testColumns1));
@@ -269,23 +272,25 @@ TEST_F(RecordIteratorTest, TestLikeOp) {
     conditions[0] = CompareCondition(columnMetas[2].name, LIKE, regex);
 
     Column readColumns[4];
-    int numRecords = iter.iterate(readColumns, conditions, [&](int) {
-        compareColumns(testColumns0, readColumns, 4);
-        return true;
-    });
+    int numRecords = iter.iterate(
+        conditions, [&](int, RecordID, const Columns &readColumns) {
+            compareColumns(testColumns0, readColumns);
+            return true;
+        });
     EXPECT_EQ(numRecords, 1);
 
     // Test invalid regex.
     regex = "[1-9";
     conditions[0].value = regex;
     EXPECT_THROW(
-        iter.iterate(readColumns, conditions, [&](int) { return true; }),
+        iter.iterate(conditions,
+                     [&](int, RecordID, const Columns &) { return true; }),
         Internal::InvalidRegexError);
 }
 
-TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
-    Column testColumns0[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
+TEST_F(RecordScannerTest, TestInvalidLikeOperator) {
+    Columns testColumns0 = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
     ASSERT_NO_THROW(table.insert(testColumns0));
 
     CompareConditions conditions = CompareConditions(1);
@@ -293,21 +298,22 @@ TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
 
     Column readColumns[4];
     EXPECT_THROW(
-        iter.iterate(readColumns, conditions, [&](int) { return true; }),
+        iter.iterate(conditions,
+                     [&](int, RecordID, const Columns &) { return true; }),
         Internal::InvalidOperatorError);
 }
 
-TEST_F(RecordIteratorTest, TestIndexedScan) {
-    Column testColumns0[4] = {Column(0), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns1[4] = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns2[4] = {Column(2), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
-    Column testColumns3[4] = {Column(3), Column(1.1F), Column(testVarChar, 100),
-                              Column::nullIntColumn()};
+TEST_F(RecordScannerTest, TestIndexedScan) {
+    Columns testColumns0 = {Column(0), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns1 = {Column(1), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns2 = {Column(2), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
+    Columns testColumns3 = {Column(3), Column(1.1F), Column(testVarChar, 100),
+                            Column::nullIntColumn()};
 
-    Column *columns[] = {testColumns0, testColumns1, testColumns2,
+    Columns columns[] = {testColumns0, testColumns1, testColumns2,
                          testColumns3};
 
     std::vector<RecordID> records;
@@ -318,20 +324,19 @@ TEST_F(RecordIteratorTest, TestIndexedScan) {
 
     // Empty conditions.
     CompareConditions conditions;
-    Column readColumns[4];
 
     for (int i = 0; i < records.size(); i++) {
         bool got = false;
         int numRecords = iter.iterate(
-            readColumns, conditions,
+            conditions,
             [&]() -> RecordID {
                 // Only request for records[i].
                 if (got) return {-1, -1};
                 got = true;
                 return records[i];
             },
-            [&](int) {
-                compareColumns(columns[i], readColumns, 4);
+            [&](int, RecordID, const Columns &readColumns) {
+                compareColumns(columns[i], readColumns);
                 return true;
             });
         EXPECT_EQ(numRecords, 1);

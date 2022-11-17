@@ -1,5 +1,5 @@
-#ifndef _SIMPLEDB_RECORD_ITERATOR_H
-#define _SIMPLEDB_RECORD_ITERATOR_H
+#ifndef _SIMPLEDB_RECORD_SCANNER_H
+#define _SIMPLEDB_RECORD_SCANNER_H
 
 #include <utility>
 #include <vector>
@@ -11,7 +11,7 @@ namespace Internal {
 class Table;
 struct Column;
 struct RecordID;
-using Columns = Column *;
+using Columns = std::vector<Column>;
 
 enum CompareOp {
     EQ,        // =
@@ -37,26 +37,28 @@ struct CompareCondition {
 
 using CompareConditions = std::vector<CompareCondition>;
 
-class RecordIterator {
+class RecordScanner {
 public:
-    RecordIterator(Table *table);
-    using IteratorFunc = std::function<bool(int index)>;
+    RecordScanner(Table *table);
+    using IteratorFunc =
+        std::function<bool(int index, RecordID id, const Columns bufColumns)>;
     using GetNextRecordFunc = std::function<RecordID(void)>;
 
     // Iterate through all records of the table.
-    int iterate(Columns bufColumns, CompareConditions conditions,
+    int iterate(CompareConditions conditions, IteratorFunc callback);
+    int iterate(CompareConditions conditions, GetNextRecordFunc getNext,
                 IteratorFunc callback);
-    int iterate(Columns bufColumns, CompareConditions conditions,
-                GetNextRecordFunc getNext, IteratorFunc callback);
+
+    std::pair<RecordID, Columns> findFirst(CompareConditions conditions);
 
 #if TESTING
-    RecordIterator() = default;
+    RecordScanner() = default;
 #endif
 
 private:
     Table *table;
 
-    bool validate(const Columns columns, const CompareConditions &conditions);
+    bool validate(const Columns &columns, const CompareConditions &conditions);
 };
 
 }  // namespace Internal
