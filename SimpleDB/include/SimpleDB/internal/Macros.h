@@ -1,6 +1,8 @@
 #ifndef _SIMPLEDB_MACROS_H
 #define _SIMPLEDB_MACROS_H
 
+#include <stdint.h>
+
 #include <limits>
 
 namespace SimpleDB {
@@ -14,6 +16,7 @@ const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN + 1;
 const int MAX_COLUMNS = 16;
 const int MAX_COLUMN_NAME_LEN = 64;
 const int MAX_TABLE_NAME_LEN = 64;
+const int MAX_DATABASE_NAME_LEN = MAX_VARCHAR_LEN;
 
 // Can be fit into a single page.
 const int RECORD_SLOT_SIZE = 1024;

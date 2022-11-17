@@ -104,6 +104,11 @@ DECLARE_ERROR(Unknown, ExecutionErrorBase, "Unknown exception");
 DECLARE_ERROR(Internal, ExecutionErrorBase, "Internal error");
 DECLARE_ERROR(IncompatableValue, ExecutionErrorBase,
               "Incompatable value error");
+DECLARE_ERROR(Uninitialized, ExecutionErrorBase, "DMBS is uninitialized");
+DECLARE_ERROR(Initialization, ExecutionErrorBase, "Fail to initialize DMBS");
+DECLARE_ERROR(DatabaseExists, ExecutionErrorBase,
+              "The database already exists");
+DECLARE_ERROR(CreateDatabase, ExecutionErrorBase, "Fail to create database");
 
 }  // namespace Error
 

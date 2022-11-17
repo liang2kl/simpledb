@@ -23,8 +23,11 @@ int RecordIterator::iterate(Columns bufColumns, CompareConditions conditions,
             if (table->occupied(*handle, slot)) {
                 table->get({page, slot}, bufColumns);
                 if (validate(bufColumns, conditions)) {
-                    callback(numReturns);
+                    bool continueIteration = callback(numReturns);
                     numReturns++;
+                    if (!continueIteration) {
+                        break;
+                    }
                 }
             }
         }

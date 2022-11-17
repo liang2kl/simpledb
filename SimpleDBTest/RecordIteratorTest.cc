@@ -68,6 +68,7 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
 
     int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns0, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
@@ -78,6 +79,7 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
 
     numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns1, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
@@ -86,7 +88,7 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
     conditions[0] =
         CompareCondition(columnMetas[0].name, GE, (const char *)(&value));
     numRecords =
-        iter.iterate(readColumns, conditions, [](int) { ASSERT_TRUE(false); });
+        iter.iterate(readColumns, conditions, [](int) { return true; });
     EXPECT_EQ(numRecords, 0);
 
     // Two constraints (GE, LT).
@@ -99,6 +101,7 @@ TEST_F(RecordIteratorTest, TestCompareInt) {
 
     numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns2, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 }
@@ -137,6 +140,7 @@ TEST_F(RecordIteratorTest, TestCompareFloat) {
 
         int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
             compareColumns(testColumn, readColumns, 4);
+            return true;
         });
         EXPECT_EQ(numRecords, 1);
     }
@@ -162,6 +166,7 @@ TEST_F(RecordIteratorTest, TestCompareVarchar) {
     Column readColumns[4];
     int numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns0, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
@@ -169,6 +174,7 @@ TEST_F(RecordIteratorTest, TestCompareVarchar) {
     conditions[0].op = GT;
     numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns1, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
@@ -176,6 +182,7 @@ TEST_F(RecordIteratorTest, TestCompareVarchar) {
     conditions[0].op = LT;
     numRecords = iter.iterate(readColumns, conditions, [&](int index) {
         compareColumns(testColumns2, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 }
@@ -189,7 +196,8 @@ TEST_F(RecordIteratorTest, TestNullField) {
         CompareCondition(columnMetas[3].name, EQ, (const char *)(&value));
 
     Column readColumns[4];
-    int numRecords = iter.iterate(readColumns, conditions, [&](int) {});
+    int numRecords =
+        iter.iterate(readColumns, conditions, [&](int) { return true; });
 
     EXPECT_EQ(numRecords, 0);
 }
@@ -209,12 +217,14 @@ TEST_F(RecordIteratorTest, TestNullOp) {
     Column readColumns[4];
     int numRecords = iter.iterate(readColumns, conditions, [&](int) {
         compareColumns(testColumns0, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
     conditions[0].op = NOT_NULL;
     numRecords = iter.iterate(readColumns, conditions, [&](int) {
         compareColumns(testColumns1, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 }
@@ -237,7 +247,8 @@ TEST_F(RecordIteratorTest, TestNullValue) {
             CompareCondition(columnMetas[2].name, testCase.first, nullptr);
 
         Column readColumns[4];
-        int numRecords = iter.iterate(readColumns, conditions, [&](int) {});
+        int numRecords =
+            iter.iterate(readColumns, conditions, [&](int) { return true; });
         EXPECT_EQ(numRecords, testCase.second);
     }
 }
@@ -260,14 +271,16 @@ TEST_F(RecordIteratorTest, TestLikeOp) {
     Column readColumns[4];
     int numRecords = iter.iterate(readColumns, conditions, [&](int) {
         compareColumns(testColumns0, readColumns, 4);
+        return true;
     });
     EXPECT_EQ(numRecords, 1);
 
     // Test invalid regex.
     regex = "[1-9";
     conditions[0].value = regex;
-    EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
-                 Internal::InvalidRegexError);
+    EXPECT_THROW(
+        iter.iterate(readColumns, conditions, [&](int) { return true; }),
+        Internal::InvalidRegexError);
 }
 
 TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
@@ -279,8 +292,9 @@ TEST_F(RecordIteratorTest, TestInvalidLikeOperator) {
     conditions[0] = CompareCondition(columnMetas[0].name, LIKE, "[0-9]+");
 
     Column readColumns[4];
-    EXPECT_THROW(iter.iterate(readColumns, conditions, [&](int) {}),
-                 Internal::InvalidOperatorError);
+    EXPECT_THROW(
+        iter.iterate(readColumns, conditions, [&](int) { return true; }),
+        Internal::InvalidOperatorError);
 }
 
 TEST_F(RecordIteratorTest, TestIndexedScan) {
@@ -316,7 +330,10 @@ TEST_F(RecordIteratorTest, TestIndexedScan) {
                 got = true;
                 return records[i];
             },
-            [&](int) { compareColumns(columns[i], readColumns, 4); });
+            [&](int) {
+                compareColumns(columns[i], readColumns, 4);
+                return true;
+            });
         EXPECT_EQ(numRecords, 1);
     }
 }

@@ -40,7 +40,7 @@ using CompareConditions = std::vector<CompareCondition>;
 class RecordIterator {
 public:
     RecordIterator(Table *table);
-    using IteratorFunc = std::function<void(int index)>;
+    using IteratorFunc = std::function<bool(int index)>;
     using GetNextRecordFunc = std::function<RecordID(void)>;
 
     // Iterate through all records of the table.
