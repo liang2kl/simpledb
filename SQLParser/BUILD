@@ -5,7 +5,7 @@ ANTLR_FLAGS = "-Dlanguage=Cpp -visitor -no-listener -package SQLParser " + \
 
 genrule(
     name = "antlr-sources",
-    srcs = ["src/Sql.g4"],
+    srcs = ["Sql.g4"],
     outs = [
         "SqlLexer.cpp", "SqlParser.cpp",
         "SqlVisitor.cpp", "SqlBaseVisitor.cpp",
@@ -19,6 +19,6 @@ cc_library(
     name = "sqlparser",
     srcs = [":antlr-sources"],
     hdrs = [":antlr-sources"],
-    deps = ["//:antlr4-runtime"],
+    deps = ["@usr_local//:antlr4_runtime"],
     visibility = ["//visibility:public"]
 )
