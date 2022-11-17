@@ -24,9 +24,11 @@ class DBMS {
 
 public:
     DBMS(const std::string &rootPath);
+    DBMS() = default;
     ~DBMS();
 
     void init();
+    void close();
 
     // Execute one or more SQL statement(s). No results will be returned if one
     // of the statements has failed even if the effects have taken place, for

@@ -1,5 +1,6 @@
 .vscode
 .DS_Store
+dbdata/
 
 # Bazel
 # Ignore backup files.

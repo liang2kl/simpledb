@@ -20,6 +20,11 @@ alias(
     actual = "//SimpleDBService:simpledb_service",
 )
 
+alias(
+    name = "simpledb_server",
+    actual = "//SimpleDBServer:main",
+)
+
 test_suite(
     name = "test_all",
     tests = [

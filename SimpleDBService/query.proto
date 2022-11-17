@@ -11,6 +11,7 @@ message ExecutionRequest {
 
 message ExecutionBatchResponse {
   repeated ExecutionResponse responses = 1;
+  Stats stats = 2;
 }
 
 message ExecutionResponse {
@@ -40,6 +41,10 @@ message ExecutionError {
     ERR_INTERNAL = 1;
     ERR_UNKNOWN = 2;
     ERR_INCOMPATIBLE_VALUE = 3;
+    ERR_SYNTAX = 4;
+    ERR_DATABASE_EXIST = 5;
+    ERR_CREATE_DATABASE = 6;
+    ERR_DATABASE_NOT_EXIST = 7;
   }
   string message = 1;
   Type type = 2;

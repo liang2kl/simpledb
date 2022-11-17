@@ -39,12 +39,7 @@ DBMS::DBMS(const std::string &rootPath) : rootPath(rootPath) {
     visitor = ParseTreeVisitor(this);
 }
 
-DBMS::~DBMS() {
-    databaseSystemTable.close();
-    for (auto &pair : openedTables) {
-        pair.second->close();
-    }
-}
+DBMS::~DBMS() { close(); }
 
 void DBMS::init() {
     if (initialized) {
@@ -59,7 +54,7 @@ void DBMS::init() {
         }
     } else {
         try {
-            std::filesystem::create_directory(systemPath);
+            std::filesystem::create_directories(systemPath);
         } catch (std::filesystem::filesystem_error &e) {
             throw Error::InitializationError(e.what());
         }
@@ -69,6 +64,14 @@ void DBMS::init() {
     initDatabaseSystemTable();
 
     initialized = true;
+}
+
+void DBMS::close() {
+    databaseSystemTable.close();
+    for (auto &pair : openedTables) {
+        pair.second->close();
+    }
+    initialized = false;
 }
 
 std::vector<Service::ExecutionResult> DBMS::executeSQL(std::istream &stream) {
@@ -108,7 +111,7 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
     const std::filesystem::path dbPath = rootPath / dbName;
     if (!std::filesystem::is_directory(dbPath)) {
         try {
-            std::filesystem::create_directory(dbPath);
+            std::filesystem::create_directories(dbPath);
         } catch (std::filesystem::filesystem_error &e) {
             throw Error::CreateDatabaseError(e.what());
         }
