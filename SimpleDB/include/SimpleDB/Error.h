@@ -109,6 +109,8 @@ DECLARE_ERROR(Initialization, ExecutionErrorBase, "Fail to initialize DMBS");
 DECLARE_ERROR(DatabaseExists, ExecutionErrorBase,
               "The database already exists");
 DECLARE_ERROR(CreateDatabase, ExecutionErrorBase, "Fail to create database");
+DECLARE_ERROR(DatabaseNotExist, ExecutionErrorBase,
+              "The database does not exists");
 
 }  // namespace Error
 

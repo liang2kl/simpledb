@@ -70,8 +70,7 @@ private:
     void initDatabaseSystemTable();
 
     // === Helper methods ===
-    std::string getTablePath(const std::string &tableName);
-    std::string getDatabasePath(const std::string &tableName);
+    Service::PlainResult makePlainResult(const std::string &msg);
 };
 
 };  // namespace SimpleDB

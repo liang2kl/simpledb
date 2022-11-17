@@ -17,6 +17,13 @@ using namespace SQLParser;
 using namespace SimpleDB::Internal;
 using namespace SimpleDB::Service;
 
+#define WRAP_INTERNAL_THROW(stmt)            \
+    try {                                    \
+        stmt;                                \
+    } catch (BaseError & e) {                \
+        throw Error::UnknownError(e.what()); \
+    }
+
 namespace SimpleDB {
 
 class : public antlr4::BaseErrorListener {
@@ -111,12 +118,24 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
     Columns columns = {Column(dbName.c_str(), MAX_VARCHAR_LEN)};
     databaseSystemTable.insert(columns);
 
-    PlainResult result;
-    result.set_msg("OK");
-    return result;
+    return makePlainResult("OK");
 }
 
-PlainResult DBMS::dropDatabase(const std::string &dbName) {}
+PlainResult DBMS::dropDatabase(const std::string &dbName) {
+    CompareConditions conditions(1);
+    conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
+                                     CompareOp::EQ, dbName.c_str());
+
+    auto [id, columns] = databaseSystemTable.getScanner().findFirst(conditions);
+    if (id == RecordID::NULL_RECORD) {
+        throw Error::DatabaseNotExistError(dbName);
+    }
+
+    WRAP_INTERNAL_THROW(databaseSystemTable.remove(id));
+
+    return makePlainResult("OK");
+}
+
 PlainResult DBMS::useDatabase(const std::string &dbName) {}
 ShowTableResult DBMS::showTables() {}
 ShowDatabasesResult DBMS::showDatabases() {}
@@ -141,6 +160,12 @@ void DBMS::initDatabaseSystemTable() {
     } catch (BaseError &e) {
         throw Error::InitializationError(e.what());
     }
+}
+
+PlainResult DBMS::makePlainResult(const std::string &msg) {
+    PlainResult result;
+    result.set_msg(msg);
+    return result;
 }
 
 }  // namespace SimpleDB

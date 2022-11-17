@@ -44,20 +44,24 @@ TEST_F(DBMSTest, TestInvalidSQL) {
     }
 }
 
-TEST_F(DBMSTest, TestCreateDatabase) {
+TEST_F(DBMSTest, TestCreateDropDatabase) {
     initDBMS();
     std::vector<std::string> testCases = {
-        "CREATE DATABASE db1;",
-        "CREATE DATABASE db2;",
-        "CREATE DATABASE db3;",
+        "DATABASE db1;",
+        "DATABASE db2;",
+        "DATABASE db3;",
     };
 
     for (auto testCase : testCases) {
-        ASSERT_NO_THROW(executeSQL(testCase));
+        ASSERT_NO_THROW(executeSQL("CREATE " + testCase));
     }
 
     for (auto testCase : testCases) {
-        ASSERT_THROW(executeSQL(testCase), Error::DatabaseExistsError);
+        ASSERT_THROW(executeSQL("CREATE " + testCase),
+                     Error::DatabaseExistsError);
+        ASSERT_NO_THROW(executeSQL("DROP " + testCase));
+        ASSERT_THROW(executeSQL("DROP " + testCase),
+                     Error::DatabaseNotExistError);
     }
 }
 

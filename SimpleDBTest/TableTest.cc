@@ -49,7 +49,8 @@ protected:
 };
 
 TEST_F(TableTest, TestUninitializeAccess) {
-    EXPECT_THROW(table.get({0, 0}), Internal::TableNotInitializedError);
+    EXPECT_THROW(auto _ = table.get({0, 0}),
+                 Internal::TableNotInitializedError);
     EXPECT_THROW(table.insert(Columns()), Internal::TableNotInitializedError);
     EXPECT_THROW(table.update({0, 0}, Columns()),
                  Internal::TableNotInitializedError);
@@ -137,7 +138,7 @@ TEST_F(TableTest, TestRemove) {
 
     ASSERT_NO_THROW(table.remove(id));
     EXPECT_FALSE(table.occupied(handle, id.slot));
-    EXPECT_THROW(table.get(id), Internal::InvalidSlotError);
+    EXPECT_THROW(auto _ = table.get(id), Internal::InvalidSlotError);
 }
 
 TEST_F(TableTest, TestReleasePage) {
