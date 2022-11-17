@@ -26,15 +26,15 @@ DEFINE_string(dir, "", "Root directory of the database data");
 DEFINE_bool(verbose, false, "Output verbose logs");
 DEFINE_bool(debug, false, "Output debug logs");
 DEFINE_bool(silent, false, "Silence all logs");
-static bool validateDir(const char *flagName, const std::string &value) {
+DEFINE_string(addr, "127.0.0.1:9100", "Server bind address");
+DEFINE_validator(dir, [](const char *flagName, const std::string &value) {
     if (value.empty()) {
         std::cerr << "ERROR: --" << flagName << " must be specified"
                   << std::endl;
         return false;
     }
     return true;
-}
-DEFINE_validator(dir, &validateDir);
+});
 
 SimpleDB::DBMS *dbms;
 std::shared_ptr<grpc::Server> server;
@@ -82,19 +82,18 @@ void runServer() {
     SQLService service(dbms);
     grpc::ServerBuilder builder;
 
-    const std::string serverAddress = "127.0.0.1:9100";
-
-    builder.AddListeningPort(serverAddress, grpc::InsecureServerCredentials())
+    builder.AddListeningPort(FLAGS_addr, grpc::InsecureServerCredentials())
         .RegisterService(&service)
         .BuildAndStart();
     server = builder.BuildAndStart();
-    std::cout << "Server listening on " << serverAddress << std::endl;
+    std::cout << "Server listening on " << FLAGS_addr << std::endl;
     server->Wait();
+
+    delete dbms;
 }
 
 void sigintHandler(int) {
     // Exit gracefully...
     std::cout << "\nShutting down server..." << std::endl;
     server->Shutdown();
-    delete dbms;
 }
