@@ -34,6 +34,14 @@ grpc_extra_deps()
 load("@rules_proto_grpc//cpp:repositories.bzl", rules_proto_grpc_cpp_repos = "cpp_repos")
 rules_proto_grpc_cpp_repos()
 
+# gflags
+http_archive(
+    name = "com_github_gflags_gflags",
+    url = "https://github.com/gflags/gflags/archive/refs/tags/v2.2.2.tar.gz",
+    strip_prefix = "gflags-2.2.2",
+    sha256 = "34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf"
+)
+
 # Hedron's Compile Commands Extractor for Bazel
 # https://github.com/hedronvision/bazel-compile-commands-extractor
 http_archive(

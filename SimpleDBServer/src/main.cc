@@ -2,6 +2,7 @@
 #include <SimpleDB/Error.h>
 #include <SimpleDB/SimpleDB.h>
 #include <SimpleDBService/query.grpc.pb.h>
+#include <gflags/gflags.h>
 #include <grpc/grpc.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
@@ -15,36 +16,35 @@
 
 #include "SQLService.h"
 
-void showUsage();
+// Forward declarations
 void runServer();
 void sigintHandler(int);
+void initFromCLIFlags(int argc, char *argv[]);
+
+// CLI flags and validators
+DEFINE_string(dir, "", "Root directory of the database data");
+DEFINE_bool(verbose, false, "Output verbose logs");
+DEFINE_bool(debug, false, "Output debug logs");
+DEFINE_bool(silent, false, "Silence all logs");
+static bool validateDir(const char *flagName, const std::string &value) {
+    if (value.empty()) {
+        std::cerr << "ERROR: --" << flagName << " must be specified"
+                  << std::endl;
+        return false;
+    }
+    return true;
+}
+DEFINE_validator(dir, &validateDir);
 
 SimpleDB::DBMS *dbms;
 std::shared_ptr<grpc::Server> server;
 
 int main(int argc, char *argv[]) {
-    if (argc != 3) {
-        showUsage();
-    }
-
-    std::string rootPath;
-
-    if (argc == 3) {
-        if (std::string(argv[1]).rfind("--dir") == 0) {
-            rootPath = argv[2];
-        } else {
-            showUsage();
-        }
-    }
+    // Parse CLI flags
+    initFromCLIFlags(argc, argv);
 
     // Register handlers
     signal(SIGINT, sigintHandler);
-
-    // TODO: Read log level from commandline.
-    SimpleDB::Internal::Logger::setLogLevel(
-        SimpleDB::Internal::LogLevel::VERBOSE);
-
-    dbms = new SimpleDB::DBMS(rootPath);
 
     try {
         dbms->init();
@@ -59,6 +59,25 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 
+void initFromCLIFlags(int argc, char *argv[]) {
+    gflags::ParseCommandLineFlags(&argc, &argv, false);
+
+    SimpleDB::Internal::LogLevel logLevel =
+        SimpleDB::Internal::LogLevel::NOTICE;
+
+    if (FLAGS_silent) {
+        logLevel = SimpleDB::Internal::LogLevel::SILENT;
+    } else if (FLAGS_debug) {
+        logLevel = SimpleDB::Internal::LogLevel::DEBUG_;
+    } else if (FLAGS_verbose) {
+        logLevel = SimpleDB::Internal::LogLevel::VERBOSE;
+    }
+
+    SimpleDB::Internal::Logger::setLogLevel(logLevel);
+
+    dbms = new SimpleDB::DBMS(FLAGS_dir);
+}
+
 void runServer() {
     SQLService service(dbms);
     grpc::ServerBuilder builder;
@@ -71,11 +90,6 @@ void runServer() {
     server = builder.BuildAndStart();
     std::cout << "Server listening on " << serverAddress << std::endl;
     server->Wait();
-}
-
-void showUsage() {
-    std::cout << "Usage: <program> [--dir <data-directory>]\n";
-    exit(1);
 }
 
 void sigintHandler(int) {
