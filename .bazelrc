@@ -1,1 +1,2 @@
 build --cxxopt='-std=c++17'
+build --linkopt='-Wl,-no_fixup_chains'
