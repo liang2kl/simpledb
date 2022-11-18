@@ -7,6 +7,7 @@
 
 #include <exception>
 #include <iostream>
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -19,11 +20,16 @@ using SimpleDB::Service::ExecutionResponse;
 using SimpleDB::Service::ExecutionResult;
 using ErrorType = SimpleDB::Service::ExecutionError::Type;
 
+using namespace SimpleDB::Error;
+
 SQLService::SQLService(SimpleDB::DBMS* dbms) : dbms(dbms) {}
 
 Status SQLService::ExecuteSQLProgram(ServerContext* context,
                                      const ExecutionRequest* request,
                                      ExecutionBatchResponse* response) {
+    // Lock the mutex to prevent concurrent execution.
+    std::lock_guard<std::mutex> _(mutex);
+
     const std::string sql = request->sql();
     std::istringstream stream(sql);
 
@@ -34,26 +40,32 @@ Status SQLService::ExecuteSQLProgram(ServerContext* context,
             resp.mutable_result()->CopyFrom(result);
             response->mutable_responses()->Add(std::move(resp));
         }
-    } catch (SimpleDB::Error::SyntaxError& e) {
+    } catch (SyntaxError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_SYNTAX,
                   e.what());
-    } catch (SimpleDB::Error::IncompatableValueError& e) {
+        return Status::OK;
+    } catch (IncompatableValueError& e) {
         makeError(response,
                   ErrorType::ExecutionError_Type_ERR_INCOMPATIBLE_VALUE,
                   e.what());
-    } catch (SimpleDB::Error::DatabaseExistsError& e) {
+        return Status::OK;
+    } catch (DatabaseExistsError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_DATABASE_EXIST,
                   e.what());
-    } catch (SimpleDB::Error::CreateDatabaseError& e) {
+        return Status::OK;
+    } catch (CreateDatabaseError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_CREATE_DATABASE,
                   e.what());
-    } catch (SimpleDB::Error::DatabaseNotExistError& e) {
+        return Status::OK;
+    } catch (DatabaseNotExistError& e) {
         makeError(response,
                   ErrorType::ExecutionError_Type_ERR_DATABASE_NOT_EXIST,
                   e.what());
-    } catch (SimpleDB::Error::InternalError& e) {
+        return Status::OK;
+    } catch (InternalError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_INTERNAL,
                   e.what());
+        return Status::OK;
     } catch (std::exception& e) {
         return Status(StatusCode::INTERNAL,
                       std::string("Unexpected exception occured: ") + e.what());

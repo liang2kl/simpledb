@@ -4,6 +4,8 @@
 #include <SimpleDB/SimpleDB.h>
 #include <SimpleDBService/query.grpc.pb.h>
 
+#include <mutex>
+
 class SQLService final : public SimpleDB::Service::Query::Service {
 public:
     SQLService(SimpleDB::DBMS* dbms);
@@ -17,4 +19,5 @@ private:
     void makeError(SimpleDB::Service::ExecutionBatchResponse* resp,
                    SimpleDB::Service::ExecutionError::Type type,
                    const std::string& message);
+    std::mutex mutex;
 };

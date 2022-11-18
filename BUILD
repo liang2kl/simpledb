@@ -21,8 +21,18 @@ alias(
 )
 
 alias(
+    name = "simpledb_service_py",
+    actual = "//SimpleDBService:simpledb_service_py"
+)
+
+alias(
     name = "simpledb_server",
     actual = "//SimpleDBServer:main",
+)
+
+alias(
+    name = "simpledb_client",
+    actual = "//SimpleDBClient:main",
 )
 
 test_suite(

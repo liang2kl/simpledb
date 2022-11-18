@@ -81,12 +81,13 @@ void initFromCLIFlags(int argc, char *argv[]) {
 void runServer() {
     SQLService service(dbms);
     grpc::ServerBuilder builder;
+    grpc::ResourceQuota quota;
+
+    std::cout << "Server listening on " << FLAGS_addr << std::endl;
 
     builder.AddListeningPort(FLAGS_addr, grpc::InsecureServerCredentials())
-        .RegisterService(&service)
-        .BuildAndStart();
+        .RegisterService(&service);
     server = builder.BuildAndStart();
-    std::cout << "Server listening on " << FLAGS_addr << std::endl;
     server->Wait();
 
     delete dbms;

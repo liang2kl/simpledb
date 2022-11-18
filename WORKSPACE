@@ -31,8 +31,12 @@ load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
 grpc_extra_deps()
+
 load("@rules_proto_grpc//cpp:repositories.bzl", rules_proto_grpc_cpp_repos = "cpp_repos")
 rules_proto_grpc_cpp_repos()
+
+load("@rules_proto_grpc//python:repositories.bzl", rules_proto_grpc_python_repos = "python_repos")
+rules_proto_grpc_python_repos()
 
 # gflags
 http_archive(
@@ -41,6 +45,23 @@ http_archive(
     strip_prefix = "gflags-2.2.2",
     sha256 = "34af2f15cf7367513b352bdcd2493ab14ce43692d2dcd9dfc499492966c64dcf"
 )
+
+# rules_python
+http_archive(
+    name = "rules_python",
+    sha256 = "8c8fe44ef0a9afc256d1e75ad5f448bb59b81aba149b8958f02f7b3a98f5d9b4",
+    strip_prefix = "rules_python-0.13.0",
+    url = "https://github.com/bazelbuild/rules_python/archive/refs/tags/0.13.0.tar.gz",
+)
+load("@rules_python//python:pip.bzl", "pip_parse")
+
+# dep repo
+pip_parse(
+   name = "simpledb_service_dep",
+   requirements_lock = "//SimpleDBClient:requirements.txt",
+)
+load("@simpledb_service_dep//:requirements.bzl", "install_deps")
+install_deps()
 
 # Hedron's Compile Commands Extractor for Bazel
 # https://github.com/hedronvision/bazel-compile-commands-extractor
