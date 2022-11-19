@@ -15,6 +15,6 @@ cc_library(
     deps = ["//:sqlparser", "//:simpledb_service"],
     strip_include_prefix = "include/SimpleDB",
     includes = ["include"],
-    defines = ["DEBUG=1", "TESTING=1"],
+    local_defines = ["DEBUG=1", "TESTING=1"],
     visibility = ["//visibility:public"],
 )

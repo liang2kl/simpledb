@@ -11,7 +11,7 @@ FILE *Logger::errorStream = stderr;
 
 void Logger::log(LogLevel level, const char *fmt, ...) {
     if (level < displayMinLevel) return;
-    fprintf(errorStream, "[%s] ", logLevelNames[level]);
+    fprintf(errorStream, "[%-7s] ", logLevelNames[level]);
 
     va_list argList;
 

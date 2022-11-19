@@ -17,31 +17,31 @@ public:
     ParseTreeVisitor() = default;
     ParseTreeVisitor(::SimpleDB::DBMS *dbms);
 
-    virtual std::any visitProgram(
+    virtual antlrcpp::Any visitProgram(
         SQLParser::SqlParser::ProgramContext *ctx) override;
-    virtual std::any visitStatement(
+    virtual antlrcpp::Any visitStatement(
         SQLParser::SqlParser::StatementContext *ctx) override;
-    virtual std::any visitCreate_db(
+    virtual antlrcpp::Any visitCreate_db(
         SQLParser::SqlParser::Create_dbContext *ctx) override;
-    virtual std::any visitDrop_db(
+    virtual antlrcpp::Any visitDrop_db(
         SQLParser::SqlParser::Drop_dbContext *ctx) override;
-    virtual std::any visitShow_dbs(
+    virtual antlrcpp::Any visitShow_dbs(
         SQLParser::SqlParser::Show_dbsContext *ctx) override;
-    virtual std::any visitUse_db(
+    virtual antlrcpp::Any visitUse_db(
         SQLParser::SqlParser::Use_dbContext *ctx) override;
-    virtual std::any visitShow_tables(
+    virtual antlrcpp::Any visitShow_tables(
         SQLParser::SqlParser::Show_tablesContext *ctx) override;
-    virtual std::any visitCreate_table(
+    virtual antlrcpp::Any visitCreate_table(
         SQLParser::SqlParser::Create_tableContext *ctx) override;
-    virtual std::any visitDrop_table(
+    virtual antlrcpp::Any visitDrop_table(
         SQLParser::SqlParser::Drop_tableContext *ctx) override;
-    virtual std::any visitDescribe_table(
+    virtual antlrcpp::Any visitDescribe_table(
         SQLParser::SqlParser::Describe_tableContext *ctx) override;
 
     // @returns: std::vector<ColumnMeta>
-    virtual std::any visitField_list(
+    virtual antlrcpp::Any visitField_list(
         SQLParser::SqlParser::Field_listContext *ctx) override;
-    virtual std::any visitNormal_field(
+    virtual antlrcpp::Any visitNormal_field(
         SQLParser::SqlParser::Normal_fieldContext *ctx) override;
 
 private:

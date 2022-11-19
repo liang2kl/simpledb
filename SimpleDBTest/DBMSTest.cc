@@ -25,9 +25,9 @@ protected:
     }
 
     void initDBMS() { dbms.init(); }
-    void executeSQL(const std::string &sql) {
+    std::vector<Service::ExecutionResult> executeSQL(const std::string &sql) {
         auto stream = getStream(sql);
-        dbms.executeSQL(stream);
+        return dbms.executeSQL(stream);
     }
 };
 
@@ -62,6 +62,33 @@ TEST_F(DBMSTest, TestCreateDropDatabase) {
         ASSERT_NO_THROW(executeSQL("DROP " + testCase));
         ASSERT_THROW(executeSQL("DROP " + testCase),
                      Error::DatabaseNotExistError);
+    }
+}
+
+TEST_F(DBMSTest, TestShowDatabases) {
+    initDBMS();
+
+    std::vector<std::string> testCases = {
+        "db1",
+        "db2",
+        "db3",
+    };
+
+    for (auto testCase : testCases) {
+        ASSERT_NO_THROW(executeSQL("CREATE DATABASE " + testCase + ";"));
+    }
+
+    std::vector<Service::ExecutionResult> results;
+
+    ASSERT_NO_THROW(results = executeSQL("SHOW DATABASES;"));
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_TRUE(results[0].has_show_databases());
+    ASSERT_EQ(results[0].show_databases().databases_size(), testCases.size());
+
+    for (int i = 0; i < testCases.size(); i++) {
+        // The order is not necessarily the same, but it is actually the same in
+        // our implementation.
+        ASSERT_EQ(results[0].show_databases().databases(i), testCases[i]);
     }
 }
 

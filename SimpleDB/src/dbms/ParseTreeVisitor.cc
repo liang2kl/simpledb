@@ -20,13 +20,13 @@ namespace Internal {
 
 ParseTreeVisitor::ParseTreeVisitor(::SimpleDB::DBMS *dbms) : dbms(dbms) {}
 
-std::any ParseTreeVisitor::visitProgram(SqlParser::ProgramContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitProgram(SqlParser::ProgramContext *ctx) {
     std::vector<ExecutionResult> results;
 
     try {
         for (auto *stmt : ctx->statement()) {
-            std::any result = stmt->accept(this);
-            results.push_back(std::any_cast<ExecutionResult>(result));
+            antlrcpp::Any result = stmt->accept(this);
+            results.push_back(result.as<ExecutionResult>());
         }
     } catch (Error::ExecutionErrorBase &e) {
         // Normal exception.
@@ -62,7 +62,8 @@ std::any ParseTreeVisitor::visitProgram(SqlParser::ProgramContext *ctx) {
     return results;
 }
 
-std::any ParseTreeVisitor::visitStatement(SqlParser::StatementContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitStatement(
+    SqlParser::StatementContext *ctx) {
     if (ctx->alter_statement()) {
         return ctx->alter_statement()->accept(this);
     }
@@ -81,71 +82,73 @@ std::any ParseTreeVisitor::visitStatement(SqlParser::StatementContext *ctx) {
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitCreate_db(SqlParser::Create_dbContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitCreate_db(
+    SqlParser::Create_dbContext *ctx) {
     visitChildren(ctx);
 
     PlainResult result = dbms->createDatabase(ctx->Identifier()->getText());
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitDrop_db(SqlParser::Drop_dbContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitDrop_db(SqlParser::Drop_dbContext *ctx) {
     visitChildren(ctx);
 
     PlainResult result = dbms->dropDatabase(ctx->Identifier()->getText());
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitShow_dbs(SqlParser::Show_dbsContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitShow_dbs(SqlParser::Show_dbsContext *ctx) {
     ShowDatabasesResult result = dbms->showDatabases();
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitUse_db(SqlParser::Use_dbContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitUse_db(SqlParser::Use_dbContext *ctx) {
     PlainResult result = dbms->useDatabase(ctx->Identifier()->getText());
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitShow_tables(
+antlrcpp::Any ParseTreeVisitor::visitShow_tables(
     SqlParser::Show_tablesContext *ctx) {
     ShowTableResult result = dbms->showTables();
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitCreate_table(
+antlrcpp::Any ParseTreeVisitor::visitCreate_table(
     SqlParser::Create_tableContext *ctx) {
-    std::any results = ctx->field_list()->accept(this);
+    antlrcpp::Any results = ctx->field_list()->accept(this);
 
-    std::vector<ColumnMeta> columns =
-        std::any_cast<std::vector<ColumnMeta>>(results);
+    std::vector<ColumnMeta> columns = results.as<std::vector<ColumnMeta>>();
     PlainResult result =
         dbms->createTable(ctx->Identifier()->getText(), columns);
 
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitDrop_table(SqlParser::Drop_tableContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitDrop_table(
+    SqlParser::Drop_tableContext *ctx) {
     PlainResult result = dbms->dropTable(ctx->Identifier()->getText());
     return wrap(result);
 }
 
-std::any ParseTreeVisitor::visitDescribe_table(
+antlrcpp::Any ParseTreeVisitor::visitDescribe_table(
     SqlParser::Describe_tableContext *ctx) {
     // dbms->describeTable(ctx->Identifier()->getText());
-    return std::any();
+    return antlrcpp::Any();
 }
 
-std::any ParseTreeVisitor::visitField_list(SqlParser::Field_listContext *ctx) {
+antlrcpp::Any ParseTreeVisitor::visitField_list(
+    SqlParser::Field_listContext *ctx) {
     std::vector<ColumnMeta> columns;
 
     for (auto field : ctx->field()) {
-        std::any result = field->accept(this);
-        columns.push_back(std::any_cast<ColumnMeta>(result));
+        antlrcpp::Any result = field->accept(this);
+        columns.push_back(result.as<ColumnMeta>());
     }
 
     return columns;
 }
 
-std::any ParseTreeVisitor::visitNormal_field(
+antlrcpp::Any ParseTreeVisitor::visitNormal_field(
     SqlParser::Normal_fieldContext *ctx) {
     ColumnMeta column;
     ParseHelper::parseName(ctx->Identifier()->getText(), column.name);

@@ -57,6 +57,14 @@ int RecordScanner::iterate(CompareConditions conditions,
     return numReturns;
 }
 
+int RecordScanner::iterate(IteratorFunc callback) {
+    return iterate(CompareConditions(), callback);
+}
+
+int RecordScanner::iterate(GetNextRecordFunc getNext, IteratorFunc callback) {
+    return iterate(CompareConditions(), getNext, callback);
+}
+
 std::pair<RecordID, Columns> RecordScanner::findFirst(
     CompareConditions conditions) {
     RecordID rid = RecordID::NULL_RECORD;

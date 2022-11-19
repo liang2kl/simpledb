@@ -9,5 +9,6 @@ cc_test(
         "@googletest//:gtest",
         "//:simpledb-test",
     ],
+    local_defines = ["DEBUG=1", "TESTING=1"],
     visibility = ["//visibility:public"],
 )

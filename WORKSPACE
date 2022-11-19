@@ -24,9 +24,6 @@ http_archive(
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 rules_proto_grpc_toolchains()
 rules_proto_grpc_repos()
-load("@rules_proto//proto:repositories.bzl", "rules_proto_dependencies", "rules_proto_toolchains")
-rules_proto_dependencies()
-rules_proto_toolchains()
 load("@com_github_grpc_grpc//bazel:grpc_deps.bzl", "grpc_deps")
 grpc_deps()
 load("@com_github_grpc_grpc//bazel:grpc_extra_deps.bzl", "grpc_extra_deps")
@@ -62,6 +59,17 @@ pip_parse(
 )
 load("@simpledb_service_dep//:requirements.bzl", "install_deps")
 install_deps()
+
+# antlr
+http_archive(
+    name = "rules_antlr",
+    sha256 = "26e6a83c665cf6c1093b628b3a749071322f0f70305d12ede30909695ed85591",
+    strip_prefix = "rules_antlr-0.5.0",
+    urls = ["https://github.com/marcohu/rules_antlr/archive/0.5.0.tar.gz"],
+)
+load("@rules_antlr//antlr:repositories.bzl", "rules_antlr_dependencies")
+load("@rules_antlr//antlr:lang.bzl", "CPP")
+rules_antlr_dependencies("4.8", CPP)
 
 # Hedron's Compile Commands Extractor for Bazel
 # https://github.com/hedronvision/bazel-compile-commands-extractor

@@ -1,2 +1,3 @@
 build --cxxopt='-std=c++17'
 build --linkopt='-Wl,-no_fixup_chains'
+build --host_action_env=PATH=/bin:/usr/bin --incompatible_strict_action_env

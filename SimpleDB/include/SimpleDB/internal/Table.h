@@ -48,6 +48,8 @@ struct Column {
     Column() = default;
 };
 
+static_assert(sizeof(Column) <= RECORD_SLOT_SIZE);
+
 struct ColumnMeta {
     DataType type;
     ColumnSizeType size;

@@ -8,18 +8,18 @@
 namespace SimpleDB {
 namespace Internal {
 
-const int PAGE_SIZE = 8192;
+const int PAGE_SIZE = 4096;
 const int NUM_BUFFER_PAGE = 1024;
 
 const int MAX_VARCHAR_LEN = 256 - 1;
 const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN + 1;
-const int MAX_COLUMNS = 16;
+const int MAX_COLUMNS = 12;
 const int MAX_COLUMN_NAME_LEN = 64;
 const int MAX_TABLE_NAME_LEN = 64;
 const int MAX_DATABASE_NAME_LEN = MAX_VARCHAR_LEN;
 
 // Can be fit into a single page.
-const int RECORD_SLOT_SIZE = 1024;
+const int RECORD_SLOT_SIZE = 512;
 static_assert(RECORD_SLOT_SIZE <= PAGE_SIZE);
 
 const int NUM_SLOT_PER_PAGE = PAGE_SIZE / RECORD_SLOT_SIZE;
@@ -35,7 +35,7 @@ const uint16_t INDEX_META_CANARY = 0xDADA;
 const uint16_t EMPTY_INDEX_PAGE_CANARY = 0xDCDC;
 
 const int INDEX_SLOT_SIZE = 420;
-const int MAX_NUM_CHILD_PER_NODE = 20;
+const int MAX_NUM_CHILD_PER_NODE = 10;
 const int MIN_NUM_CHILD_PER_NODE = (MAX_NUM_CHILD_PER_NODE + 1) / 2;
 const int MAX_NUM_ENTRY_PER_NODE = MAX_NUM_CHILD_PER_NODE - 1;
 const int MIN_NUM_ENTRY_PER_NODE = MIN_NUM_CHILD_PER_NODE - 1;

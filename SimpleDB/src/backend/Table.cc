@@ -266,6 +266,7 @@ void Table::remove(RecordID id) {
     }
 
     // As we are dealing with the pointer directly, we don't need to flush.
+    PF::markDirty(*handle);
     assert(handle->validate());
 }
 

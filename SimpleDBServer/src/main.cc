@@ -50,6 +50,7 @@ int main(int argc, char *argv[]) {
         dbms->init();
     } catch (SimpleDB::Error::InitializationError &e) {
         std::cerr << e.what() << std::endl;
+        delete dbms;
         return -1;
     }
 

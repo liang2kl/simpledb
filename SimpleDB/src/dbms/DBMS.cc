@@ -90,18 +90,13 @@ std::vector<Service::ExecutionResult> DBMS::executeSQL(std::istream &stream) {
     auto program = parser.program();
 
     // The errors are handled in the visitor.
-    return std::any_cast<std::vector<Service::ExecutionResult>>(
-        visitor.visitProgram(program));
+    return visitor.visitProgram(program)
+        .as<std::vector<Service::ExecutionResult>>();
 }
 
 PlainResult DBMS::createDatabase(const std::string &dbName) {
     // TODO: Add index to system table.
-    CompareConditions conditions(1);
-    conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
-                                     CompareOp::EQ, dbName.c_str());
-
-    bool found = databaseSystemTable.getScanner().findFirst(conditions).first !=
-                 RecordID::NULL_RECORD;
+    bool found = findDatabase(dbName).first != RecordID::NULL_RECORD;
 
     if (found) {
         throw Error::DatabaseExistsError(dbName);
@@ -125,23 +120,37 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
 }
 
 PlainResult DBMS::dropDatabase(const std::string &dbName) {
-    CompareConditions conditions(1);
-    conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
-                                     CompareOp::EQ, dbName.c_str());
-
-    auto [id, columns] = databaseSystemTable.getScanner().findFirst(conditions);
+    auto [id, columns] = findDatabase(dbName);
     if (id == RecordID::NULL_RECORD) {
         throw Error::DatabaseNotExistError(dbName);
     }
 
     WRAP_INTERNAL_THROW(databaseSystemTable.remove(id));
+    std::filesystem::remove_all(rootPath / dbName);
 
     return makePlainResult("OK");
 }
 
-PlainResult DBMS::useDatabase(const std::string &dbName) {}
+PlainResult DBMS::useDatabase(const std::string &dbName) {
+    bool found = findDatabase(dbName).first != RecordID::NULL_RECORD;
+    if (!found) {
+        throw Error::DatabaseNotExistError(dbName);
+    }
+    currentDatabase = dbName;
+    return makePlainResult("Switch to database " + dbName);
+}
+
+ShowDatabasesResult DBMS::showDatabases() {
+    ShowDatabasesResult result;
+    databaseSystemTable.getScanner().iterate(
+        [&](int, RecordID, const Columns &bufColumns) {
+            result.mutable_databases()->Add(bufColumns[0].data.stringValue);
+            return true;
+        });
+    return result;
+}
+
 ShowTableResult DBMS::showTables() {}
-ShowDatabasesResult DBMS::showDatabases() {}
 PlainResult DBMS::createTable(const std::string &tableName,
                               const std::vector<ColumnMeta> &columns) {}
 PlainResult DBMS::dropTable(const std::string &tableName) {}
@@ -169,6 +178,14 @@ PlainResult DBMS::makePlainResult(const std::string &msg) {
     PlainResult result;
     result.set_msg(msg);
     return result;
+}
+
+std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
+    CompareConditions conditions(1);
+    conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
+                                     CompareOp::EQ, dbName.c_str());
+
+    return databaseSystemTable.getScanner().findFirst(conditions);
 }
 
 }  // namespace SimpleDB

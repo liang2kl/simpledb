@@ -1,33 +1,13 @@
 import argparse
 import sys
-import pygments
-from prettytable import PrettyTable
-from prompt_toolkit import prompt, HTML
-from prompt_toolkit import print_formatted_text as print
+from prompt_toolkit import prompt
 from pygments.lexers.sql import SqlLexer
 from prompt_toolkit.lexers import PygmentsLexer
-import SimpleDBService.query_pb2_grpc as service
-from SimpleDBService.query_pb2 import ExecutionRequest
 import SimpleDBService.query_pb2 as query_pb2
 import grpc
 
-class SimpleDBClient(service.QueryServicer):
-    def __init__(self, addr: str) -> None:
-        super().__init__()
-        self.addr = addr
-        self.channel = None
-
-    def connect(self):
-        self.channel = grpc.insecure_channel(self.addr)
-        self.stub = service.QueryStub(self.channel)
-
-    def execute(self, sql: str):
-        request = ExecutionRequest()
-        request.sql = sql
-        return self.ExecuteSQLProgram(request, None)
-
-    def ExecuteSQLProgram(self, request, context):
-        return self.stub.ExecuteSQLProgram(request)
+from util import print_html, print_bold, print_table, print
+from client import SimpleDBClient
 
 lexer = PygmentsLexer(SqlLexer)
 
@@ -43,19 +23,14 @@ STARTUP_PROMPT = """\
 
 client: SimpleDBClient = None
 
-def print_html(s, *args, **kwargs):
-    print(HTML(s), *args, **kwargs)
-
-def print_bold(s, *args, **kwargs):
-    print_html(f"<b>{s}</b>", *args, **kwargs)
-
-def print_table(headers, rows):
-    table = PrettyTable()
-    table.field_names = headers
-    table.align = "l"
-    for r in rows:
-        table.add_row(r)
-    print(table)
+def connect_server(addr: str):
+    global client
+    try:
+        client = SimpleDBClient(addr)
+        client.connect()
+    except:
+        return False
+    return True
 
 def print_resp(resp):
     if (resp.HasField("error")):
@@ -70,20 +45,11 @@ def print_resp(resp):
     else:
         print(resp.result)
 
-def connect_server(addr: str):
-    global client
-    try:
-        client = SimpleDBClient(addr)
-        client.connect()
-    except:
-        return False
-    return True
-
 def send_request(sql: str):
     try:
         responses = client.execute(sql).responses
     except grpc.RpcError as e:
-        print(f"RPC Error ({e.code()}):", e.details())
+        print(f"RPC Error ({e.code()}):", e.details(), end="\n\n")
         return
     
     if len(responses) == 1:
@@ -118,7 +84,7 @@ if __name__ == "__main__":
     print_html(STARTUP_PROMPT)
     print_bold("Run configurations")
     for k, v in result.__dict__.items():
-        print(f"  {k.replace('_', ' ')}: {v}")
+        print(f"  {k.replace('_', ' ').capitalize()}: {v}")
     print("")
 
     success = connect_server(result.server_addr)

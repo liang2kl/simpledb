@@ -40,6 +40,7 @@ public:
 private:
 #endif
     std::filesystem::path rootPath;
+    std::string currentDatabase;
     bool initialized = false;
 
     // === System Tables ===
@@ -73,6 +74,9 @@ private:
 
     // === Helper methods ===
     Service::PlainResult makePlainResult(const std::string &msg);
+    std::pair<Internal::RecordID, Internal::Columns> findDatabase(
+        const std::string &dbName);
+    void checkUseDatabase();
 };
 
 };  // namespace SimpleDB
