@@ -399,14 +399,9 @@ void Table::serialize(const Columns &srcObjects, char *destData,
     for (int i = 0; i < meta.numColumn; i++) {
         if ((bitmap & (ColumnBitmap(1) << i)) == 0) {
             if (all) {
-                if (!meta.columns[i].hasDefault) {
-                    Logger::log(
-                        ERROR,
-                        "Table: internal error: column %s has "
-                        "no default value but is required to serialize\n",
-                        meta.columns[i].name);
-                    throw Internal::ValueNotGivenError();
-                }
+#if DEBUG
+                assert(meta.columns[i].hasDefault);
+#endif
                 // Use default value
                 memcpy(destData, meta.columns[i].defaultValue,
                        meta.columns[i].size);
