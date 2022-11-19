@@ -71,6 +71,10 @@ DECLARE_ERROR(NullValueFoundInNotNullColumn, TableErrorBase,
               "Null value found in not null column");
 DECLARE_ERROR(NullValueGivenForNotNullColumn, TableErrorBase,
               "Null value given for not null column");
+DECLARE_ERROR(ValueNotGiven, TableErrorBase,
+              "The value of a column without default value is not given");
+DECLARE_ERROR(IncorrectColumnNum, TableErrorBase,
+              "Incorrect number of columns are given");
 
 // ==== Iterator Error ====
 DECLARE_ERROR_CLASS(Iterator, InternalErrorBase, "Iterator error");

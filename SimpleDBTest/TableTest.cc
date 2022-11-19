@@ -1,3 +1,4 @@
+#include <SimpleDB/Error.h>
 #include <SimpleDB/internal/RecordScanner.h>
 #ifndef TESTING
 #define TESTING 1
@@ -30,7 +31,9 @@ protected:
         {.type = VARCHAR,
          .size = 100,
          .nullable = false,
-         .name = "varchar_val"},
+         .name = "varchar_val",
+         .hasDefault = true,
+         .defaultValue = "HELLO"},
         // A nullable column.
         {.type = INT, .size = 4, .nullable = true, .name = "int_val_nullable"},
     };
@@ -106,6 +109,19 @@ TEST_F(TableTest, TestInsertGet) {
 
         EXPECT_EQ(table.meta.firstFree, page + 1);
     }
+}
+
+TEST_F(TableTest, TestInsertIncompleteFields) {
+    initTable();
+    // The third column has default value.
+    Columns newColumns = testColumns;
+    newColumns.erase(std::next(newColumns.begin(), 2));
+    EXPECT_NO_THROW(table.insert(newColumns, /*bitmap=*/0b1011));
+
+    // Now removes a column without default value.
+    newColumns.erase(newColumns.begin());
+    EXPECT_THROW(table.insert(newColumns, /*bitmap=*/0b1010),
+                 ValueNotGivenError);
 }
 
 TEST_F(TableTest, TestUpdate) {

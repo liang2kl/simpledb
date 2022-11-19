@@ -99,7 +99,8 @@ public:
              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
-    RecordID insert(const Columns &columns);
+    RecordID insert(const Columns &columns,
+                    ColumnBitmap bitmap = COLUMN_BITMAP_ALL);
 
     // Update record.
     void update(RecordID id, const Columns &columns,
@@ -172,7 +173,8 @@ private:
 
     void deserialize(const char *srcData, Columns &destObjects,
                      ColumnBitmap columnBitmap);
-    void serialize(const Columns &srcObjects, char *destData, ColumnBitmap map);
+    void serialize(const Columns &srcObjects, char *destData, ColumnBitmap map,
+                   bool all);
 
     // Must ensure that the handle is valid.
     bool occupied(const PageHandle &handle, int slot);
@@ -182,6 +184,8 @@ private:
     RecordID getEmptySlot();
 
     void validateSlot(int page, int slot);
+    void validateColumnBitmap(const Columns &columns, ColumnBitmap bitmap,
+                              bool isUpdate);
 };
 
 }  // namespace Internal

@@ -1,9 +1,11 @@
 #include "internal/Table.h"
 
+#include <SimpleDB/Error.h>
 #include <string.h>
 
 #include <cmath>
 #include <cstdio>
+#include <cstring>
 
 #include "internal/Logger.h"
 #include "internal/Macros.h"
@@ -187,7 +189,7 @@ Columns Table::get(RecordID id, ColumnBitmap columnBitmap) {
     return columns;
 }
 
-RecordID Table::insert(const Columns &columns) {
+RecordID Table::insert(const Columns &columns, ColumnBitmap bitmap) {
     checkInit();
 
     // Find an empty slot.
@@ -196,9 +198,13 @@ RecordID Table::insert(const Columns &columns) {
     Logger::log(VERBOSE, "Table: insert record to page %d slot %d\n", id.page,
                 id.slot);
 
+    // Validate the bitmap.
+    validateColumnBitmap(columns, bitmap, /*isUpdate=*/false);
+
     PageHandle *handle = getHandle(id.page);
     char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
-    serialize(columns, start, COLUMN_BITMAP_ALL);
+
+    serialize(columns, start, bitmap, /*all=*/true);
 
     // Mark the page as dirty.
     PF::markDirty(*handle);
@@ -225,8 +231,11 @@ void Table::update(RecordID id, const Columns &columns, ColumnBitmap bitmap) {
         throw Internal::InvalidSlotError();
     }
 
+    // Validate the bitmap.
+    validateColumnBitmap(columns, bitmap, /*isUpdate=*/true);
+
     char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
-    serialize(columns, start, bitmap);
+    serialize(columns, start, bitmap, /*all=*/false);
 
     // Mark dirty.
     PF::markDirty(*handle);
@@ -381,7 +390,7 @@ void Table::deserialize(const char *srcData, Columns &destObjects,
 }
 
 void Table::serialize(const Columns &srcObjects, char *destData,
-                      ColumnBitmap bitmap) {
+                      ColumnBitmap bitmap, bool all) {
     RecordMeta *recordMeta = (RecordMeta *)destData;
     destData += sizeof(RecordMeta);
 
@@ -389,6 +398,19 @@ void Table::serialize(const Columns &srcObjects, char *destData,
     int index = 0;
     for (int i = 0; i < meta.numColumn; i++) {
         if ((bitmap & (ColumnBitmap(1) << i)) == 0) {
+            if (all) {
+                if (!meta.columns[i].hasDefault) {
+                    Logger::log(
+                        ERROR,
+                        "Table: internal error: column %s has "
+                        "no default value but is required to serialize\n",
+                        meta.columns[i].name);
+                    throw Internal::ValueNotGivenError();
+                }
+                // Use default value
+                memcpy(destData, meta.columns[i].defaultValue,
+                       meta.columns[i].size);
+            }
             destData += meta.columns[i].size;
             continue;
         }
@@ -445,6 +467,32 @@ void Table::validateSlot(int page, int slot) {
             "%d) X [1, %d)\n",
             page, slot, meta.numUsedPages, NUM_SLOT_PER_PAGE);
         throw Internal::InvalidSlotError();
+    }
+}
+
+void Table::validateColumnBitmap(const Columns &columns, ColumnBitmap bitmap,
+                                 bool isUpdate) {
+    int numColumns = 0;
+    for (int i = 0; i < meta.numColumn; i++) {
+        if ((bitmap & (1L << i)) == 0) {
+            // The bit is not set, thus must having a default value.
+            if (!isUpdate && !meta.columns[i].hasDefault) {
+                Logger::log(ERROR,
+                            "Table: column %d has no default value, but the "
+                            "column is not set in the bitmap\n",
+                            i);
+                throw ValueNotGivenError();
+            }
+        } else {
+            numColumns++;
+        }
+    }
+
+    if (numColumns != columns.size()) {
+        Logger::log(ERROR,
+                    "Table: bitmap has %d columns, but %ld columns are given\n",
+                    numColumns, columns.size());
+        throw IncorrectColumnNumError();
     }
 }
 
