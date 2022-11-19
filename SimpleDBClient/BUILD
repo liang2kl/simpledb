@@ -7,6 +7,7 @@ py_binary(
         "//:simpledb_service_py",
         requirement("prompt_toolkit"),
         requirement("Pygments"),
+        requirement("prettytable"),
     ],
     visibility = ["//visibility:public"]
 )
