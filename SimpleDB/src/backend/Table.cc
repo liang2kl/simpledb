@@ -1,6 +1,7 @@
 #include "internal/Table.h"
 
 #include <SimpleDB/Error.h>
+#include <SimpleDB/internal/Column.h>
 #include <string.h>
 
 #include <cmath>
@@ -312,6 +313,36 @@ std::string Table::getColumnName(int index) const {
         throw Internal::InvalidColumnIndexError();
     }
     return meta.columns[index].name;
+}
+
+void Table::iterate(IterateCallback callback) {
+    Columns bufColumns;
+
+    for (int page = 1; page < meta.numUsedPages; page++) {
+        PageHandle *handle = getHandle(page);
+        for (int slot = 1; slot < NUM_SLOT_PER_PAGE; slot++) {
+            if (occupied(*handle, slot)) {
+                RecordID rid = {page, slot};
+
+                // TODO: Optimization: only get necessary columns.
+                get(rid, bufColumns);
+                bool _continue = callback(rid, bufColumns);
+                if (!_continue) {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+std::vector<ColumnInfo> Table::getColumnMeta() {
+    std::vector<ColumnInfo> columns;
+    for (int i = 0; i < meta.numColumn; i++) {
+        auto &column = meta.columns[i];
+        columns.push_back(
+            {.name = column.name, .type = column.type, .size = column.size});
+    }
+    return columns;
 }
 
 PageHandle *Table::getHandle(int page) {

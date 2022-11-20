@@ -7,47 +7,13 @@
 #include <utility>
 #include <vector>
 
+#include "internal/Column.h"
 #include "internal/FileCoordinator.h"
 #include "internal/Macros.h"
+#include "internal/QueryDataSource.h"
 
 namespace SimpleDB {
 namespace Internal {
-
-using ColumnSizeType = uint32_t;
-
-enum DataType {
-    INT,     // 32 bit integer
-    FLOAT,   // 32 bit float
-    VARCHAR  // length-variable string
-};
-
-union ColumnValue {
-    int intValue;
-    float floatValue;
-    char stringValue[MAX_COLUMN_SIZE];
-};
-
-struct Column {
-    DataType type;
-    ColumnSizeType size;
-    bool isNull = false;
-    ColumnValue data;
-
-    // Initialize a null column.
-    static Column nullColumn(DataType type, ColumnSizeType size);
-    static Column nullIntColumn();
-    static Column nullFloatColumn();
-    static Column nullVarcharColumn(ColumnSizeType size);
-
-    // Convenienve constructors.
-    Column(int data);
-    Column(float data);
-    Column(const char *data, int maxLength);
-
-    Column() = default;
-};
-
-static_assert(sizeof(Column) <= RECORD_SLOT_SIZE);
 
 struct ForeignKey {
     char name[MAX_COLUMN_NAME_LEN];
@@ -65,24 +31,10 @@ struct ColumnMeta {
     char defaultValue[MAX_COLUMN_SIZE];
 };
 
-using Columns = std::vector<Column>;
-using ColumnBitmap = int16_t;
-
-static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
-
-struct RecordID {
-    int page;
-    int slot;
-
-    bool operator==(const RecordID &rhs) const;
-    bool operator!=(const RecordID &rhs) const;
-    static const RecordID NULL_RECORD;
-};
-
 // A Table holds the metadata of a certain table, which should be unique
 // thourghout the program, and be stored in memory once created for the sake of
 // metadata reading/writing performance.
-class Table {
+class Table : public QueryDataSource {
     friend class QueryBuilder;
 
 public:
@@ -118,6 +70,10 @@ public:
 
     int getColumnIndex(const char *name) const;
     std::string getColumnName(int index) const;
+
+    // QueryDataSource requirements.
+    virtual void iterate(IterateCallback callback) override;
+    virtual std::vector<ColumnInfo> getColumnMeta() override;
 
 #if !TESTING
 private:

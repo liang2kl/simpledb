@@ -1,18 +1,22 @@
 #include "internal/QueryBuilder.h"
 
+#include <SimpleDB/internal/Column.h>
+
 #include <vector>
 
 #include "Error.h"
 #include "internal/Comparer.h"
 #include "internal/Logger.h"
+#include "internal/QueryFilter.h"
 
 namespace SimpleDB {
 namespace Internal {
-QueryBuilder &QueryBuilder::scan(Table *table) {
-    if (scannedTable != nullptr) {
+
+QueryBuilder &QueryBuilder::scan(QueryDataSource *source) {
+    if (dataSource != nullptr) {
         throw MultipleScanError();
     }
-    scannedTable = table;
+    dataSource = source;
     return *this;
 }
 
@@ -49,68 +53,73 @@ QueryBuilder &QueryBuilder::limit(int count) {
 }
 
 QueryBuilder::Result QueryBuilder::execute() {
-    // TODO: Index-based scan.
-    checkProvider();
-
     Result result;
-    Columns bufColumns;
+
+    this->iterate([&](RecordID rid, Columns &columns) {
+        result.emplace_back(rid, columns);
+        return true;
+    });
+
+    return result;
+}
+
+// TODO: Add tests for this.
+void QueryBuilder::iterate(IterateCallback callback) {
+    checkDataSource();
+
     AggregatedFilter filter = aggregateAllFilters();
 
-    for (int page = 1; page < scannedTable->meta.numUsedPages; page++) {
-        PageHandle *handle = scannedTable->getHandle(page);
-        for (int slot = 1; slot < NUM_SLOT_PER_PAGE; slot++) {
-            if (scannedTable->occupied(*handle, slot)) {
-                RecordID rid = {page, slot};
+    dataSource->iterate([&](RecordID rid, Columns &columns) {
+        if (filter.apply(columns)) {
+            return callback(rid, columns);
+        }
+        return true;
+    });
+}
 
-                // TODO: Optimization: only get necessary columns.
-                scannedTable->get(rid, bufColumns);
-                if (filter.apply(bufColumns)) {
-                    result.push_back({rid, bufColumns});
-                }
-            }
+std::vector<ColumnInfo> QueryBuilder::getColumnMeta() {
+    checkDataSource();
+    auto columnMetas = dataSource->getColumnMeta();
+    std::vector<ColumnInfo> result;
+
+    // We should "apply" SelectFilter here.
+    for (auto &columnMeta : columnMetas) {
+        if (selectFilter.columnNames.empty() ||
+            selectFilter.columnNames.find(columnMeta.name) !=
+                selectFilter.columnNames.end()) {
+            result.push_back(columnMeta);
         }
     }
 
     return result;
 }
 
-void QueryBuilder::checkProvider() {
-    // Check query source.
-    // TODO: Other sources.
-    if (scannedTable == nullptr) {
-        throw NoScanProviderError();
+void QueryBuilder::checkDataSource() {
+    if (dataSource == nullptr) {
+        throw NoScanDataSourceError();
     }
 }
 
 AggregatedFilter QueryBuilder::aggregateAllFilters() {
     // Create a virtual table.
-    // TODO: other source.
-    // for (int i = 0)
-    virtualTable.columns.resize(scannedTable->meta.numColumn);
-    for (int i = 0; i < scannedTable->meta.numColumn; i++) {
-        ColumnMeta &column = scannedTable->meta.columns[i];
-        virtualTable.columns[i] = {
-            .name = column.name, .type = column.type, .size = column.size};
-    }
+    virtualTable.columns = dataSource->getColumnMeta();
 
-    std::vector<BaseFilter *> filters;
+    AggregatedFilter filter;
     // Condition filters comes before selectors.
     for (int i = 0; i < conditionFilters.size(); i++) {
         conditionFilters[i].table = &virtualTable;
-        filters.push_back(&conditionFilters[i]);
+        filter.filters.push_back(&conditionFilters[i]);
     }
     // The select filter comes after.
     if (selectFilter.columnNames.size() > 0) {
         selectFilter.table = &virtualTable;
-        filters.push_back(&selectFilter);
+        filter.filters.push_back(&selectFilter);
     }
     // Add limit filter at the back.
-    filters.push_back(&limitFilter);
+    filter.filters.push_back(&limitFilter);
 
-    return AggregatedFilter(filters);
+    return filter;
 }
-
-// int QueryBuilder::VirtualTable
 
 }  // namespace Internal
 }  // namespace SimpleDB

@@ -102,7 +102,8 @@ DECLARE_ERROR_CLASS(QueryBuilder, InternalErrorBase, "QueryBuilder error");
 DECLARE_ERROR(MultipleScan, QueryBuilderErrorBase,
               "Multiple tables are provided for scan");
 DECLARE_ERROR(InvalidLimit, QueryBuilderErrorBase, "Invalid limit given");
-DECLARE_ERROR(NoScanProvider, QueryBuilderErrorBase, "No scan provider given");
+DECLARE_ERROR(NoScanDataSource, QueryBuilderErrorBase,
+              "No scan data source provided");
 DECLARE_ERROR(ColumnNotFound, QueryBuilderErrorBase,
               "Column not found in table");
 

@@ -38,14 +38,8 @@ struct CompareCondition {
 
 using CompareConditions = std::vector<CompareCondition>;
 
-struct VirtualColumnMeta {
-    std::string name;
-    DataType type;
-    ColumnSizeType size;
-};
-
 struct VirtualTable {
-    std::vector<VirtualColumnMeta> columns;
+    std::vector<ColumnInfo> columns;
     int getColumnIndex(const std::string name) {
         for (int i = 0; i < columns.size(); i++) {
             if (name == columns[i].name) {
@@ -86,7 +80,7 @@ struct LimitFilter : public BaseFilter {
 };
 
 struct AggregatedFilter : public BaseFilter {
-    AggregatedFilter(std::vector<BaseFilter *> filters) : filters(filters) {}
+    AggregatedFilter() = default;
     virtual bool apply(Columns &columns) override;
     std::vector<BaseFilter *> filters;
 };
