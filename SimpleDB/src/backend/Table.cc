@@ -88,7 +88,6 @@ void Table::create(const std::string &file, const std::string &name,
     try {
         // Create and open the file.
         PF::create(file);
-        fd = PF::open(file);
     } catch (Internal::FileExistsError) {
         Logger::log(
             WARNING,
@@ -98,6 +97,8 @@ void Table::create(const std::string &file, const std::string &name,
         Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
         throw Internal::CreateTableError();
     }
+
+    fd = PF::open(file);
 
     if (name.size() > MAX_TABLE_NAME_LEN) {
         Logger::log(
