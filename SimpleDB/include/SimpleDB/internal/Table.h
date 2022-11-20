@@ -9,7 +9,6 @@
 
 #include "internal/FileCoordinator.h"
 #include "internal/Macros.h"
-#include "internal/RecordScanner.h"
 
 namespace SimpleDB {
 namespace Internal {
@@ -50,6 +49,12 @@ struct Column {
 
 static_assert(sizeof(Column) <= RECORD_SLOT_SIZE);
 
+struct ForeignKey {
+    char name[MAX_COLUMN_NAME_LEN];
+    char table[MAX_TABLE_NAME_LEN];
+    char column[MAX_COLUMN_NAME_LEN];
+};
+
 struct ColumnMeta {
     DataType type;
     ColumnSizeType size;
@@ -78,7 +83,7 @@ struct RecordID {
 // thourghout the program, and be stored in memory once created for the sake of
 // metadata reading/writing performance.
 class Table {
-    friend class RecordScanner;
+    friend class QueryBuilder;
 
 public:
     // The metadata is not initialized in this constructor.
@@ -89,8 +94,8 @@ public:
     void open(const std::string &file) noexcept(false);
 
     // Create a new table in a file.
-    void create(const std::string &file, const std::string &name, int numColumn,
-                ColumnMeta *columns) noexcept(false);
+    void create(const std::string &file, const std::string &name,
+                const std::vector<ColumnMeta> &columns) noexcept(false);
 
     // Get record.
     [[nodiscard]] Columns get(RecordID id,
@@ -111,10 +116,8 @@ public:
 
     void close();
 
-    int getColumnIndex(const char *name);
-    void getColumnName(int index, char *name);
-
-    RecordScanner getScanner() { return RecordScanner(this); }
+    int getColumnIndex(const char *name) const;
+    std::string getColumnName(int index) const;
 
 #if !TESTING
 private:
@@ -127,6 +130,7 @@ private:
 
         uint32_t numColumn;
         ColumnMeta columns[MAX_COLUMNS];
+        ForeignKey foreignKeys[MAX_FOREIGN_KEYS];
         uint16_t numUsedPages;
         uint16_t firstFree;
 

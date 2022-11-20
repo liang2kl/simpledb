@@ -12,9 +12,10 @@
 
 /** File structures
  *  - /system: System tables
- *      - /system/databases: Database information
+ *      - /databases: Database information
+ *      - /tables: Table information
  *  - /<db-name>: Database
- *      - /<db-name>/<table-name>: Table
+ *      - /<table-name>: Table
  */
 
 namespace SimpleDB {
@@ -44,14 +45,11 @@ private:
     bool initialized = false;
 
     // === System Tables ===
-    Internal::Table databaseSystemTable;
+    Internal::Table systemDatabaseTable;
+    Internal::Table systemTablesTable;
 
-    Internal::ColumnMeta databaseSystemTableColumns[1] = {
-        Internal::ColumnMeta{.type = Internal::DataType::VARCHAR,
-                             .size = Internal::MAX_DATABASE_NAME_LEN,
-                             .nullable = false,
-                             .name = "name",
-                             .hasDefault = false}};
+    static std::vector<Internal::ColumnMeta> systemDatabaseTableColumns;
+    static std::vector<Internal::ColumnMeta> systemTablesTableColumns;
 
     Internal::ParseTreeVisitor visitor;
     std::map<std::string, Internal::Table *> openedTables;
@@ -65,18 +63,30 @@ private:
     Service::ShowTableResult showTables();
     Service::PlainResult createTable(
         const std::string &tableName,
-        const std::vector<Internal::ColumnMeta> &columns);
+        const std::vector<Internal::ColumnMeta> &columns,
+        const std::string &primaryKey,
+        const std::vector<Internal::ForeignKey> &foreignKeys);
     Service::PlainResult dropTable(const std::string &tableName);
     // void describeTable(const std::string &tableName);
 
     // === System tables ===
-    void initDatabaseSystemTable();
+    void initSystemTable(Internal::Table *table, const std::string &name,
+                         const std::vector<Internal::ColumnMeta> columns);
 
     // === Helper methods ===
+    void checkUseDatabase();
+    void clearCurrentDatabase();
+
+    std::filesystem::path getSystemTablePath(const std::string &name);
+    std::filesystem::path getUserTablePath(const std::string database,
+                                           const std::string &name);
+
     Service::PlainResult makePlainResult(const std::string &msg);
+
     std::pair<Internal::RecordID, Internal::Columns> findDatabase(
         const std::string &dbName);
-    void checkUseDatabase();
+    std::pair<Internal::RecordID, Internal::Columns> findTable(
+        const std::string &database, const std::string &tableName);
 };
 
 };  // namespace SimpleDB

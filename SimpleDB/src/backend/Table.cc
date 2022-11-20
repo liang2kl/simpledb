@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <vector>
 
 #include "internal/Logger.h"
 #include "internal/Macros.h"
@@ -64,7 +65,7 @@ void Table::open(const std::string &file) {
 }
 
 void Table::create(const std::string &file, const std::string &name,
-                   int numColumn, ColumnMeta *columns) {
+                   const std::vector<ColumnMeta> &columns) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 
@@ -75,11 +76,11 @@ void Table::create(const std::string &file, const std::string &name,
                     file.c_str());
     }
 
-    if (numColumn > MAX_COLUMNS) {
+    if (columns.size() > MAX_COLUMNS) {
         Logger::log(
             ERROR,
-            "Table: fail to create table: too many columns: %d, max %d\n",
-            numColumn, MAX_COLUMNS);
+            "Table: fail to create table: too many columns: %ld, max %d\n",
+            columns.size(), MAX_COLUMNS);
         throw Internal::TooManyColumnsError();
     }
 
@@ -107,11 +108,11 @@ void Table::create(const std::string &file, const std::string &name,
 
     meta.firstFree = 1;
     meta.numUsedPages = 1;
-    meta.numColumn = numColumn;
+    meta.numColumn = columns.size();
     strcpy(meta.name, name.c_str());
 
     int totalSize = 0;
-    for (int i = 0; i < numColumn; i++) {
+    for (int i = 0; i < columns.size(); i++) {
         // Validate column meta.
         bool sizeValid = columns[i].type == VARCHAR
                              ? columns[i].size <= MAX_VARCHAR_LEN
@@ -283,7 +284,7 @@ void Table::close() {
     if (!initialized) {
         return;
     }
-    Logger::log(VERBOSE, "Table: closing table\n");
+    Logger::log(VERBOSE, "Table: closing table %s\n", meta.name);
 
     flushMeta();
 
@@ -299,18 +300,18 @@ void Table::close() {
     pageHandleMap.clear();
 }
 
-int Table::getColumnIndex(const char *name) {
+int Table::getColumnIndex(const char *name) const {
     auto iter = columnNameMap.find(name);
     return iter == columnNameMap.end() ? -1 : iter->second;
 }
 
-void Table::getColumnName(int index, char *name) {
+std::string Table::getColumnName(int index) const {
     if (index < 0 || index >= meta.numColumn) {
         Logger::log(ERROR, "Table: column index %d out of range [0, %d)\n",
                     index, meta.numColumn);
         throw Internal::InvalidColumnIndexError();
     }
-    strcpy(name, meta.columns[index].name);
+    return meta.columns[index].name;
 }
 
 PageHandle *Table::getHandle(int page) {

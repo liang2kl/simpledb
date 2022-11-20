@@ -1,6 +1,5 @@
 #include "Util.h"
 
-#include <SimpleDB/internal/RecordScanner.h>
 #include <gtest/gtest.h>
 
 void compareColumns(const SimpleDB::Internal::Columns &columns,

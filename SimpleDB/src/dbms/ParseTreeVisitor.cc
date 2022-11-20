@@ -4,6 +4,7 @@
 #include <SimpleDB/internal/Table.h>
 
 #include <cstdio>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -115,11 +116,14 @@ antlrcpp::Any ParseTreeVisitor::visitShow_tables(
 
 antlrcpp::Any ParseTreeVisitor::visitCreate_table(
     SqlParser::Create_tableContext *ctx) {
-    antlrcpp::Any results = ctx->field_list()->accept(this);
+    auto [columns, primaryKey, foreignKeys] =
+        ctx->field_list()
+            ->accept(this)
+            .as<std::tuple<std::vector<ColumnMeta>, std::string,
+                           std::vector<ForeignKey>>>();
 
-    std::vector<ColumnMeta> columns = results.as<std::vector<ColumnMeta>>();
-    PlainResult result =
-        dbms->createTable(ctx->Identifier()->getText(), columns);
+    PlainResult result = dbms->createTable(ctx->Identifier()->getText(),
+                                           columns, primaryKey, foreignKeys);
 
     return wrap(result);
 }
@@ -139,13 +143,29 @@ antlrcpp::Any ParseTreeVisitor::visitDescribe_table(
 antlrcpp::Any ParseTreeVisitor::visitField_list(
     SqlParser::Field_listContext *ctx) {
     std::vector<ColumnMeta> columns;
+    std::string primaryKey;
+    std::vector<ForeignKey> foreignKeys;
 
     for (auto field : ctx->field()) {
-        antlrcpp::Any result = field->accept(this);
-        columns.push_back(result.as<ColumnMeta>());
+        if (dynamic_cast<SqlParser::Normal_fieldContext *>(field)) {
+            columns.push_back(field->accept(this).as<ColumnMeta>());
+        } else if (dynamic_cast<SqlParser::Primary_key_fieldContext *>(field)) {
+            if (!primaryKey.empty()) {
+                throw Error::MultiplePrimaryKeyError();
+            }
+            primaryKey =
+                static_cast<SqlParser::Primary_key_fieldContext *>(field)
+                    ->Identifier()
+                    ->getText();
+            // FIXME: We just ignore the identifiers behind...
+        } else if (dynamic_cast<SqlParser::Foreign_key_fieldContext *>(field)) {
+            foreignKeys.push_back(field->accept(this).as<ForeignKey>());
+        } else {
+            assert(false);
+        }
     }
 
-    return columns;
+    return std::make_tuple(columns, primaryKey, foreignKeys);
 }
 
 antlrcpp::Any ParseTreeVisitor::visitNormal_field(

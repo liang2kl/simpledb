@@ -97,6 +97,15 @@ DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
 DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "The index is already existed");
 DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
 
+// ==== QueryBuilder Error ====
+DECLARE_ERROR_CLASS(QueryBuilder, InternalErrorBase, "QueryBuilder error");
+DECLARE_ERROR(MultipleScan, QueryBuilderErrorBase,
+              "Multiple tables are provided for scan");
+DECLARE_ERROR(InvalidLimit, QueryBuilderErrorBase, "Invalid limit given");
+DECLARE_ERROR(NoScanProvider, QueryBuilderErrorBase, "No scan provider given");
+DECLARE_ERROR(ColumnNotFound, QueryBuilderErrorBase,
+              "Column not found in table");
+
 }  // namespace Internal
 
 // Exposed errors.
@@ -115,6 +124,12 @@ DECLARE_ERROR(DatabaseExists, ExecutionErrorBase,
 DECLARE_ERROR(CreateDatabase, ExecutionErrorBase, "Fail to create database");
 DECLARE_ERROR(DatabaseNotExist, ExecutionErrorBase,
               "The database does not exists");
+DECLARE_ERROR(DatabaseNotSelected, ExecutionErrorBase,
+              "No database is selected");
+DECLARE_ERROR(TableExists, ExecutionErrorBase, "The table already exists");
+DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table already exists");
+DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
+              "More than one primary key is given");
 
 }  // namespace Error
 

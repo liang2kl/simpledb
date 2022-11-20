@@ -1,6 +1,7 @@
 #include "DBMS.h"
 
-#include <SimpleDB/internal/RecordScanner.h>
+#include <SQLParser/SqlLexer.h>
+#include <SimpleDB/internal/QueryBuilder.h>
 
 #include <any>
 #include <filesystem>
@@ -8,21 +9,14 @@
 #include <tuple>
 
 #include "Error.h"
-#include "SQLParser/SqlLexer.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
+#include "internal/QueryBuilder.h"
 #include "internal/Table.h"
 
 using namespace SQLParser;
 using namespace SimpleDB::Internal;
 using namespace SimpleDB::Service;
-
-#define WRAP_INTERNAL_THROW(stmt)            \
-    try {                                    \
-        stmt;                                \
-    } catch (BaseError & e) {                \
-        throw Error::UnknownError(e.what()); \
-    }
 
 namespace SimpleDB {
 
@@ -61,16 +55,18 @@ void DBMS::init() {
     }
 
     // Create or load system tables.
-    initDatabaseSystemTable();
+    initSystemTable(&systemDatabaseTable, "databases",
+                    systemDatabaseTableColumns);
+    initSystemTable(&systemTablesTable, "tables", systemTablesTableColumns);
 
     initialized = true;
 }
 
 void DBMS::close() {
-    databaseSystemTable.close();
-    for (auto &pair : openedTables) {
-        pair.second->close();
-    }
+    systemDatabaseTable.close();
+    systemTablesTable.close();
+
+    clearCurrentDatabase();
     initialized = false;
 }
 
@@ -102,7 +98,7 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
         throw Error::DatabaseExistsError(dbName);
     }
 
-    // Create database directory
+    // Create database directory.
     const std::filesystem::path dbPath = rootPath / dbName;
     if (!std::filesystem::is_directory(dbPath)) {
         try {
@@ -112,9 +108,9 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
         }
     }
 
-    // Append to the system table
+    // Append to the system table.
     Columns columns = {Column(dbName.c_str(), MAX_VARCHAR_LEN)};
-    databaseSystemTable.insert(columns);
+    systemDatabaseTable.insert(columns);
 
     return makePlainResult("OK");
 }
@@ -125,7 +121,7 @@ PlainResult DBMS::dropDatabase(const std::string &dbName) {
         throw Error::DatabaseNotExistError(dbName);
     }
 
-    WRAP_INTERNAL_THROW(databaseSystemTable.remove(id));
+    systemDatabaseTable.remove(id);
     std::filesystem::remove_all(rootPath / dbName);
 
     return makePlainResult("OK");
@@ -136,38 +132,112 @@ PlainResult DBMS::useDatabase(const std::string &dbName) {
     if (!found) {
         throw Error::DatabaseNotExistError(dbName);
     }
+
+    // Switch database.
+    clearCurrentDatabase();
     currentDatabase = dbName;
+
     return makePlainResult("Switch to database " + dbName);
 }
 
 ShowDatabasesResult DBMS::showDatabases() {
+    QueryBuilder builder;
+    builder.scan(&systemDatabaseTable);
+
+    QueryBuilder::Result queryResult = builder.execute();
+
     ShowDatabasesResult result;
-    databaseSystemTable.getScanner().iterate(
-        [&](int, RecordID, const Columns &bufColumns) {
-            result.mutable_databases()->Add(bufColumns[0].data.stringValue);
-            return true;
-        });
+
+    for (const auto &res : queryResult) {
+        const auto &column = res.second[0];
+        result.mutable_databases()->Add(column.data.stringValue);
+    }
+
     return result;
 }
 
-ShowTableResult DBMS::showTables() {}
 PlainResult DBMS::createTable(const std::string &tableName,
-                              const std::vector<ColumnMeta> &columns) {}
-PlainResult DBMS::dropTable(const std::string &tableName) {}
-// void DBMS::describeTable(const std::string &tableName) {}
+                              const std::vector<ColumnMeta> &columns,
+                              const std::string &primaryKey,
+                              const std::vector<ForeignKey> &foreignKeys) {
+    checkUseDatabase();
 
-void DBMS::initDatabaseSystemTable() {
-    std::filesystem::path path = rootPath / "system" / "databases";
+    // Check if the table exists.
+    bool exists =
+        findTable(currentDatabase, tableName).first != RecordID::NULL_RECORD;
 
-    // TODO: Add index to system table.
+    if (exists) {
+        throw Error::TableExistsError(tableName);
+    }
+
+    std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
+    Table *table = new Table();
+    table->create(path, tableName, columns);
+
+    openedTables[tableName] = table;
+
+    // Append to the system table.
+    systemTablesTable.insert(
+        {Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
+         Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN)});
+
+    return makePlainResult("OK");
+}
+
+PlainResult DBMS::dropTable(const std::string &tableName) {
+    checkUseDatabase();
+
+    RecordID id = findTable(currentDatabase, tableName).first;
+    if (id == RecordID::NULL_RECORD) {
+        throw Error::TableNotExistsError(tableName);
+    }
+
+    std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
+    // Close the table, if it's opened.
+    auto it = openedTables.find(tableName);
+    if (it != openedTables.end()) {
+        it->second->close();
+        delete it->second;
+        openedTables.erase(it);
+    }
+
+    // Remove the table from the system table.
+    systemTablesTable.remove(id);
+
+    // Remove the table file.
+    std::filesystem::remove(getUserTablePath(currentDatabase, tableName));
+
+    return makePlainResult("OK");
+}
+
+ShowTableResult DBMS::showTables() {
+    checkUseDatabase();
+
+    QueryBuilder builder;
+    builder.scan(&systemTablesTable)
+        .condition(systemTablesTableColumns[1].name, EQ,
+                   currentDatabase.c_str())
+        .select(systemTablesTableColumns[0].name);
+
+    QueryBuilder::Result queryResult = builder.execute();
+
+    ShowTableResult result;
+    for (const auto &res : queryResult) {
+        result.mutable_tables()->Add(res.second[0].data.stringValue);
+    }
+
+    return result;
+}
+
+void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
+                           const std::vector<Internal::ColumnMeta> columns) {
+    std::filesystem::path path = getSystemTablePath(name);
+
     try {
         if (std::filesystem::exists(path)) {
-            databaseSystemTable.open(path);
+            table->open(path);
         } else {
-            databaseSystemTable.create(
-                path, "system_databases",
-                sizeof(databaseSystemTableColumns) / sizeof(ColumnMeta),
-                databaseSystemTableColumns);
+            table->create(path, "system_" + name, columns);
         }
     } catch (BaseError &e) {
         throw Error::InitializationError(e.what());
@@ -181,11 +251,65 @@ PlainResult DBMS::makePlainResult(const std::string &msg) {
 }
 
 std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
-    CompareConditions conditions(1);
-    conditions[0] = CompareCondition(databaseSystemTableColumns[0].name,
-                                     CompareOp::EQ, dbName.c_str());
+    CompareConditions conditions = {{CompareCondition::eq(
+        systemDatabaseTableColumns[0].name, dbName.c_str())}};
 
-    return databaseSystemTable.getScanner().findFirst(conditions);
+    QueryBuilder builder;
+    builder.scan(&systemDatabaseTable)
+        .condition(systemDatabaseTableColumns[0].name, EQ, dbName.c_str())
+        .limit(1);
+
+    auto result = builder.execute();
+
+    if (result.size() == 0) {
+        return {RecordID::NULL_RECORD, {}};
+    } else {
+        return result[0];
+    }
+}
+
+std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
+                                             const std::string &tableName) {
+    QueryBuilder builder;
+
+    builder.scan(&systemTablesTable)
+        .condition(systemTablesTableColumns[0].name, EQ, tableName.c_str())
+        .condition(systemTablesTableColumns[1].name, EQ, database.c_str())
+        .limit(1);
+
+    auto result = builder.execute();
+
+    if (result.size() == 0) {
+        return {RecordID::NULL_RECORD, {}};
+    } else {
+        return result[0];
+    }
+}
+
+void DBMS::checkUseDatabase() {
+    if (currentDatabase.empty()) {
+        throw Error::DatabaseNotSelectedError();
+    }
+}
+
+void DBMS::clearCurrentDatabase() {
+    if (!currentDatabase.empty()) {
+        // Close related stuff
+        for (auto &pair : openedTables) {
+            pair.second->close();
+            delete pair.second;
+        }
+        openedTables.clear();
+    }
+    currentDatabase.clear();
+}
+
+std::filesystem::path DBMS::getSystemTablePath(const std::string &name) {
+    return rootPath / "system" / name;
+}
+std::filesystem::path DBMS::getUserTablePath(const std::string database,
+                                             const std::string &name) {
+    return rootPath / database / name;
 }
 
 }  // namespace SimpleDB

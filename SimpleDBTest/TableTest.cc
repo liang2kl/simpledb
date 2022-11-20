@@ -1,5 +1,4 @@
 #include <SimpleDB/Error.h>
-#include <SimpleDB/internal/RecordScanner.h>
 #ifndef TESTING
 #define TESTING 1
 #endif
@@ -23,9 +22,7 @@ protected:
 
     Table table;
 
-    const int numColumn = 4;
-
-    ColumnMeta columnMetas[4] = {
+    std::vector<ColumnMeta> columnMetas = {
         {.type = INT, .size = 4, .nullable = false, .name = "int_val"},
         {.type = FLOAT, .size = 4, .nullable = false, .name = "float_val"},
         {.type = VARCHAR,
@@ -46,8 +43,7 @@ protected:
     const char *tableName = "table_name";
 
     void initTable() {
-        ASSERT_NO_THROW(
-            table.create("tmp/table", tableName, numColumn, columnMetas));
+        ASSERT_NO_THROW(table.create("tmp/table", tableName, columnMetas));
     }
 };
 
@@ -63,7 +59,7 @@ TEST_F(TableTest, TestUninitializeAccess) {
 TEST_F(TableTest, TestCreateNewTable) {
     initTable();
 
-    EXPECT_EQ(table.meta.numColumn, numColumn);
+    EXPECT_EQ(table.meta.numColumn, columnMetas.size());
     EXPECT_EQ(strcmp(tableName, table.meta.name), 0);
 }
 
@@ -81,11 +77,11 @@ TEST_F(TableTest, TestInitFromInvalidFile) {
 }
 
 TEST_F(TableTest, TestInitWithDuplicateColumnName) {
-    ColumnMeta columnMetas[2] = {
+    std::vector<ColumnMeta> columnMetas = {
         {.type = INT, .size = 4, .name = "int_val"},
         {.type = INT, .size = 4, .name = "int_val"},
     };
-    EXPECT_THROW(table.create("tmp/table", tableName, 2, columnMetas),
+    EXPECT_THROW(table.create("tmp/table", tableName, columnMetas),
                  Internal::DuplicateColumnNameError);
 }
 
@@ -177,26 +173,25 @@ TEST_F(TableTest, TestReleasePage) {
 TEST_F(TableTest, TestColumnName) {
     initTable();
 
-    char readName[MAX_COLUMN_NAME_LEN + 1];
+    std::string readName;
 
-    for (int i = 0; i < numColumn; i++) {
+    for (int i = 0; i < columnMetas.size(); i++) {
         EXPECT_EQ(table.getColumnIndex(columnMetas[i].name), i);
-        EXPECT_NO_THROW(table.getColumnName(i, readName));
-        EXPECT_EQ(strcmp(readName, columnMetas[i].name), 0);
+        EXPECT_NO_THROW(readName = table.getColumnName(i));
+        EXPECT_EQ(strcmp(readName.c_str(), columnMetas[i].name), 0);
     }
 
-    EXPECT_THROW(table.getColumnName(-1, readName),
-                 Internal::InvalidColumnIndexError);
-    EXPECT_THROW(table.getColumnName(numColumn, readName),
+    EXPECT_THROW(table.getColumnName(-1), Internal::InvalidColumnIndexError);
+    EXPECT_THROW(table.getColumnName(columnMetas.size()),
                  Internal::InvalidColumnIndexError);
 }
 
 TEST_F(TableTest, TestInvalidVarcharSize) {
-    ColumnMeta columnMetas[1] = {
+    std::vector<ColumnMeta> columnMetas = {
         {.type = VARCHAR, .size = MAX_VARCHAR_LEN + 1, .name = "val"},
     };
 
-    EXPECT_THROW(table.create("tmp/table", tableName, 1, columnMetas),
+    EXPECT_THROW(table.create("tmp/table", tableName, columnMetas),
                  Internal::InvalidColumnSizeError);
 }
 
@@ -206,7 +201,7 @@ TEST_F(TableTest, TestMaxVarcharSize) {
     // This is an non-terminated string.
     varchar[MAX_VARCHAR_LEN] = 'c';
 
-    ColumnMeta columnMetas[1] = {
+    std::vector<ColumnMeta> columnMetas = {
         {.type = VARCHAR, .size = MAX_VARCHAR_LEN, .name = "val"},
     };
 
@@ -216,7 +211,7 @@ TEST_F(TableTest, TestMaxVarcharSize) {
 
     RecordID id;
 
-    ASSERT_NO_THROW(table.create("tmp/table", tableName, 1, columnMetas));
+    ASSERT_NO_THROW(table.create("tmp/table", tableName, columnMetas));
     ASSERT_NO_THROW(id = table.insert(columns));
 
     Columns readColumns;
