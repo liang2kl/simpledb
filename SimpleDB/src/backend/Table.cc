@@ -119,11 +119,11 @@ void Table::create(const std::string &file, const std::string &name,
                              : columns[i].size == 4;
 
         if (!sizeValid) {
-            Logger::log(ERROR,
-                        "Table: insert failed: column %d has size %d, which is "
-                        "larger than "
-                        "maximum size %d\n",
-                        i, columns[i].size, MAX_COLUMN_SIZE);
+            Logger::log(
+                ERROR,
+                "Table: create table failed: column %d has size %d, which is "
+                "larger than maximum size %d\n",
+                i, columns[i].size, MAX_COLUMN_SIZE);
             throw Internal::InvalidColumnSizeError();
         }
 

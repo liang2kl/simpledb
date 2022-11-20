@@ -42,6 +42,9 @@ def print_resp(resp):
     elif resp.result.HasField("show_databases"):
         print_table(["Database"],
                     [[x] for x in resp.result.show_databases.databases])
+    elif resp.result.HasField("show_table"):
+        print_table(["Table"],
+                    [[x] for x in resp.result.show_table.tables])
     else:
         print(resp.result)
 

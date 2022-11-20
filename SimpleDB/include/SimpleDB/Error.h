@@ -119,6 +119,7 @@ DECLARE_ERROR(IncompatableValue, ExecutionErrorBase,
               "Incompatable value error");
 DECLARE_ERROR(Uninitialized, ExecutionErrorBase, "DMBS is uninitialized");
 DECLARE_ERROR(Initialization, ExecutionErrorBase, "Fail to initialize DMBS");
+DECLARE_ERROR(InvalidDatabaseName, ExecutionErrorBase, "Invalid database name");
 DECLARE_ERROR(DatabaseExists, ExecutionErrorBase,
               "The database already exists");
 DECLARE_ERROR(CreateDatabase, ExecutionErrorBase, "Fail to create database");
@@ -127,6 +128,7 @@ DECLARE_ERROR(DatabaseNotExist, ExecutionErrorBase,
 DECLARE_ERROR(DatabaseNotSelected, ExecutionErrorBase,
               "No database is selected");
 DECLARE_ERROR(TableExists, ExecutionErrorBase, "The table already exists");
+DECLARE_ERROR(InvalidTableName, ExecutionErrorBase, "Invalid table name");
 DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table does not exist");
 DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
               "More than one primary key is given");

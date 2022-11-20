@@ -91,6 +91,9 @@ std::vector<Service::ExecutionResult> DBMS::executeSQL(std::istream &stream) {
 }
 
 PlainResult DBMS::createDatabase(const std::string &dbName) {
+    if (dbName.size() > MAX_DATABASE_NAME_LEN) {
+        throw Error::InvalidDatabaseNameError("database name too long");
+    }
     // TODO: Add index to system table.
     bool found = findDatabase(dbName).first != RecordID::NULL_RECORD;
 
@@ -161,6 +164,10 @@ PlainResult DBMS::createTable(const std::string &tableName,
                               const std::string &primaryKey,
                               const std::vector<ForeignKey> &foreignKeys) {
     checkUseDatabase();
+
+    if (tableName.size() > MAX_TABLE_NAME_LEN) {
+        throw Error::InvalidTableNameError("table name is too long");
+    }
 
     // Check if the table exists.
     bool exists =
