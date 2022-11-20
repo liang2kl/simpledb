@@ -38,7 +38,7 @@ protected:
         ASSERT_NO_THROW(table.create("tmp/table", tableName, columnMetas));
     }
 
-    QueryBuilder getBaseBuilder() { return QueryBuilder().scan(&table); }
+    QueryBuilder getBaseBuilder() { return QueryBuilder(&table); }
 };
 
 TEST_F(QueryConditionTest, TestCompareInt) {

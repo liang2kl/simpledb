@@ -12,13 +12,7 @@
 namespace SimpleDB {
 namespace Internal {
 
-QueryBuilder &QueryBuilder::scan(QueryDataSource *source) {
-    if (dataSource != nullptr) {
-        throw MultipleScanError();
-    }
-    dataSource = source;
-    return *this;
-}
+QueryBuilder::QueryBuilder(QueryDataSource *source) : dataSource(source) {}
 
 QueryBuilder &QueryBuilder::condition(const CompareCondition &condition) {
     ConditionFilter filter;

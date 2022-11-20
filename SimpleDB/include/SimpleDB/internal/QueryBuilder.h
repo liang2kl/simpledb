@@ -14,8 +14,7 @@ namespace Internal {
 class QueryBuilder : public QueryDataSource {
 public:
     using Result = std::vector<std::pair<RecordID, Columns>>;
-    QueryBuilder() = default;
-    QueryBuilder &scan(QueryDataSource *source);
+    QueryBuilder(QueryDataSource *dataSource);
     QueryBuilder &condition(const CompareCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
                             const char *value);

@@ -144,8 +144,7 @@ PlainResult DBMS::useDatabase(const std::string &dbName) {
 }
 
 ShowDatabasesResult DBMS::showDatabases() {
-    QueryBuilder builder;
-    builder.scan(&systemDatabaseTable);
+    QueryBuilder builder(&systemDatabaseTable);
 
     QueryBuilder::Result queryResult = builder.execute();
 
@@ -220,8 +219,8 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
 ShowTableResult DBMS::showTables() {
     checkUseDatabase();
 
-    QueryBuilder builder;
-    builder.scan(&systemTablesTable)
+    QueryBuilder builder(&systemTablesTable);
+    builder
         .condition(systemTablesTableColumns[1].name, EQ,
                    currentDatabase.c_str())
         .select(systemTablesTableColumns[0].name);
@@ -261,9 +260,8 @@ std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
     CompareConditions conditions = {{CompareCondition::eq(
         systemDatabaseTableColumns[0].name, dbName.c_str())}};
 
-    QueryBuilder builder;
-    builder.scan(&systemDatabaseTable)
-        .condition(systemDatabaseTableColumns[0].name, EQ, dbName.c_str())
+    QueryBuilder builder(&systemDatabaseTable);
+    builder.condition(systemDatabaseTableColumns[0].name, EQ, dbName.c_str())
         .limit(1);
 
     auto result = builder.execute();
@@ -277,10 +275,9 @@ std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
 
 std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
                                              const std::string &tableName) {
-    QueryBuilder builder;
+    QueryBuilder builder(&systemTablesTable);
 
-    builder.scan(&systemTablesTable)
-        .condition(systemTablesTableColumns[0].name, EQ, tableName.c_str())
+    builder.condition(systemTablesTableColumns[0].name, EQ, tableName.c_str())
         .condition(systemTablesTableColumns[1].name, EQ, database.c_str())
         .limit(1);
 
