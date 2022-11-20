@@ -127,7 +127,7 @@ DECLARE_ERROR(DatabaseNotExist, ExecutionErrorBase,
 DECLARE_ERROR(DatabaseNotSelected, ExecutionErrorBase,
               "No database is selected");
 DECLARE_ERROR(TableExists, ExecutionErrorBase, "The table already exists");
-DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table already exists");
+DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table does not exist");
 DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
               "More than one primary key is given");
 

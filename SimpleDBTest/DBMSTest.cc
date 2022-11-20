@@ -24,7 +24,14 @@ protected:
         return std::istringstream(sql);
     }
 
+    const std::string testDbName = "db";
+
     void initDBMS() { dbms.init(); }
+    void createAndUseDatabase() {
+        ASSERT_NO_THROW(dbms.createDatabase(testDbName));
+        ASSERT_NO_THROW(dbms.useDatabase(testDbName));
+    }
+
     std::vector<Service::ExecutionResult> executeSQL(const std::string &sql) {
         auto stream = getStream(sql);
         return dbms.executeSQL(stream);
@@ -92,21 +99,45 @@ TEST_F(DBMSTest, TestShowDatabases) {
     }
 }
 
-// TEST_F(DBMSTest, TestCreateTable) {
-//     std::vector<std::string> successCases = {
-//         "CREATE TABLE t2 (c1 INT, c2 VARCHAR(10));",
-//         "CREATE TABLE t3 (c1 INT, c2 VARCHAR(10), c3 FLOAT);",
-//     };
+TEST_F(DBMSTest, TestCreateDropTable) {
+    initDBMS();
+    createAndUseDatabase();
 
-//     std::vector<Service::ExecutionResult> results;
+    // dbms.useDatabase(const std::string &dbName)
+    std::vector<std::pair<std::string, std::string>> successCases = {
+        {"t2", "CREATE TABLE t2 (c1 INT, c2 VARCHAR(10));"},
+        {"t3", "CREATE TABLE t3 (c1 INT, c2 VARCHAR(10), c3 FLOAT);"},
+    };
 
-//     for (auto testCase : successCases) {
-//         auto stream = getStream(testCase);
-//         EXPECT_NO_THROW(results = dbms.executeSQL(stream))
-//             << "Test case: " << stream.str();
-//         EXPECT_EQ(results.size(), 1);
-//         if (results.size() == 1) {
-//             EXPECT_EQ(results[0].has_plain(), true);
-//         }
-//     }
-// }
+    std::vector<Service::ExecutionResult> results;
+
+    for (auto testCase : successCases) {
+        auto [tableName, sql] = testCase;
+        ASSERT_NO_THROW(results = executeSQL(sql)) << "Test case: " << sql;
+        ASSERT_EQ(results.size(), 1);
+        EXPECT_TRUE(results[0].has_plain());
+
+        auto dropStatement = std::string("DROP TABLE ") + tableName + ";";
+        ASSERT_NO_THROW(results = executeSQL(dropStatement));
+        ASSERT_THROW(results = executeSQL(dropStatement),
+                     Error::TableNotExistsError);
+    }
+}
+
+TEST_F(DBMSTest, TestShowTables) {
+    initDBMS();
+    createAndUseDatabase();
+
+    ASSERT_NO_THROW(executeSQL("CREATE TABLE t1 (c1 INT, c2 VARCHAR(10));"));
+    ASSERT_NO_THROW(executeSQL("CREATE TABLE t2 (c1 INT, c2 VARCHAR(10));"));
+
+    std::vector<Service::ExecutionResult> results;
+
+    ASSERT_NO_THROW(results = executeSQL("SHOW TABLES;"));
+
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_TRUE(results[0].has_show_table());
+    ASSERT_TRUE(results[0].show_table().tables().size() == 2);
+    ASSERT_TRUE(results[0].show_table().tables(0) == "t1");
+    ASSERT_TRUE(results[0].show_table().tables(1) == "t2");
+}
