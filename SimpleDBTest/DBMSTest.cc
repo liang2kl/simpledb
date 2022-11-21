@@ -1,4 +1,6 @@
 #include <SimpleDB/Error.h>
+
+#include <tuple>
 #ifndef TESTING
 #define TESTING 1
 #endif
@@ -140,4 +142,65 @@ TEST_F(DBMSTest, TestShowTables) {
     ASSERT_TRUE(results[0].show_table().tables().size() == 2);
     ASSERT_TRUE(results[0].show_table().tables(0) == "t1");
     ASSERT_TRUE(results[0].show_table().tables(1) == "t2");
+}
+
+TEST_F(DBMSTest, TestDescTable) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string tableName = "t";
+
+    std::vector<std::tuple</*NAME=*/std::string, /*TYPE=*/std::string,
+                           /*NOTNULL=*/bool, /*HASDEFAULT=*/bool,
+                           /*DEFAULT=*/std::string>>
+        testCases = {
+            {"c1", "INT", true, true, "12"},
+            {"c2", "VARCHAR(20)", false, true, "'test_string'"},
+            {"c3", "FLOAT", true, true, "1.23"},
+            {"c4", "INT", false, false, ""},
+        };
+
+    std::string sql = "CREATE TABLE " + tableName + " (";
+
+    for (auto testCase : testCases) {
+        auto [name, type, notNull, hasDefault, defaultValue] = testCase;
+        sql += name + " " + type;
+        if (notNull) {
+            sql += " NOT NULL";
+        }
+        if (hasDefault) {
+            sql += " DEFAULT " + defaultValue;
+        }
+        sql += ", ";
+    }
+
+    sql.pop_back();
+    sql.pop_back();
+    sql += ");";
+
+    ASSERT_NO_THROW(executeSQL(sql));
+
+    std::vector<Service::ExecutionResult> results;
+
+    ASSERT_NO_THROW(results = executeSQL("DESC " + tableName + ";"));
+    ASSERT_EQ(results.size(), 1);
+    ASSERT_TRUE(results[0].has_describe_table());
+    ASSERT_TRUE(results[0].describe_table().columns_size() == testCases.size());
+
+    for (int i = 0; i < testCases.size(); i++) {
+        auto [name, type, notNull, hasDefault, defaultValue] = testCases[i];
+        auto column = results[0].describe_table().columns(i);
+        EXPECT_EQ(column.field(), name);
+        EXPECT_EQ(column.type(), type);
+        EXPECT_EQ(column.nullable(), !notNull);
+        EXPECT_EQ(column.has_default_value(), hasDefault);
+        if (hasDefault) {
+            if (type == "FLOAT") {
+                EXPECT_EQ(std::stof(column.default_value()),
+                          std::stof(defaultValue));
+            } else {
+                EXPECT_EQ(column.default_value(), defaultValue);
+            }
+        }
+    }
 }

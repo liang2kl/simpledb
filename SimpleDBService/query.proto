@@ -32,6 +32,7 @@ message ExecutionResult {
     QueryResult query = 2;
     ShowTableResult show_table = 3;
     ShowDatabasesResult show_databases = 4;
+    DescribeTableResult describe_table = 5;
   }
 }
 
@@ -91,4 +92,17 @@ message ShowTableResult {
 // SHOW DATABASAES result.
 message ShowDatabasesResult {
   repeated string databases = 1;
+}
+
+// DESCRIBE TABLE result.
+message DescribeTableResult {
+  repeated ColumnDescription columns = 1;
+}
+
+message ColumnDescription {
+  string field = 1;
+  string type = 2;
+  bool nullable = 3;
+  // TODO: Primary key / foreign key
+  optional string default_value = 5;
 }

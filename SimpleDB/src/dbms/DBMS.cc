@@ -235,6 +235,31 @@ ShowTableResult DBMS::showTables() {
     return result;
 }
 
+DescribeTableResult DBMS::describeTable(const std::string &tableName) {
+    checkUseDatabase();
+
+    Table *table = getTable(tableName);
+
+    if (table == nullptr) {
+        throw Error::TableNotExistsError(tableName);
+    }
+
+    DescribeTableResult result;
+
+    for (int i = 0; i < table->meta.numColumn; i++) {
+        const ColumnMeta &column = table->meta.columns[i];
+        auto *meta = result.add_columns();
+        meta->set_field(column.name);
+        meta->set_type(column.typeDesc());
+        meta->set_nullable(column.nullable);
+        if (column.hasDefault) {
+            meta->set_default_value(column.defaultValDesc());
+        }
+    }
+
+    return result;
+}
+
 void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
                            const std::vector<Internal::ColumnMeta> columns) {
     std::filesystem::path path = getSystemTablePath(name);
@@ -288,6 +313,27 @@ std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
     } else {
         return result[0];
     }
+}
+
+Table *DBMS::getTable(const std::string &tableName) {
+    RecordID id = findTable(currentDatabase, tableName).first;
+    if (id == RecordID::NULL_RECORD) {
+        return nullptr;
+    }
+
+    std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
+    Table *table;
+
+    auto it = openedTables.find(tableName);
+    if (it != openedTables.end()) {
+        table = it->second;
+    } else {
+        table = new Table();
+        table->open(path);
+        openedTables[tableName] = table;
+    }
+
+    return table;
 }
 
 void DBMS::checkUseDatabase() {

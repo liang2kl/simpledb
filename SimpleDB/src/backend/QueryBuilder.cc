@@ -72,9 +72,9 @@ void QueryBuilder::iterate(IterateCallback callback) {
     });
 }
 
-std::vector<ColumnInfo> QueryBuilder::getColumnMeta() {
+std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
     checkDataSource();
-    auto columnMetas = dataSource->getColumnMeta();
+    auto columnMetas = dataSource->getColumnInfo();
     std::vector<ColumnInfo> result;
 
     // We should "apply" SelectFilter here.
@@ -97,7 +97,7 @@ void QueryBuilder::checkDataSource() {
 
 AggregatedFilter QueryBuilder::aggregateAllFilters() {
     // Create a virtual table.
-    virtualTable.columns = dataSource->getColumnMeta();
+    virtualTable.columns = dataSource->getColumnInfo();
 
     AggregatedFilter filter;
     // Condition filters comes before selectors.

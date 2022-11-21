@@ -14,7 +14,7 @@ public:
     using IterateCallback = std::function<bool(RecordID, Columns &columns)>;
     virtual ~QueryDataSource() = default;
     virtual void iterate(IterateCallback callback) = 0;
-    virtual std::vector<ColumnInfo> getColumnMeta() = 0;
+    virtual std::vector<ColumnInfo> getColumnInfo() = 0;
 };
 
 }  // namespace Internal

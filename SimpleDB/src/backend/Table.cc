@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <string>
 #include <vector>
 
 #include "internal/Logger.h"
@@ -21,6 +22,31 @@ bool RecordID::operator==(const RecordID &rhs) const {
     return page == rhs.page && slot == rhs.slot;
 }
 bool RecordID::operator!=(const RecordID &rhs) const { return !(*this == rhs); }
+
+std::string ColumnMeta::typeDesc() const {
+    switch (type) {
+        case INT:
+            return "INT";
+        case FLOAT:
+            return "FLOAT";
+        case VARCHAR:
+            return "VARCHAR(" + std::to_string(size) + ")";
+    }
+}
+
+std::string ColumnMeta::defaultValDesc() const {
+    if (!hasDefault) {
+        return std::string();
+    }
+    switch (type) {
+        case INT:
+            return std::to_string(defaultValue.intValue);
+        case FLOAT:
+            return std::to_string(defaultValue.floatValue);
+        case VARCHAR:
+            return std::string(defaultValue.stringValue);
+    }
+}
 
 Table::~Table() { close(); }
 
@@ -336,7 +362,7 @@ void Table::iterate(IterateCallback callback) {
     }
 }
 
-std::vector<ColumnInfo> Table::getColumnMeta() {
+std::vector<ColumnInfo> Table::getColumnInfo() {
     std::vector<ColumnInfo> columns;
     for (int i = 0; i < meta.numColumn; i++) {
         auto &column = meta.columns[i];
@@ -436,7 +462,7 @@ void Table::serialize(const Columns &srcObjects, char *destData,
                 assert(meta.columns[i].hasDefault);
 #endif
                 // Use default value
-                memcpy(destData, meta.columns[i].defaultValue,
+                memcpy(destData, meta.columns[i].defaultValue.stringValue,
                        meta.columns[i].size);
             }
             destData += meta.columns[i].size;

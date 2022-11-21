@@ -13,6 +13,8 @@
 #include "internal/QueryDataSource.h"
 
 namespace SimpleDB {
+class DBMS;
+
 namespace Internal {
 
 struct ForeignKey {
@@ -28,7 +30,10 @@ struct ColumnMeta {
     char name[MAX_COLUMN_NAME_LEN];
 
     bool hasDefault;
-    char defaultValue[MAX_COLUMN_SIZE];
+    ColumnValue defaultValue;
+
+    std::string typeDesc() const;
+    std::string defaultValDesc() const;
 };
 
 // A Table holds the metadata of a certain table, which should be unique
@@ -36,6 +41,7 @@ struct ColumnMeta {
 // metadata reading/writing performance.
 class Table : public QueryDataSource {
     friend class QueryBuilder;
+    friend class ::SimpleDB::DBMS;
 
 public:
     // The metadata is not initialized in this constructor.
@@ -73,7 +79,7 @@ public:
 
     // QueryDataSource requirements.
     virtual void iterate(IterateCallback callback) override;
-    virtual std::vector<ColumnInfo> getColumnMeta() override;
+    virtual std::vector<ColumnInfo> getColumnInfo() override;
 
 #if !TESTING
 private:

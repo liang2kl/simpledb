@@ -30,7 +30,7 @@ protected:
          .nullable = false,
          .name = "varchar_val",
          .hasDefault = true,
-         .defaultValue = "HELLO"},
+         .defaultValue = {.stringValue = "HELLO"}},
         // A nullable column.
         {.type = INT, .size = 4, .nullable = true, .name = "int_val_nullable"},
     };

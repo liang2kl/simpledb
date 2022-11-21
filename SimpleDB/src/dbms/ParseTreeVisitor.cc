@@ -136,8 +136,9 @@ antlrcpp::Any ParseTreeVisitor::visitDrop_table(
 
 antlrcpp::Any ParseTreeVisitor::visitDescribe_table(
     SqlParser::Describe_tableContext *ctx) {
-    // dbms->describeTable(ctx->Identifier()->getText());
-    return antlrcpp::Any();
+    DescribeTableResult result =
+        dbms->describeTable(ctx->Identifier()->getText());
+    return wrap(result);
 }
 
 antlrcpp::Any ParseTreeVisitor::visitField_list(
@@ -181,11 +182,14 @@ antlrcpp::Any ParseTreeVisitor::visitNormal_field(
         column.size = 4;
     }
 
-    column.nullable = ctx->Null() != nullptr;
+    column.nullable = ctx->Null() == nullptr;
 
     if (ctx->value() != nullptr) {
+        column.hasDefault = true;
         ParseHelper::parseDefaultValue(ctx->value()->getText(), column.type,
                                        column.defaultValue, column.size);
+    } else {
+        column.hasDefault = false;
     }
 
     return column;

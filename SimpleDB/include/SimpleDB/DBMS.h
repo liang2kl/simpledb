@@ -67,7 +67,7 @@ private:
         const std::string &primaryKey,
         const std::vector<Internal::ForeignKey> &foreignKeys);
     Service::PlainResult dropTable(const std::string &tableName);
-    // void describeTable(const std::string &tableName);
+    Service::DescribeTableResult describeTable(const std::string &tableName);
 
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,
@@ -87,6 +87,7 @@ private:
         const std::string &dbName);
     std::pair<Internal::RecordID, Internal::Columns> findTable(
         const std::string &database, const std::string &tableName);
+    Internal::Table *getTable(const std::string &tableName);
 };
 
 };  // namespace SimpleDB

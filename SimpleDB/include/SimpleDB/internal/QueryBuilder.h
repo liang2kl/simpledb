@@ -25,7 +25,7 @@ public:
 
     // QueryDataSource requirements, allowing chained pipelines.
     virtual void iterate(IterateCallback callback) override;
-    virtual std::vector<ColumnInfo> getColumnMeta() override;
+    virtual std::vector<ColumnInfo> getColumnInfo() override;
 
 private:
     std::vector<ConditionFilter> conditionFilters;

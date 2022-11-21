@@ -1,6 +1,9 @@
 #ifndef _SIMPLEDB_PARSE_HELPER_H
 #define _SIMPLEDB_PARSE_HELPER_H
 
+#include <SimpleDB/internal/Column.h>
+
+#include <cstring>
 #include <string>
 
 #include "Error.h"
@@ -16,7 +19,7 @@ public:
         if (name.size() >= MAX_COLUMN_NAME_LEN) {
             throw Error::IncompatableValueError("Column name too long");
         }
-        name.copy(dest, name.size());
+        std::strcpy(dest, name.c_str());
     }
 
     static DataType parseDataType(const std::string &type) {
@@ -32,19 +35,19 @@ public:
     }
 
     static void parseDefaultValue(const std::string &value, DataType type,
-                                  char *dest, int size) {
+                                  ColumnValue &dest, int size) {
         switch (type) {
             case INT:
-                *(int *)dest = parseInt(value);
+                dest.intValue = parseInt(value);
                 break;
             case FLOAT:
-                *(float *)dest = parseFloat(value);
+                dest.floatValue = parseFloat(value);
                 break;
             case VARCHAR:
                 if (value.size() >= MAX_VARCHAR_LEN || value.size() > size) {
                     throw Error::IncompatableValueError("VARCHAR too long");
                 }
-                value.copy(dest, value.size());
+                value.copy(dest.stringValue, value.size());
                 break;
         }
     }

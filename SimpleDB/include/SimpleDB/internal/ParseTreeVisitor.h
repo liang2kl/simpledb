@@ -57,6 +57,7 @@ private:
     DECLARE_WRAPPER(Plain, plain);
     DECLARE_WRAPPER(ShowDatabases, show_databases);
     DECLARE_WRAPPER(ShowTable, show_table);
+    DECLARE_WRAPPER(DescribeTable, describe_table);
 
 #undef DECLARE_WRAPPER
 };
