@@ -3,6 +3,7 @@
 
 #include <set>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "internal/Table.h"
@@ -52,13 +53,13 @@ struct VirtualTable {
 
 struct BaseFilter {
     virtual ~BaseFilter() {}
-    virtual bool apply(Columns &columns) = 0;
+    virtual std::pair<bool, bool> apply(Columns &columns) = 0;
 };
 
 struct ConditionFilter : public BaseFilter {
     ConditionFilter() = default;
     ~ConditionFilter() = default;
-    virtual bool apply(Columns &columns) override;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
     CompareCondition condition;
     VirtualTable *table;
 };
@@ -66,7 +67,7 @@ struct ConditionFilter : public BaseFilter {
 struct SelectFilter : public BaseFilter {
     SelectFilter() = default;
     ~SelectFilter() = default;
-    virtual bool apply(Columns &columns) override;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
     std::set<std::string> columnNames;
     VirtualTable *table;
 };
@@ -74,14 +75,14 @@ struct SelectFilter : public BaseFilter {
 struct LimitFilter : public BaseFilter {
     LimitFilter() : limit(-1) {}
     ~LimitFilter() = default;
-    virtual bool apply(Columns &columns) override;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
     int limit;
     int count = 0;
 };
 
 struct AggregatedFilter : public BaseFilter {
     AggregatedFilter() = default;
-    virtual bool apply(Columns &columns) override;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
     std::vector<BaseFilter *> filters;
 };
 

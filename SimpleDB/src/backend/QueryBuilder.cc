@@ -64,10 +64,11 @@ void QueryBuilder::iterate(IterateCallback callback) {
     AggregatedFilter filter = aggregateAllFilters();
 
     dataSource->iterate([&](RecordID rid, Columns &columns) {
-        if (filter.apply(columns)) {
-            return callback(rid, columns);
+        auto [accept, continue_] = filter.apply(columns);
+        if (accept) {
+            return callback(rid, columns) && continue_;
         }
-        return true;
+        return continue_;
     });
 }
 

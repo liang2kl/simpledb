@@ -11,29 +11,42 @@ namespace SimpleDB {
 namespace Internal {
 
 // ===== Begin AggregatedFilter =====
-bool AggregatedFilter::apply(Columns &columns) {
+std::pair<bool, bool> AggregatedFilter::apply(Columns &columns) {
+    bool stop = false;
     for (auto filter : filters) {
-        if (!filter->apply(columns)) {
-            return false;
+        auto [accept, continue_] = filter->apply(columns);
+        if (!continue_) {
+            stop = true;
+        }
+        if (!accept) {
+            return {false, !stop};
         }
     }
-    return true;
+    return {true, !stop};
 }
 // ====== End AggregatedFilter ======
 
 // ===== Begin LimitFilter =====
-bool LimitFilter::apply(Columns &columns) {
-    if (count == limit) {
-        return false;
+std::pair<bool, bool> LimitFilter::apply(Columns &columns) {
+    count++;
+    if (limit < 0) {
+        return {true, true};
     }
 
-    count++;
-    return true;
+    if (count > limit) {
+        return {false, false};
+    }
+
+    if (count == limit) {
+        return {true, false};
+    }
+
+    return {true, true};
 }
 // ====== End LimitFilter ======
 
 // ===== Begin SelectFilter =====
-bool SelectFilter::apply(Columns &columns) {
+std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
     Columns newColumns;
     // TODO: Optimization.
 
@@ -47,7 +60,7 @@ bool SelectFilter::apply(Columns &columns) {
     }
 
     columns = newColumns;
-    return true;
+    return {true, true};
 }
 // ====== End SelectFilger ======
 
@@ -116,7 +129,7 @@ static bool _comparer(CompareOp op, const char *lhs, const char *rhs) {
     }
 }
 
-bool ConditionFilter::apply(Columns &columns) {
+std::pair<bool, bool> ConditionFilter::apply(Columns &columns) {
     int columnIndex = table->getColumnIndex(condition.columnName);
     if (columnIndex < 0) {
         throw Internal::ColumnNotFoundError(condition.columnName);
@@ -125,12 +138,12 @@ bool ConditionFilter::apply(Columns &columns) {
     const Column &column = columns[columnIndex];
 
     if (condition.op == IS_NULL || condition.op == NOT_NULL) {
-        return _nullComparer(condition.op, column);
+        return {_nullComparer(condition.op, column), true};
     }
 
     // FIXME: What's the specification to deal with this?
     if (column.isNull) {
-        return false;
+        return {false, true};
     }
 
     if (condition.op == LIKE) {
@@ -142,7 +155,7 @@ bool ConditionFilter::apply(Columns &columns) {
                         condition.columnName, column.type);
             throw Internal::InvalidOperatorError();
         }
-        return _regexComparer(condition.op, column, condition.value);
+        return {_regexComparer(condition.op, column, condition.value), true};
     }
 
     _Comparer comparer;
@@ -159,7 +172,8 @@ bool ConditionFilter::apply(Columns &columns) {
             break;
     }
 
-    return comparer(condition.op, column.data.stringValue, condition.value);
+    return {comparer(condition.op, column.data.stringValue, condition.value),
+            true};
 }
 // ====== End ConditionFilter ======
 
