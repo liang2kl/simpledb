@@ -47,7 +47,8 @@ public:
                 if (value.size() >= MAX_VARCHAR_LEN || value.size() > size) {
                     throw Error::IncompatableValueError("VARCHAR too long");
                 }
-                value.copy(dest.stringValue, value.size());
+                std::strcpy(dest.stringValue,
+                            value.substr(1, value.size() - 2).c_str());
                 break;
         }
     }

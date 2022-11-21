@@ -198,8 +198,12 @@ TEST_F(DBMSTest, TestDescTable) {
             if (type == "FLOAT") {
                 EXPECT_EQ(std::stof(column.default_value()),
                           std::stof(defaultValue));
-            } else {
+            } else if (type == "INT") {
                 EXPECT_EQ(column.default_value(), defaultValue);
+            } else {
+                EXPECT_EQ(column.default_value().substr(
+                              1, column.default_value().size() - 2),
+                          defaultValue);
             }
         }
     }
