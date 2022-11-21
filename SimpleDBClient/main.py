@@ -46,8 +46,9 @@ def print_resp(resp):
         print_table(["Table"],
                     [[x] for x in resp.result.show_table.tables])
     elif resp.result.HasField("describe_table"):
-        print_table(["Field", "Type", "Nullable", "Default"],
-                    [[x.field, x.type, x.nullable, x.default_value] for x in resp.result.describe_table.columns])
+        print_table(["Field", "Type", "Null", "Default"],
+                    [[x.field, x.type, "YES" if x.nullable else "NO", x.default_value]
+                        for x in resp.result.describe_table.columns])
     else:
         print(resp.result)
 

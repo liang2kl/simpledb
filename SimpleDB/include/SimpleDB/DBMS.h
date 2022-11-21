@@ -7,6 +7,7 @@
 
 #include "SQLParser/SqlParser.h"
 #include "internal/ParseTreeVisitor.h"
+#include "internal/QueryBuilder.h"
 #include "internal/Service.h"
 #include "internal/Table.h"
 
@@ -87,6 +88,7 @@ private:
         const std::string &dbName);
     std::pair<Internal::RecordID, Internal::Columns> findTable(
         const std::string &database, const std::string &tableName);
+    Internal::QueryBuilder::Result findAllTables();
     Internal::Table *getTable(const std::string &tableName);
 };
 

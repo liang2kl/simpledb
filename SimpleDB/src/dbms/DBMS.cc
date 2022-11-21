@@ -1,14 +1,13 @@
 #include "DBMS.h"
 
-#include <SQLParser/SqlLexer.h>
-#include <SimpleDB/internal/QueryBuilder.h>
-
 #include <any>
 #include <filesystem>
 #include <system_error>
 #include <tuple>
 
 #include "Error.h"
+#include "SQLParser/SqlLexer.h"
+#include "SimpleDB/internal/QueryBuilder.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
 #include "internal/QueryBuilder.h"
@@ -124,6 +123,17 @@ PlainResult DBMS::dropDatabase(const std::string &dbName) {
         throw Error::DatabaseNotExistError(dbName);
     }
 
+    QueryBuilder::Result allTables = findAllTables();
+    for (const auto &result : allTables) {
+        auto [recordId, _] = result;
+        systemTablesTable.remove(recordId);
+    }
+
+    // If the database is currently opened, close it first.
+    if (currentDatabase == dbName) {
+        clearCurrentDatabase();
+    }
+
     systemDatabaseTable.remove(id);
     std::filesystem::remove_all(rootPath / dbName);
 
@@ -219,13 +229,7 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
 ShowTableResult DBMS::showTables() {
     checkUseDatabase();
 
-    QueryBuilder builder(&systemTablesTable);
-    builder
-        .condition(systemTablesTableColumns[1].name, EQ,
-                   currentDatabase.c_str())
-        .select(systemTablesTableColumns[0].name);
-
-    QueryBuilder::Result queryResult = builder.execute();
+    QueryBuilder::Result queryResult = findAllTables();
 
     ShowTableResult result;
     for (const auto &res : queryResult) {
@@ -296,6 +300,16 @@ std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
     } else {
         return result[0];
     }
+}
+
+QueryBuilder::Result DBMS::findAllTables() {
+    QueryBuilder builder(&systemTablesTable);
+    builder
+        .condition(systemTablesTableColumns[1].name, EQ,
+                   currentDatabase.c_str())
+        .select(systemTablesTableColumns[0].name);
+
+    return builder.execute();
 }
 
 std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
