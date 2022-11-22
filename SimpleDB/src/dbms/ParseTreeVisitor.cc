@@ -158,7 +158,6 @@ antlrcpp::Any ParseTreeVisitor::visitField_list(
                 static_cast<SqlParser::Primary_key_fieldContext *>(field)
                     ->Identifier()
                     ->getText();
-            // FIXME: We just ignore the identifiers behind...
         } else if (dynamic_cast<SqlParser::Foreign_key_fieldContext *>(field)) {
             foreignKeys.push_back(field->accept(this).as<ForeignKey>());
         } else {
@@ -193,6 +192,23 @@ antlrcpp::Any ParseTreeVisitor::visitNormal_field(
     }
 
     return column;
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_table_add_pk(
+    SQLParser::SqlParser::Alter_table_add_pkContext *ctx) {
+    PlainResult result =
+        dbms->alterPrimaryKey(ctx->Identifier(0)->getText(),
+                              ctx->Identifier(1)->getText(), /*drop=*/false);
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_table_drop_pk(
+    SQLParser::SqlParser::Alter_table_drop_pkContext *ctx) {
+    PlainResult result = dbms->alterPrimaryKey(
+        ctx->Identifier(0)->getText(),
+        ctx->Identifier(1) == nullptr ? "" : ctx->Identifier(1)->getText(),
+        /*drop=*/true);
+    return wrap(result);
 }
 
 }  // namespace Internal

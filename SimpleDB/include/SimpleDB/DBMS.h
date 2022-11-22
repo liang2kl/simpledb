@@ -15,6 +15,7 @@
  *  - /system: System tables
  *      - /databases: Database information
  *      - /tables: Table information
+ *      - /indices: Index information
  *  - /<db-name>: Database
  *      - /<table-name>: Table
  */
@@ -48,9 +49,11 @@ private:
     // === System Tables ===
     Internal::Table systemDatabaseTable;
     Internal::Table systemTablesTable;
+    Internal::Table systemIndicesTable;
 
     static std::vector<Internal::ColumnMeta> systemDatabaseTableColumns;
     static std::vector<Internal::ColumnMeta> systemTablesTableColumns;
+    static std::vector<Internal::ColumnMeta> systemIndicesTableColumns;
 
     Internal::ParseTreeVisitor visitor;
     std::map<std::string, Internal::Table *> openedTables;
@@ -69,6 +72,14 @@ private:
         const std::vector<Internal::ForeignKey> &foreignKeys);
     Service::PlainResult dropTable(const std::string &tableName);
     Service::DescribeTableResult describeTable(const std::string &tableName);
+
+    Service::PlainResult alterPrimaryKey(const std::string &tableName,
+                                         const std::string &primaryKey,
+                                         bool drop);
+    Service::PlainResult addIndex(const std::string &tableName,
+                                  const std::string &columnName);
+    Service::PlainResult dropIndex(const std::string &tableName,
+                                   const std::string &columnName);
 
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,

@@ -1,9 +1,12 @@
 #include "DBMS.h"
 
+#include <SimpleDB/internal/ParseTreeVisitor.h>
+
 #include <any>
 #include <filesystem>
 #include <system_error>
 #include <tuple>
+#include <vector>
 
 #include "Error.h"
 #include "SQLParser/SqlLexer.h"
@@ -57,6 +60,7 @@ void DBMS::init() {
     initSystemTable(&systemDatabaseTable, "databases",
                     systemDatabaseTableColumns);
     initSystemTable(&systemTablesTable, "tables", systemTablesTableColumns);
+    initSystemTable(&systemIndicesTable, "indices", systemIndicesTableColumns);
 
     initialized = true;
 }
@@ -188,14 +192,29 @@ PlainResult DBMS::createTable(const std::string &tableName,
 
     std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
     Table *table = new Table();
-    table->create(path, tableName, columns);
+
+    try {
+        table->create(path, tableName, columns, primaryKey);
+    } catch (Internal::TooManyColumnsError &e) {
+        throw CreateTableError(e.what());
+    } catch (Internal::InvalidPrimaryKeyError &e) {
+        throw CreateTableError(e.what());
+    } catch (Internal::CreateTableError &e) {
+        throw CreateTableError(e.what());
+    } catch (Internal::InvalidColumnSizeError &e) {
+        throw CreateTableError(e.what());
+    } catch (Internal::DuplicateColumnNameError &e) {
+        throw CreateTableError(e.what());
+    }
 
     openedTables[tableName] = table;
 
     // Append to the system table.
     systemTablesTable.insert(
         {Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
-         Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN)});
+         Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN),
+         table->meta.primaryKeyIndex >= 0 ? Column(table->meta.primaryKeyIndex)
+                                          : Column::nullIntColumn()});
 
     return makePlainResult("OK");
 }
@@ -256,12 +275,43 @@ DescribeTableResult DBMS::describeTable(const std::string &tableName) {
         meta->set_field(column.name);
         meta->set_type(column.typeDesc());
         meta->set_nullable(column.nullable);
+        meta->set_primary_key(table->meta.primaryKeyIndex == i);
         if (column.hasDefault) {
             meta->set_default_value(column.defaultValDesc());
         }
     }
 
     return result;
+}
+
+PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
+                                  const std::string &primaryKey, bool drop) {
+    checkUseDatabase();
+
+    Table *table = getTable(tableName);
+
+    if (table == nullptr) {
+        throw Error::TableNotExistsError(tableName);
+    }
+
+    try {
+        if (drop) {
+            table->dropPrimaryKey(primaryKey);
+        } else {
+            table->setPrimaryKey(primaryKey);
+        }
+    } catch (Internal::TableErrorBase &e) {
+        throw Error::AlterTableError(e.what());
+    }
+
+    // Update the system table.
+    RecordID id = findTable(currentDatabase, tableName).first;
+    systemTablesTable.update(
+        id,
+        {drop ? Column::nullIntColumn() : Column(table->meta.primaryKeyIndex)},
+        0b100);
+
+    return makePlainResult("OK");
 }
 
 void DBMS::initSystemTable(Internal::Table *table, const std::string &name,

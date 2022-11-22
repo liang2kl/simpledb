@@ -67,6 +67,10 @@ DECLARE_ERROR(ColumnFull, TableErrorBase, "The column is full");
 DECLARE_ERROR(ColumnExists, TableErrorBase, "The column already exists");
 DECLARE_ERROR(InvalidPageMeta, TableErrorBase, "The page meta is invalid");
 DECLARE_ERROR(TooManyColumns, TableErrorBase, "Too many columns");
+DECLARE_ERROR(InvalidPrimaryKey, TableErrorBase, "Invalid primary key");
+DECLARE_ERROR(PrimaryKeyExists, TableErrorBase, "Primary key exists");
+DECLARE_ERROR(PrimaryKeyNotExists, TableErrorBase,
+              "Primary key does not exist");
 DECLARE_ERROR(NullValueFoundInNotNullColumn, TableErrorBase,
               "Null value found in not null column");
 DECLARE_ERROR(NullValueGivenForNotNullColumn, TableErrorBase,
@@ -133,6 +137,8 @@ DECLARE_ERROR(InvalidTableName, ExecutionErrorBase, "Invalid table name");
 DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table does not exist");
 DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
               "More than one primary key is given");
+DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
+DECLARE_ERROR(AlterTable, ExecutionErrorBase, "Fail to alter table");
 
 }  // namespace Error
 

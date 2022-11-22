@@ -38,11 +38,19 @@ public:
     virtual antlrcpp::Any visitDescribe_table(
         SQLParser::SqlParser::Describe_tableContext *ctx) override;
 
-    // @returns: std::vector<ColumnMeta>
     virtual antlrcpp::Any visitField_list(
         SQLParser::SqlParser::Field_listContext *ctx) override;
     virtual antlrcpp::Any visitNormal_field(
         SQLParser::SqlParser::Normal_fieldContext *ctx) override;
+
+    virtual antlrcpp::Any visitAlter_table_drop_pk(
+        SQLParser::SqlParser::Alter_table_drop_pkContext *ctx) override;
+    virtual antlrcpp::Any visitAlter_table_add_pk(
+        SQLParser::SqlParser::Alter_table_add_pkContext *ctx) override;
+    // virtual antlrcpp::Any visitAlter_add_index(
+    //     SQLParser::SqlParser::Alter_add_indexContext *ctx) override;
+    // virtual antlrcpp::Any visitAlter_drop_index(
+    //     SQLParser::SqlParser::Alter_drop_indexContext *ctx) override;
 
 private:
     DBMS *dbms;

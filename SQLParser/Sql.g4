@@ -64,10 +64,11 @@ alter_statement:
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'INDEX' '(' identifiers ')'	# alter_drop_index
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'PRIMARY' 'KEY' (
 		Identifier
-	)?																# alter_table_drop_pk
-	| 'ALTER' 'TABLE' Identifier 'DROP' 'FOREIGN' 'KEY' Identifier	# alter_table_drop_foreign_key
-	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' (Identifier)? 'PRIMARY' 'KEY' '(' identifiers
-		')' # alter_table_add_pk
+
+	)?																					# alter_table_drop_pk
+	| 'ALTER' 'TABLE' Identifier 'DROP' 'FOREIGN' 'KEY' Identifier						# alter_table_drop_foreign_key
+	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' 'PRIMARY' 'KEY' '(' Identifier ')'	#
+		alter_table_add_pk
 	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' (Identifier)? 'FOREIGN' 'KEY' '(' identifiers
 		')' 'REFERENCES' Identifier '(' identifiers ')'				# alter_table_add_foreign_key
 	| 'ALTER' 'TABLE' Identifier 'ADD' 'UNIQUE' '(' identifiers ')'	# alter_table_add_unique;
@@ -75,8 +76,8 @@ alter_statement:
 field_list: field (',' field)*;
 
 field:
-	Identifier type_ ('NOT' Null)? ('DEFAULT' value)?												# normal_field
-	| 'PRIMARY' 'KEY' (Identifier)? '(' identifiers ')'												# primary_key_field
+	Identifier type_ ('NOT' Null)? ('DEFAULT' value)?	# normal_field
+	| 'PRIMARY' 'KEY' '(' Identifier ')'				# primary_key_field
 	| 'FOREIGN' 'KEY' (Identifier)? '(' identifiers ')' 'REFERENCES' Identifier '(' identifiers ')'	#
 		foreign_key_field;
 

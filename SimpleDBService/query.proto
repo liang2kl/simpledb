@@ -103,6 +103,7 @@ message ColumnDescription {
   string field = 1;
   string type = 2;
   bool nullable = 3;
+  bool primary_key = 4;
   // TODO: Primary key / foreign key
   optional string default_value = 5;
 }

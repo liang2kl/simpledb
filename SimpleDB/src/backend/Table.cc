@@ -7,6 +7,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstring>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -92,7 +93,8 @@ void Table::open(const std::string &file) {
 }
 
 void Table::create(const std::string &file, const std::string &name,
-                   const std::vector<ColumnMeta> &columns) {
+                   const std::vector<ColumnMeta> &columns,
+                   const std::string &primaryKey) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 
@@ -109,6 +111,30 @@ void Table::create(const std::string &file, const std::string &name,
             "Table: fail to create table: too many columns: %ld, max %d\n",
             columns.size(), MAX_COLUMNS);
         throw Internal::TooManyColumnsError();
+    }
+
+    // TODO: Check foreign keys.
+    // Check primary key.
+    int primaryKeyIndex = -1;
+    if (!primaryKey.empty()) {
+        // Find the column index.
+        for (int i = 0; i < columns.size(); i++) {
+            const auto &column = columns[i];
+            if (column.name == primaryKey) {
+                if (column.type != INT) {
+                    throw InvalidPrimaryKeyError(
+                        "VARCHAR or FLOAT is not supported for primary key");
+                }
+                primaryKeyIndex = i;
+                break;
+            }
+        }
+        if (primaryKeyIndex == -1) {
+            throw InvalidPrimaryKeyError("field not exists");
+        }
+        if (columns[primaryKeyIndex].nullable) {
+            throw InvalidPrimaryKeyError("primary key cannot be nullable");
+        }
     }
 
     try {
@@ -137,6 +163,7 @@ void Table::create(const std::string &file, const std::string &name,
     meta.firstFree = 1;
     meta.numUsedPages = 1;
     meta.numColumn = columns.size();
+    meta.primaryKeyIndex = primaryKeyIndex;
     strcpy(meta.name, name.c_str());
 
     int totalSize = 0;
@@ -306,6 +333,59 @@ void Table::remove(RecordID id) {
     // As we are dealing with the pointer directly, we don't need to flush.
     PF::markDirty(*handle);
     assert(handle->validate());
+}
+
+void Table::setPrimaryKey(const std::string &field) {
+    checkInit();
+
+    if (meta.primaryKeyIndex != -1) {
+        throw PrimaryKeyExistsError(getColumnName(meta.primaryKeyIndex));
+    }
+
+    int columnIndex = getColumnIndex(field.c_str());
+
+    if (columnIndex < 0) {
+        throw Internal::ColumnNotFoundError(field);
+    }
+
+    // Validate the column type.
+    if (meta.columns[columnIndex].type != INT) {
+        throw InvalidPrimaryKeyError(
+            "VARCHAR or FLOAT is not supported for primary key");
+    }
+
+    // Validate the nullability.
+    if (meta.columns[columnIndex].nullable) {
+        throw InvalidPrimaryKeyError(
+            "nullable column is not supported for primary key");
+    }
+
+    // Check the uniqueness of the primary key.
+    std::set<int> keys;
+    iterate([&](RecordID, Columns &columns) {
+        int key = columns[columnIndex].data.intValue;
+        if (keys.find(key) != keys.end()) {
+            throw InvalidPrimaryKeyError("primary key has duplicated values");
+        }
+        keys.insert(key);
+        return true;
+    });
+
+    meta.primaryKeyIndex = columnIndex;
+}
+
+void Table::dropPrimaryKey(const std::string &field) {
+    checkInit();
+
+    if (meta.primaryKeyIndex == -1) {
+        throw PrimaryKeyNotExistsError();
+    }
+
+    if (!field.empty() && getColumnIndex(field.c_str()) < 0) {
+        throw Internal::ColumnNotFoundError(field);
+    }
+
+    meta.primaryKeyIndex = -1;
 }
 
 void Table::close() {

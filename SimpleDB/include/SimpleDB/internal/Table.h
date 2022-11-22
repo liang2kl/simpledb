@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #include <map>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -53,7 +54,8 @@ public:
 
     // Create a new table in a file.
     void create(const std::string &file, const std::string &name,
-                const std::vector<ColumnMeta> &columns) noexcept(false);
+                const std::vector<ColumnMeta> &columns,
+                const std::string &primaryKey = std::string()) noexcept(false);
 
     // Get record.
     [[nodiscard]] Columns get(RecordID id,
@@ -71,6 +73,10 @@ public:
 
     // Remove record.
     void remove(RecordID id);
+
+    // Set primary key.
+    void setPrimaryKey(const std::string &field);
+    void dropPrimaryKey(const std::string &field);
 
     void close();
 
@@ -92,6 +98,7 @@ private:
 
         uint32_t numColumn;
         ColumnMeta columns[MAX_COLUMNS];
+        int primaryKeyIndex;
         ForeignKey foreignKeys[MAX_FOREIGN_KEYS];
         uint16_t numUsedPages;
         uint16_t firstFree;

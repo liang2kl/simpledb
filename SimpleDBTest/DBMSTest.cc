@@ -107,8 +107,11 @@ TEST_F(DBMSTest, TestCreateDropTable) {
 
     // dbms.useDatabase(const std::string &dbName)
     std::vector<std::pair<std::string, std::string>> successCases = {
-        {"t2", "CREATE TABLE t2 (c1 INT, c2 VARCHAR(10));"},
-        {"t3", "CREATE TABLE t3 (c1 INT, c2 VARCHAR(10), c3 FLOAT);"},
+        {"t1", "CREATE TABLE t1 (c1 INT, c2 VARCHAR(10));"},
+        {"t2", "CREATE TABLE t2 (c1 INT, c2 VARCHAR(10), c3 FLOAT);"},
+        {"t3",
+         "CREATE TABLE t3 (c1 INT NOT NULL, c2 VARCHAR(10), c3 FLOAT, PRIMARY "
+         "KEY (c1));"},
     };
 
     std::vector<Service::ExecutionResult> results;
@@ -123,6 +126,18 @@ TEST_F(DBMSTest, TestCreateDropTable) {
         ASSERT_NO_THROW(results = executeSQL(dropStatement));
         ASSERT_THROW(results = executeSQL(dropStatement),
                      Error::TableNotExistsError);
+    }
+
+    std::vector<std::string> failedCases = {
+        /* Primary key failures */
+        "CREATE TABLE t1 (c1 INT NOT NULL, PRIMARY KEY (c2));",
+        "CREATE TABLE t1 (c1 FLOAT NOT NULL, PRIMARY KEY (c1));",
+        "CREATE TABLE t1 (c1 INT, PRIMARY KEY (c1));",
+    };
+
+    for (auto testCase : failedCases) {
+        ASSERT_THROW(results = executeSQL(testCase), BaseError)
+            << "Test case: " << testCase;
     }
 }
 
@@ -201,10 +216,32 @@ TEST_F(DBMSTest, TestDescTable) {
             } else if (type == "INT") {
                 EXPECT_EQ(column.default_value(), defaultValue);
             } else {
-                EXPECT_EQ(column.default_value().substr(
-                              1, column.default_value().size() - 2),
-                          defaultValue);
+                EXPECT_EQ(column.default_value(),
+                          defaultValue.substr(1, defaultValue.size() - 2));
             }
         }
     }
+}
+
+TEST_F(DBMSTest, TestAddDropPrimaryKey) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string sql =
+        "CREATE TABLE t1 (c1 INT NOT NULL, c2 INT NOT NULL, c3 INT, PRIMARY "
+        "KEY (c1));";
+
+    ASSERT_NO_THROW(executeSQL(sql));
+
+    std::string dropSql = "ALTER TABLE t1 DROP PRIMARY KEY;";
+    std::string addSql = "ALTER TABLE t1 ADD CONSTRAINT PRIMARY KEY (c2);";
+    std::string addSql2 = "ALTER TABLE t1 ADD CONSTRAINT PRIMARY KEY (c3);";
+
+    ASSERT_NO_THROW(executeSQL(dropSql));
+    ASSERT_NO_THROW(executeSQL(addSql));
+    ASSERT_THROW(executeSQL(addSql), Error::AlterTableError);
+    ASSERT_NO_THROW(executeSQL(dropSql));
+    ASSERT_THROW(executeSQL(addSql2), Error::AlterTableError);
+
+    // TODO: Insert rows with duplicate c2.
 }
