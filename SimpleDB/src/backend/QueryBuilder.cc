@@ -97,7 +97,7 @@ void QueryBuilder::checkDataSource() {
 
 AggregatedFilter QueryBuilder::aggregateAllFilters() {
     // Create a virtual table.
-    virtualTable.columns = dataSource->getColumnInfo();
+    virtualTable = VirtualTable(dataSource->getColumnInfo());
 
     AggregatedFilter filter;
     // Condition filters comes before selectors.

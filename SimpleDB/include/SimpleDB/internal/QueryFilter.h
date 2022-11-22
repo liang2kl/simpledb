@@ -1,6 +1,7 @@
 #ifndef _SIMPLEDB_QUERY_FILTER
 #define _SIMPLEDB_QUERY_FILTER
 
+#include <map>
 #include <set>
 #include <string>
 #include <utility>
@@ -40,14 +41,18 @@ struct CompareCondition {
 using CompareConditions = std::vector<CompareCondition>;
 
 struct VirtualTable {
-    std::vector<ColumnInfo> columns;
-    int getColumnIndex(const std::string name) {
+    VirtualTable() = default;
+    VirtualTable(const std::vector<ColumnInfo> &columns) {
         for (int i = 0; i < columns.size(); i++) {
-            if (name == columns[i].name) {
-                return i;
-            }
+            columnNameMap[columns[i].name] = i;
         }
-        return -1;
+    }
+
+    std::map<std::string, int> columnNameMap;
+
+    int getColumnIndex(const std::string name) {
+        auto it = columnNameMap.find(name);
+        return it == columnNameMap.end() ? -1 : it->second;
     }
 };
 
