@@ -205,7 +205,7 @@ TEST_F(QueryConditionTest, TestNullValue) {
     ASSERT_NO_THROW(table.insert(testColumns0));
 
     std::vector<std::pair<CompareOp, int>> testCases = {
-        {EQ, 0}, {NE, 0}, {GT, 0}, {GE, 0}, {LT, 0}, {LE, 0}, {LIKE, 0}};
+        {EQ, 0}, {NE, 0}, {GT, 0}, {GE, 0}, {LT, 0}, {LE, 0}};
 
     QueryBuilder::Result result;
 
@@ -218,42 +218,43 @@ TEST_F(QueryConditionTest, TestNullValue) {
     }
 }
 
-TEST_F(QueryConditionTest, TestLikeOp) {
-    Columns testColumns0 = {Column(1), Column(1.1F), Column("123451", 100),
-                            Column::nullIntColumn()};
-    Columns testColumns1 = {Column(1), Column(1.1F), Column("012314", 100),
-                            Column(1)};
+// TEST_F(QueryConditionTest, TestLikeOp) {
+//     Columns testColumns0 = {Column(1), Column(1.1F), Column("123451", 100),
+//                             Column::nullIntColumn()};
+//     Columns testColumns1 = {Column(1), Column(1.1F), Column("012314", 100),
+//                             Column(1)};
 
-    ASSERT_NO_THROW(table.insert(testColumns0));
-    ASSERT_NO_THROW(table.insert(testColumns1));
+//     ASSERT_NO_THROW(table.insert(testColumns0));
+//     ASSERT_NO_THROW(table.insert(testColumns1));
 
-    // Matching the first but not second.
-    const char *regex = "[1-9]+";
+//     // Matching the first but not second.
+//     const char *regex = "[1-9]+";
 
-    QueryBuilder::Result result;
+//     QueryBuilder::Result result;
 
-    QueryBuilder builder = getBaseBuilder();
-    builder.condition(columnMetas[2].name, LIKE, regex);
+//     QueryBuilder builder = getBaseBuilder();
+//     builder.condition(columnMetas[2].name, LIKE, regex);
 
-    ASSERT_NO_THROW(result = builder.execute());
-    EXPECT_EQ(result.size(), 1);
-    compareColumns(testColumns0, result[0].second);
+//     ASSERT_NO_THROW(result = builder.execute());
+//     EXPECT_EQ(result.size(), 1);
+//     compareColumns(testColumns0, result[0].second);
 
-    // Test invalid regex.
-    regex = "[1-9";
-    builder = getBaseBuilder();
-    builder.condition(columnMetas[2].name, LIKE, regex);
-    EXPECT_THROW(result = builder.execute(), Internal::InvalidRegexError);
-}
+//     // Test invalid regex.
+//     regex = "[1-9";
+//     builder = getBaseBuilder();
+//     builder.condition(columnMetas[2].name, LIKE, regex);
+//     EXPECT_THROW(result = builder.execute(), Internal::InvalidRegexError);
+// }
 
-TEST_F(QueryConditionTest, TestInvalidLikeOperator) {
-    Columns testColumns0 = {Column(1), Column(1.1F), Column(testVarChar, 100),
-                            Column::nullIntColumn()};
-    ASSERT_NO_THROW(table.insert(testColumns0));
+// TEST_F(QueryConditionTest, TestInvalidLikeOperator) {
+//     Columns testColumns0 = {Column(1), Column(1.1F), Column(testVarChar,
+//     100),
+//                             Column::nullIntColumn()};
+//     ASSERT_NO_THROW(table.insert(testColumns0));
 
-    QueryBuilder builder = getBaseBuilder();
-    builder.condition(columnMetas[0].name, LIKE, "[0-9]+");
+//     QueryBuilder builder = getBaseBuilder();
+//     builder.condition(columnMetas[0].name, LIKE, "[0-9]+");
 
-    EXPECT_THROW(auto result = builder.execute(),
-                 Internal::InvalidOperatorError);
-}
+//     EXPECT_THROW(auto result = builder.execute(),
+//                  Internal::InvalidOperatorError);
+// }

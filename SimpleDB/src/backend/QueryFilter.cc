@@ -80,26 +80,26 @@ std::pair<bool, bool> NullConditionFilter::apply(Columns &columns) {
 // ====== End NullConditionFilter ======
 
 // ===== Begin ValueConditionFilter =====
-static bool _regexComparer(CompareOp op, const Column &column,
-                           const char *regexStr) {
-#ifdef DEBUG
-    if (op != LIKE) {
-        Logger::log(ERROR,
-                    "RecordScanner: internal error: invalid compare op %d "
-                    "for LIKE comparision\n",
-                    op);
-        throw Internal::UnexpedtedOperatorError();
-    }
-#endif
-    try {
-        std::regex regex(regexStr);
-        return std::regex_match(column.data.stringValue, regex);
-    } catch (std::regex_error &e) {
-        Logger::log(ERROR, "RecordScanner: invalid input regex \"%s\"\n",
-                    regexStr);
-        throw Internal::InvalidRegexError();
-    }
-}
+// static bool _regexComparer(CompareOp op, const Column &column,
+//                            const char *regexStr) {
+// #ifdef DEBUG
+//     if (op != LIKE) {
+//         Logger::log(ERROR,
+//                     "RecordScanner: internal error: invalid compare op %d "
+//                     "for LIKE comparision\n",
+//                     op);
+//         throw Internal::UnexpedtedOperatorError();
+//     }
+// #endif
+//     try {
+//         std::regex regex(regexStr);
+//         return std::regex_match(column.data.stringValue, regex);
+//     } catch (std::regex_error &e) {
+//         Logger::log(ERROR, "RecordScanner: invalid input regex \"%s\"\n",
+//                     regexStr);
+//         throw Internal::InvalidRegexError();
+//     }
+// }
 
 using _Comparer = bool (*)(CompareOp, const char *, const char *);
 
@@ -137,26 +137,9 @@ std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
 
     const Column &column = columns[columnIndex];
 
-    // FIXME: remove this from the enum.
-    assert(condition.op != IS_NULL && condition.op != NOT_NULL);
-
     // FIXME: What's the specification to deal with this?
     if (column.isNull) {
         return {false, true};
-    }
-
-    if (condition.op == LIKE) {
-        if (column.type != VARCHAR) {
-            Logger::log(ERROR,
-                        "RecordScanner: LIKE can only be used on "
-                        "VARCHAR column, but column %s is of type "
-                        "%d\n",
-                        condition.columnName.c_str(), column.type);
-            throw Internal::InvalidOperatorError();
-        }
-        return {
-            _regexComparer(condition.op, column, condition.value.stringValue),
-            true};
     }
 
     _Comparer comparer;

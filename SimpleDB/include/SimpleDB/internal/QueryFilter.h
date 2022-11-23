@@ -14,15 +14,12 @@ namespace SimpleDB {
 namespace Internal {
 
 enum CompareOp {
-    EQ,        // =
-    NE,        // <>
-    LT,        // <
-    LE,        // <=
-    GT,        // >
-    GE,        // >=
-    IS_NULL,   // IS NULL
-    NOT_NULL,  // NOT NULL
-    LIKE,      // LIKE
+    EQ,  // =
+    NE,  // <>
+    LT,  // <
+    LE,  // <=
+    GT,  // >
+    GE,  // >=
 };
 
 struct CompareValueCondition {
