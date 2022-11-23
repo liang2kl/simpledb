@@ -245,3 +245,22 @@ TEST_F(DBMSTest, TestAddDropPrimaryKey) {
 
     // TODO: Insert rows with duplicate c2.
 }
+
+TEST_F(DBMSTest, TestAddDropIndex) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string sql1 = "CREATE TABLE t1 (c1 INT NOT NULL);";
+    std::string addIndexSql = "ALTER TABLE t1 ADD INDEX (c1);";
+    std::string dropIndexSql = "ALTER TABLE t1 DROP INDEX (c1);";
+
+    ASSERT_NO_THROW(executeSQL(sql1));
+    ASSERT_NO_THROW(executeSQL(addIndexSql));
+    ASSERT_THROW(executeSQL(addIndexSql), Error::AlterIndexError);
+    ASSERT_NO_THROW(executeSQL(dropIndexSql));
+    ASSERT_THROW(executeSQL(dropIndexSql), Error::AlterIndexError);
+}
+
+TEST_F(DBMSTest, TestAddIndexOnDuplicateColumn) {
+    // TODO
+}
