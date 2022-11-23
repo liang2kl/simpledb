@@ -1,10 +1,9 @@
 #include "internal/QueryBuilder.h"
 
-#include <SimpleDB/internal/Column.h>
-
 #include <vector>
 
 #include "Error.h"
+#include "internal/Column.h"
 #include "internal/Comparer.h"
 #include "internal/Logger.h"
 #include "internal/QueryFilter.h"

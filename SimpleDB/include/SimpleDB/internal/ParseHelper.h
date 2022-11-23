@@ -1,12 +1,11 @@
 #ifndef _SIMPLEDB_PARSE_HELPER_H
 #define _SIMPLEDB_PARSE_HELPER_H
 
-#include <SimpleDB/internal/Column.h>
-
 #include <cstring>
 #include <string>
 
 #include "Error.h"
+#include "internal/Column.h"
 #include "internal/Macros.h"
 #include "internal/Table.h"
 

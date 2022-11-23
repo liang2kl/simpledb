@@ -1,16 +1,15 @@
 #include "internal/ParseTreeVisitor.h"
 
-#include <SimpleDB/Error.h>
-#include <SimpleDB/internal/Table.h>
-
 #include <cstdio>
 #include <tuple>
 #include <utility>
 #include <vector>
 
 #include "DBMS.h"
+#include "Error.h"
 #include "internal/Logger.h"
 #include "internal/ParseHelper.h"
+#include "internal/Table.h"
 
 using namespace SQLParser;
 using namespace SimpleDB::Internal;

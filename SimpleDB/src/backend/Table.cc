@@ -1,7 +1,5 @@
 #include "internal/Table.h"
 
-#include <SimpleDB/Error.h>
-#include <SimpleDB/internal/Column.h>
 #include <string.h>
 
 #include <cmath>
@@ -11,6 +9,8 @@
 #include <string>
 #include <vector>
 
+#include "Error.h"
+#include "internal/Column.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
 #include "internal/PageFile.h"

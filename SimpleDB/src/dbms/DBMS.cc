@@ -1,3 +1,5 @@
+#include <SQLParser/SqlLexer.h>
+
 #include <any>
 #include <filesystem>
 #include <system_error>
@@ -6,8 +8,6 @@
 #include <vector>
 
 #include "Error.h"
-#include "SQLParser/SqlLexer.h"
-#include "SimpleDB/internal/QueryBuilder.h"
 #include "internal/Index.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
@@ -99,7 +99,7 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
     if (dbName.size() > MAX_DATABASE_NAME_LEN) {
         throw Error::InvalidDatabaseNameError("database name too long");
     }
-    // TODO: Add index to system table.
+
     bool found = findDatabase(dbName).first != RecordID::NULL_RECORD;
 
     if (found) {
