@@ -15,9 +15,11 @@ class QueryBuilder : public QueryDataSource {
 public:
     using Result = std::vector<std::pair<RecordID, Columns>>;
     QueryBuilder(QueryDataSource *dataSource);
-    QueryBuilder &condition(const CompareCondition &condition);
+    QueryBuilder &condition(const CompareValueCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
-                            const char *value);
+                            const char *string);
+    QueryBuilder &nullCondition(const CompareNullCondition &condition);
+    QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
     QueryBuilder &select(const std::string &column);
     QueryBuilder &limit(int count);
 
@@ -28,7 +30,8 @@ public:
     virtual std::vector<ColumnInfo> getColumnInfo() override;
 
 private:
-    std::vector<ConditionFilter> conditionFilters;
+    std::vector<ValueConditionFilter> valueConditionFilters;
+    std::vector<NullConditionFilter> nullConditionFilters;
     SelectFilter selectFilter;
     LimitFilter limitFilter;
 

@@ -1,12 +1,15 @@
 #ifndef _SIMPLEDB_PARSE_HELPER_H
 #define _SIMPLEDB_PARSE_HELPER_H
 
+#include <SQLParser/SqlParser.h>
+
 #include <cstring>
 #include <string>
 
 #include "Error.h"
 #include "internal/Column.h"
 #include "internal/Macros.h"
+#include "internal/QueryFilter.h"
 #include "internal/Table.h"
 
 namespace SimpleDB {
@@ -43,11 +46,8 @@ public:
                 dest.floatValue = parseFloat(value);
                 break;
             case VARCHAR:
-                if (value.size() >= MAX_VARCHAR_LEN || value.size() > size) {
-                    throw Error::IncompatableValueError("VARCHAR too long");
-                }
-                std::strcpy(dest.stringValue,
-                            value.substr(1, value.size() - 2).c_str());
+                parseString(value, std::min(MAX_VARCHAR_LEN, size),
+                            dest.stringValue);
                 break;
         }
     }
@@ -66,6 +66,53 @@ public:
         } catch (std::exception &e) {
             throw Error::IncompatableValueError("Invalid float value");
         }
+    }
+
+    static void parseString(const std::string &value, int maxSize, char *dest) {
+        // Here we deal with the raw string from antlr, which starts and ends
+        // with a single quote (').
+        if (value.size() - 2 >= maxSize) {
+            throw Error::IncompatableValueError("VARCHAR too long");
+        }
+        std::strcpy(dest, value.substr(1, value.size() - 2).c_str());
+    }
+
+    static CompareOp parseCompareOp(const std::string &op) {
+        if (op == "=") {
+            return EQ;
+        } else if (op == "<>") {
+            return NE;
+        } else if (op == "<") {
+            return LT;
+        } else if (op == "<=") {
+            return LE;
+        } else if (op == ">") {
+            return GT;
+        } else if (op == ">=") {
+            return GE;
+        }
+        assert(false);
+    }
+
+    static ColumnValue parseColumnValue(
+        SQLParser::SqlParser::ValueContext *ctx) {
+        ColumnValue value;
+        if (ctx->Integer() != nullptr) {
+            value.intValue = parseInt(ctx->Integer()->getText());
+        } else if (ctx->Float() != nullptr) {
+            value.floatValue = parseFloat(ctx->Float()->getText());
+        } else if (ctx->String() != nullptr) {
+            parseString(ctx->String()->getText(), MAX_VARCHAR_LEN,
+                        value.stringValue);
+        }
+        return value;
+    }
+
+    static CompareValueCondition parseCompareValueCondition(
+        const std::string &columnName, const std::string operator_,
+        SQLParser::SqlParser::ValueContext *ctx) {
+        return CompareValueCondition(columnName, parseCompareOp(operator_),
+                                     parseColumnValue(ctx));
     }
 };
 

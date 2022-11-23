@@ -139,7 +139,6 @@ TEST_F(QueryConditionTest, TestCompareVarchar) {
     QueryBuilder::Result result;
 
     // EQ.
-    CompareConditions conditions = CompareConditions(1);
     char compareStr[100] = "aaabbb";
 
     QueryBuilder builder = getBaseBuilder();
@@ -187,13 +186,13 @@ TEST_F(QueryConditionTest, TestNullOp) {
     QueryBuilder::Result result;
 
     QueryBuilder builder = getBaseBuilder();
-    builder.condition(columnMetas[3].name, IS_NULL, nullptr);
+    builder.nullCondition(columnMetas[3].name, true);
     ASSERT_NO_THROW(result = builder.execute());
     EXPECT_EQ(result.size(), 1);
     compareColumns(testColumns0, result[0].second);
 
     builder = getBaseBuilder();
-    builder.condition(columnMetas[3].name, NOT_NULL, nullptr);
+    builder.nullCondition(columnMetas[3].name, false);
     ASSERT_NO_THROW(result = builder.execute());
     EXPECT_EQ(result.size(), 1);
     compareColumns(testColumns1, result[0].second);
@@ -206,15 +205,13 @@ TEST_F(QueryConditionTest, TestNullValue) {
     ASSERT_NO_THROW(table.insert(testColumns0));
 
     std::vector<std::pair<CompareOp, int>> testCases = {
-        {EQ, 0}, {NE, 0},   {GT, 0},      {GE, 0},       {LT, 0},
-        {LE, 0}, {LIKE, 0}, {IS_NULL, 1}, {NOT_NULL, 0},
-    };
+        {EQ, 0}, {NE, 0}, {GT, 0}, {GE, 0}, {LT, 0}, {LE, 0}, {LIKE, 0}};
 
     QueryBuilder::Result result;
 
     for (auto &testCase : testCases) {
         QueryBuilder builder = getBaseBuilder();
-        builder.condition(columnMetas[2].name, testCase.first, nullptr);
+        builder.condition(columnMetas[2].name, testCase.first, "");
 
         ASSERT_NO_THROW(result = builder.execute());
         EXPECT_EQ(result.size(), testCase.second);

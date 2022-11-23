@@ -1,6 +1,7 @@
 #ifndef _SIMPLEDB_QUERY_FILTER
 #define _SIMPLEDB_QUERY_FILTER
 
+#include <cstring>
 #include <map>
 #include <set>
 #include <string>
@@ -24,21 +25,41 @@ enum CompareOp {
     LIKE,      // LIKE
 };
 
-struct CompareCondition {
-    const char *columnName;
+struct CompareValueCondition {
+    std::string columnName;
     CompareOp op;
-    const char *value;
+    ColumnValue value;
 
-    CompareCondition(const char *columnName, CompareOp op, const char *value)
+    CompareValueCondition(const std::string &columnName, CompareOp op,
+                          const ColumnValue &value)
         : columnName(columnName), op(op), value(value) {}
-    CompareCondition() = default;
 
-    static CompareCondition eq(const char *columnName, const char *value) {
-        return CompareCondition(columnName, EQ, value);
+    CompareValueCondition(const std::string &columnName, CompareOp op,
+                          const char *string)
+        : columnName(columnName), op(op) {
+        std::strcpy(value.stringValue, string);
+    }
+
+    CompareValueCondition() = default;
+
+    static CompareValueCondition eq(const char *columnName,
+                                    const ColumnValue &value) {
+        return CompareValueCondition(columnName, EQ, value);
+    }
+
+    static CompareValueCondition eq(const char *columnName,
+                                    const char *string) {
+        return CompareValueCondition(columnName, EQ, string);
     }
 };
 
-using CompareConditions = std::vector<CompareCondition>;
+struct CompareNullCondition {
+    std::string columnName;
+    bool isNull;
+    CompareNullCondition(const std::string &columnName, bool isNull)
+        : columnName(columnName), isNull(isNull) {}
+    CompareNullCondition() = default;
+};
 
 struct VirtualTable {
     VirtualTable() = default;
@@ -61,11 +82,19 @@ struct BaseFilter {
     virtual std::pair<bool, bool> apply(Columns &columns) = 0;
 };
 
-struct ConditionFilter : public BaseFilter {
-    ConditionFilter() = default;
-    ~ConditionFilter() = default;
+struct ValueConditionFilter : public BaseFilter {
+    ValueConditionFilter() = default;
+    ~ValueConditionFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
-    CompareCondition condition;
+    CompareValueCondition condition;
+    VirtualTable *table;
+};
+
+struct NullConditionFilter : public BaseFilter {
+    NullConditionFilter() = default;
+    ~NullConditionFilter() = default;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
+    CompareNullCondition condition;
     VirtualTable *table;
 };
 

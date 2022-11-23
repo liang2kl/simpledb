@@ -62,24 +62,24 @@ std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
     columns = newColumns;
     return {true, true};
 }
-// ====== End SelectFilger ======
+// ====== End SelectFilter ======
 
-// ===== Begin ConditionFilter =====
-static bool _nullComparer(CompareOp op, const Column &column) {
-    switch (op) {
-        case IS_NULL:
-            return column.isNull;
-        case NOT_NULL:
-            return !column.isNull;
-        default:
-            Logger::log(ERROR,
-                        "RecordScanner: internal error: invalid compare op %d "
-                        "for IS_NULL or NOT_NULL comparision\n",
-                        op);
-            throw Internal::UnexpedtedOperatorError();
+// ===== Begin NullConditionFilter =====
+std::pair<bool, bool> NullConditionFilter::apply(Columns &columns) {
+    int columnIndex = table->getColumnIndex(condition.columnName);
+    if (columnIndex < 0) {
+        throw Internal::ColumnNotFoundError(condition.columnName);
     }
-}
 
+    const Column &column = columns[columnIndex];
+
+    bool accept = (condition.isNull && column.isNull) ||
+                  (!condition.isNull && !column.isNull);
+    return {accept, true};
+}
+// ====== End NullConditionFilter ======
+
+// ===== Begin ValueConditionFilter =====
 static bool _regexComparer(CompareOp op, const Column &column,
                            const char *regexStr) {
 #ifdef DEBUG
@@ -129,7 +129,7 @@ static bool _comparer(CompareOp op, const char *lhs, const char *rhs) {
     }
 }
 
-std::pair<bool, bool> ConditionFilter::apply(Columns &columns) {
+std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
     int columnIndex = table->getColumnIndex(condition.columnName);
     if (columnIndex < 0) {
         throw Internal::ColumnNotFoundError(condition.columnName);
@@ -137,9 +137,8 @@ std::pair<bool, bool> ConditionFilter::apply(Columns &columns) {
 
     const Column &column = columns[columnIndex];
 
-    if (condition.op == IS_NULL || condition.op == NOT_NULL) {
-        return {_nullComparer(condition.op, column), true};
-    }
+    // FIXME: remove this from the enum.
+    assert(condition.op != IS_NULL && condition.op != NOT_NULL);
 
     // FIXME: What's the specification to deal with this?
     if (column.isNull) {
@@ -152,10 +151,12 @@ std::pair<bool, bool> ConditionFilter::apply(Columns &columns) {
                         "RecordScanner: LIKE can only be used on "
                         "VARCHAR column, but column %s is of type "
                         "%d\n",
-                        condition.columnName, column.type);
+                        condition.columnName.c_str(), column.type);
             throw Internal::InvalidOperatorError();
         }
-        return {_regexComparer(condition.op, column, condition.value), true};
+        return {
+            _regexComparer(condition.op, column, condition.value.stringValue),
+            true};
     }
 
     _Comparer comparer;
@@ -172,10 +173,11 @@ std::pair<bool, bool> ConditionFilter::apply(Columns &columns) {
             break;
     }
 
-    return {comparer(condition.op, column.data.stringValue, condition.value),
+    return {comparer(condition.op, column.data.stringValue,
+                     condition.value.stringValue),
             true};
 }
-// ====== End ConditionFilter ======
+// ====== End ValueConditionFilter ======
 
 }  // namespace Internal
 }  // namespace SimpleDB

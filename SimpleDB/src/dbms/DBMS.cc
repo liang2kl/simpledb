@@ -424,9 +424,6 @@ PlainResult DBMS::makePlainResult(const std::string &msg) {
 }
 
 std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
-    CompareConditions conditions = {{CompareCondition::eq(
-        systemDatabaseTableColumns[0].name, dbName.c_str())}};
-
     QueryBuilder builder(&systemDatabaseTable);
     builder.condition("name", EQ, dbName.c_str()).limit(1);
 

@@ -13,16 +13,29 @@ namespace Internal {
 
 QueryBuilder::QueryBuilder(QueryDataSource *source) : dataSource(source) {}
 
-QueryBuilder &QueryBuilder::condition(const CompareCondition &condition) {
-    ConditionFilter filter;
+QueryBuilder &QueryBuilder::condition(const CompareValueCondition &condition) {
+    ValueConditionFilter filter;
     filter.condition = condition;
-    conditionFilters.push_back(filter);
+    valueConditionFilters.push_back(filter);
     return *this;
 }
 
 QueryBuilder &QueryBuilder::condition(const std::string &columnName,
-                                      CompareOp op, const char *value) {
-    return condition(CompareCondition(columnName.c_str(), op, value));
+                                      CompareOp op, const char *string) {
+    return condition(CompareValueCondition(columnName.c_str(), op, string));
+}
+
+QueryBuilder &QueryBuilder::nullCondition(
+    const CompareNullCondition &condition) {
+    NullConditionFilter filter;
+    filter.condition = condition;
+    nullConditionFilters.push_back(filter);
+    return *this;
+}
+
+QueryBuilder &QueryBuilder::nullCondition(const std::string &columnName,
+                                          bool isNull) {
+    return nullCondition(CompareNullCondition(columnName.c_str(), isNull));
 }
 
 QueryBuilder &QueryBuilder::select(const std::string &column) {
@@ -100,9 +113,13 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
 
     AggregatedFilter filter;
     // Condition filters comes before selectors.
-    for (int i = 0; i < conditionFilters.size(); i++) {
-        conditionFilters[i].table = &virtualTable;
-        filter.filters.push_back(&conditionFilters[i]);
+    for (int i = 0; i < nullConditionFilters.size(); i++) {
+        nullConditionFilters[i].table = &virtualTable;
+        filter.filters.push_back(&nullConditionFilters[i]);
+    }
+    for (int i = 0; i < valueConditionFilters.size(); i++) {
+        valueConditionFilters[i].table = &virtualTable;
+        filter.filters.push_back(&valueConditionFilters[i]);
     }
     // The select filter comes after.
     if (selectFilter.columnNames.size() > 0) {
