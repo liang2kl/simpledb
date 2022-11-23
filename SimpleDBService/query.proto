@@ -33,6 +33,7 @@ message ExecutionResult {
     ShowTableResult show_table = 3;
     ShowDatabasesResult show_databases = 4;
     DescribeTableResult describe_table = 5;
+    ShowIndexesResult show_indexes = 6;
   }
 }
 
@@ -106,4 +107,12 @@ message ColumnDescription {
   bool primary_key = 4;
   // TODO: Primary key / foreign key
   optional string default_value = 5;
+}
+
+message ShowIndexesResult {
+  repeated IndexDescription indexes = 1;
+}
+
+message IndexDescription {
+  string column = 1;
 }

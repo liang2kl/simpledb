@@ -27,7 +27,7 @@ std::vector<Internal::ColumnMeta> DBMS::systemTablesTableColumns = {
      .name = "primary_key",
      .hasDefault = false}};
 
-std::vector<Internal::ColumnMeta> DBMS::systemIndicesTableColumns = {
+std::vector<Internal::ColumnMeta> DBMS::systemIndexesTableColumns = {
     {.type = VARCHAR,
      .size = MAX_DATABASE_NAME_LEN,
      .nullable = false,

@@ -138,7 +138,8 @@ DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table does not exist");
 DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
               "More than one primary key is given");
 DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
-DECLARE_ERROR(AlterTable, ExecutionErrorBase, "Fail to alter table");
+DECLARE_ERROR(AlterPrimaryKey, ExecutionErrorBase, "Fail to alter primary key");
+DECLARE_ERROR(AlterIndex, ExecutionErrorBase, "Fail to alter index");
 
 }  // namespace Error
 

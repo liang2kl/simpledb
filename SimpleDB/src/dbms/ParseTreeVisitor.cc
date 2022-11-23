@@ -195,7 +195,7 @@ antlrcpp::Any ParseTreeVisitor::visitNormal_field(
 }
 
 antlrcpp::Any ParseTreeVisitor::visitAlter_table_add_pk(
-    SQLParser::SqlParser::Alter_table_add_pkContext *ctx) {
+    SqlParser::Alter_table_add_pkContext *ctx) {
     PlainResult result =
         dbms->alterPrimaryKey(ctx->Identifier(0)->getText(),
                               ctx->Identifier(1)->getText(), /*drop=*/false);
@@ -203,11 +203,51 @@ antlrcpp::Any ParseTreeVisitor::visitAlter_table_add_pk(
 }
 
 antlrcpp::Any ParseTreeVisitor::visitAlter_table_drop_pk(
-    SQLParser::SqlParser::Alter_table_drop_pkContext *ctx) {
+    SqlParser::Alter_table_drop_pkContext *ctx) {
     PlainResult result = dbms->alterPrimaryKey(
         ctx->Identifier(0)->getText(),
         ctx->Identifier(1) == nullptr ? "" : ctx->Identifier(1)->getText(),
         /*drop=*/true);
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_add_index(
+    SqlParser::Alter_add_indexContext *ctx) {
+    PlainResult result;
+
+    // We are not dealing with something like "... ADD INDEX (a, a)", which will
+    // raise an exception for "index exists".
+
+    const auto &tableName = ctx->Identifier()->getText();
+
+    for (int i = 0; i < ctx->identifiers()->children.size(); i++) {
+        const auto &columnName = ctx->identifiers()->Identifier(i)->getText();
+        result = dbms->createIndex(tableName, columnName);
+    }
+
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_drop_index(
+    SqlParser::Alter_drop_indexContext *ctx) {
+    PlainResult result;
+
+    const auto &tableName = ctx->Identifier()->getText();
+
+    for (int i = 0; i < ctx->identifiers()->children.size(); i++) {
+        const auto &columnName = ctx->identifiers()->Identifier(i)->getText();
+        result = dbms->dropIndex(tableName, columnName);
+    }
+
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitShow_indexes(
+    SQLParser::SqlParser::Show_indexesContext *ctx) {
+    const auto &tableName = ctx->Identifier()->getText();
+
+    ShowIndexesResult result = dbms->showIndexes(tableName);
+
     return wrap(result);
 }
 

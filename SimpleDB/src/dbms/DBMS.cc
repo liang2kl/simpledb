@@ -1,20 +1,22 @@
-#include "DBMS.h"
-
-#include <SimpleDB/internal/ParseTreeVisitor.h>
-
 #include <any>
 #include <filesystem>
 #include <system_error>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "Error.h"
 #include "SQLParser/SqlLexer.h"
 #include "SimpleDB/internal/QueryBuilder.h"
+#include "internal/Index.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
+#include "internal/ParseTreeVisitor.h"
 #include "internal/QueryBuilder.h"
 #include "internal/Table.h"
+
+// Keep last...
+#include "DBMS.h"
 
 using namespace SQLParser;
 using namespace SimpleDB::Internal;
@@ -60,7 +62,7 @@ void DBMS::init() {
     initSystemTable(&systemDatabaseTable, "databases",
                     systemDatabaseTableColumns);
     initSystemTable(&systemTablesTable, "tables", systemTablesTableColumns);
-    initSystemTable(&systemIndicesTable, "indices", systemIndicesTableColumns);
+    initSystemTable(&systemIndexesTable, "indexes", systemIndexesTableColumns);
 
     initialized = true;
 }
@@ -127,7 +129,7 @@ PlainResult DBMS::dropDatabase(const std::string &dbName) {
         throw Error::DatabaseNotExistError(dbName);
     }
 
-    QueryBuilder::Result allTables = findAllTables();
+    QueryBuilder::Result allTables = findAllTables(dbName);
     for (const auto &result : allTables) {
         auto [recordId, _] = result;
         systemTablesTable.remove(recordId);
@@ -248,7 +250,7 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
 ShowTableResult DBMS::showTables() {
     checkUseDatabase();
 
-    QueryBuilder::Result queryResult = findAllTables();
+    QueryBuilder::Result queryResult = findAllTables(currentDatabase);
 
     ShowTableResult result;
     for (const auto &res : queryResult) {
@@ -261,7 +263,7 @@ ShowTableResult DBMS::showTables() {
 DescribeTableResult DBMS::describeTable(const std::string &tableName) {
     checkUseDatabase();
 
-    Table *table = getTable(tableName);
+    auto [recordId, table] = getTable(tableName);
 
     if (table == nullptr) {
         throw Error::TableNotExistsError(tableName);
@@ -288,7 +290,7 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
                                   const std::string &primaryKey, bool drop) {
     checkUseDatabase();
 
-    Table *table = getTable(tableName);
+    auto [recordId, table] = getTable(tableName);
 
     if (table == nullptr) {
         throw Error::TableNotExistsError(tableName);
@@ -301,17 +303,103 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
             table->setPrimaryKey(primaryKey);
         }
     } catch (Internal::TableErrorBase &e) {
-        throw Error::AlterTableError(e.what());
+        throw Error::AlterPrimaryKeyError(e.what());
     }
 
     // Update the system table.
-    RecordID id = findTable(currentDatabase, tableName).first;
     systemTablesTable.update(
-        id,
+        recordId,
         {drop ? Column::nullIntColumn() : Column(table->meta.primaryKeyIndex)},
         0b100);
 
     return makePlainResult("OK");
+}
+
+PlainResult DBMS::createIndex(const std::string &tableName,
+                              const std::string &columnName) {
+    checkUseDatabase();
+    auto [id, record] = findIndex(currentDatabase, tableName, columnName);
+
+    if (id != RecordID::NULL_RECORD) {
+        throw Error::AlterIndexError("index exists for " + columnName);
+    }
+
+    auto [recordId, table] = getTable(tableName);
+    int columnIndex = table->getColumnIndex(columnName.c_str());
+
+    if (columnIndex < 0) {
+        throw Error::AlterIndexError("column not exists: " + columnName);
+    }
+
+    const ColumnMeta &columnMeta = table->meta.columns[columnIndex];
+
+    if (columnMeta.type == VARCHAR) {
+        throw Error::AlterIndexError(
+            "creating index on VARCHAR is not supported");
+    }
+
+    // Now create the index. We are not caching this as it is relatively
+    // lightweight.
+    Index newIndex;
+    auto path = getIndexPath(currentDatabase, tableName, columnName);
+    std::filesystem::create_directories(path.parent_path());
+    newIndex.create(path, columnMeta);
+
+    // Inser existing records into the index.
+    try {
+        table->iterate([&](RecordID id, Columns &columns) {
+            newIndex.insert(columns[columnIndex].data.stringValue, id);
+            return true;
+        });
+    } catch (IndexKeyExistsError &e) {
+        // Remove current index file.
+        std::filesystem::remove(path);
+        throw Error::AlterIndexError(e.what());
+    }
+
+    newIndex.close();
+
+    // Finally, insert the index into the system table.
+    systemIndexesTable.insert(
+        {Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN),
+         Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
+         Column(columnName.c_str(), MAX_COLUMN_NAME_LEN)});
+
+    return makePlainResult("OK");
+}
+
+PlainResult DBMS::dropIndex(const std::string &tableName,
+                            const std::string &columnName) {
+    checkUseDatabase();
+    auto [id, record] = findIndex(currentDatabase, tableName, columnName);
+
+    if (id == RecordID::NULL_RECORD) {
+        throw Error::AlterIndexError("index does not exist: " + columnName);
+    }
+
+    // Remove record from system table.
+    systemIndexesTable.remove(id);
+
+    // Remove file.
+    auto path = getIndexPath(currentDatabase, tableName, columnName);
+    std::filesystem::remove(path);
+
+    return makePlainResult("OK");
+}
+
+ShowIndexesResult DBMS::showIndexes(const std::string &tableName) {
+    checkUseDatabase();
+
+    auto result = findIndexes(currentDatabase, tableName);
+
+    ShowIndexesResult showIndexesResult;
+
+    for (const auto &pair : result) {
+        auto *index = showIndexesResult.add_indexes();
+        index->set_column(pair.second[2].data.stringValue);
+    }
+
+    return showIndexesResult;
 }
 
 void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
@@ -340,8 +428,7 @@ std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
         systemDatabaseTableColumns[0].name, dbName.c_str())}};
 
     QueryBuilder builder(&systemDatabaseTable);
-    builder.condition(systemDatabaseTableColumns[0].name, EQ, dbName.c_str())
-        .limit(1);
+    builder.condition("name", EQ, dbName.c_str()).limit(1);
 
     auto result = builder.execute();
 
@@ -352,12 +439,9 @@ std::pair<RecordID, Columns> DBMS::findDatabase(const std::string &dbName) {
     }
 }
 
-QueryBuilder::Result DBMS::findAllTables() {
+QueryBuilder::Result DBMS::findAllTables(const std::string &database) {
     QueryBuilder builder(&systemTablesTable);
-    builder
-        .condition(systemTablesTableColumns[1].name, EQ,
-                   currentDatabase.c_str())
-        .select(systemTablesTableColumns[0].name);
+    builder.condition("database", EQ, database.c_str()).select("name");
 
     return builder.execute();
 }
@@ -366,8 +450,8 @@ std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
                                              const std::string &tableName) {
     QueryBuilder builder(&systemTablesTable);
 
-    builder.condition(systemTablesTableColumns[0].name, EQ, tableName.c_str())
-        .condition(systemTablesTableColumns[1].name, EQ, database.c_str())
+    builder.condition("name", EQ, tableName.c_str())
+        .condition("database", EQ, database.c_str())
         .limit(1);
 
     auto result = builder.execute();
@@ -379,10 +463,39 @@ std::pair<RecordID, Columns> DBMS::findTable(const std::string &database,
     }
 }
 
-Table *DBMS::getTable(const std::string &tableName) {
+std::pair<RecordID, Columns> DBMS::findIndex(const std::string &database,
+                                             const std::string &table,
+                                             const std::string &columnName) {
+    QueryBuilder builder(&systemIndexesTable);
+
+    builder.condition("database", EQ, database.c_str())
+        .condition("table", EQ, table.c_str())
+        .condition("field", EQ, columnName.c_str())
+        .limit(1);
+
+    auto result = builder.execute();
+
+    if (result.size() == 0) {
+        return {RecordID::NULL_RECORD, {}};
+    } else {
+        return result[0];
+    }
+}
+
+QueryBuilder::Result DBMS::findIndexes(const std::string &database,
+                                       const std::string &table) {
+    QueryBuilder builder(&systemIndexesTable);
+
+    builder.condition("database", EQ, database.c_str())
+        .condition("table", EQ, table.c_str());
+
+    return builder.execute();
+}
+
+std::pair<RecordID, Table *> DBMS::getTable(const std::string &tableName) {
     RecordID id = findTable(currentDatabase, tableName).first;
     if (id == RecordID::NULL_RECORD) {
-        return nullptr;
+        return {id, nullptr};
     }
 
     std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
@@ -397,7 +510,7 @@ Table *DBMS::getTable(const std::string &tableName) {
         openedTables[tableName] = table;
     }
 
-    return table;
+    return {id, table};
 }
 
 void DBMS::checkUseDatabase() {
@@ -421,9 +534,16 @@ void DBMS::clearCurrentDatabase() {
 std::filesystem::path DBMS::getSystemTablePath(const std::string &name) {
     return rootPath / "system" / name;
 }
+
 std::filesystem::path DBMS::getUserTablePath(const std::string database,
                                              const std::string &name) {
     return rootPath / database / name;
+}
+
+std::filesystem::path DBMS::getIndexPath(const std::string &database,
+                                         const std::string &table,
+                                         const std::string &column) {
+    return rootPath / "index" / database / table / column;
 }
 
 }  // namespace SimpleDB

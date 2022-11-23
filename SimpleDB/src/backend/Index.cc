@@ -45,14 +45,13 @@ void Index::open(const std::string &file) {
 void Index::create(const std::string &file, ColumnMeta column) {
     try {
         PF::create(file);
-        fd = PF::open(file);
     } catch (Internal::FileExistsError) {
         Logger::log(
             WARNING,
             "Index: creating an empty index to file %s that already exists\n",
             file.c_str());
     } catch (BaseError) {
-        Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
+        Logger::log(ERROR, "Index: fail to create index to %s\n", file.c_str());
         throw Internal::CreateIndexError();
     }
 
@@ -60,6 +59,8 @@ void Index::create(const std::string &file, ColumnMeta column) {
         Logger::log(ERROR, "Index: index on varchar is not supported\n");
         throw Internal::InvalidIndexTypeError();
     }
+
+    fd = PF::open(file);
 
     meta.type = column.type;
     meta.size = column.size;

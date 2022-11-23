@@ -49,6 +49,9 @@ def print_resp(resp):
         print_table(["Field", "Type", "Null", "Key", "Default"],
                     [[x.field, x.type, "YES" if x.nullable else "NO", "PRI" if x.primary_key else "",
                       x.default_value] for x in resp.result.describe_table.columns])
+    elif resp.result.HasField("show_indexes"):
+        print_table(["Column"],
+                    [[x.column] for x in resp.result.show_indexes.indexes])
     else:
         print(resp.result)
 

@@ -47,10 +47,12 @@ public:
         SQLParser::SqlParser::Alter_table_drop_pkContext *ctx) override;
     virtual antlrcpp::Any visitAlter_table_add_pk(
         SQLParser::SqlParser::Alter_table_add_pkContext *ctx) override;
-    // virtual antlrcpp::Any visitAlter_add_index(
-    //     SQLParser::SqlParser::Alter_add_indexContext *ctx) override;
-    // virtual antlrcpp::Any visitAlter_drop_index(
-    //     SQLParser::SqlParser::Alter_drop_indexContext *ctx) override;
+    virtual antlrcpp::Any visitAlter_add_index(
+        SQLParser::SqlParser::Alter_add_indexContext *ctx) override;
+    virtual antlrcpp::Any visitAlter_drop_index(
+        SQLParser::SqlParser::Alter_drop_indexContext *ctx) override;
+    virtual antlrcpp::Any visitShow_indexes(
+        SQLParser::SqlParser::Show_indexesContext *ctx) override;
 
 private:
     DBMS *dbms;
@@ -66,6 +68,7 @@ private:
     DECLARE_WRAPPER(ShowDatabases, show_databases);
     DECLARE_WRAPPER(ShowTable, show_table);
     DECLARE_WRAPPER(DescribeTable, describe_table);
+    DECLARE_WRAPPER(ShowIndexes, show_indexes);
 
 #undef DECLARE_WRAPPER
 };

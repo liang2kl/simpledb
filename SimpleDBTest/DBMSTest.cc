@@ -239,9 +239,9 @@ TEST_F(DBMSTest, TestAddDropPrimaryKey) {
 
     ASSERT_NO_THROW(executeSQL(dropSql));
     ASSERT_NO_THROW(executeSQL(addSql));
-    ASSERT_THROW(executeSQL(addSql), Error::AlterTableError);
+    ASSERT_THROW(executeSQL(addSql), Error::AlterPrimaryKeyError);
     ASSERT_NO_THROW(executeSQL(dropSql));
-    ASSERT_THROW(executeSQL(addSql2), Error::AlterTableError);
+    ASSERT_THROW(executeSQL(addSql2), Error::AlterPrimaryKeyError);
 
     // TODO: Insert rows with duplicate c2.
 }

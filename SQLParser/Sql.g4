@@ -35,9 +35,9 @@ db_statement:
 	'CREATE' 'DATABASE' Identifier	# create_db
 	| 'DROP' 'DATABASE' Identifier	# drop_db
 	| 'SHOW' 'DATABASES'			# show_dbs
-	| 'USE' Identifier				# use_db
-	| 'SHOW' 'TABLES'				# show_tables
-	| 'SHOW' 'INDEXES'				# show_indexes;
+	| 'USE' Identifier						# use_db
+	| 'SHOW' 'TABLES'						# show_tables
+	| 'SHOW' 'INDEXES' 'FROM' Identifier	# show_indexes;
 
 io_statement:
 	'LOAD' 'FROM' 'FILE' String 'TO' 'TABLE' Identifier		# load_data
