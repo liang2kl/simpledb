@@ -98,7 +98,7 @@ DECLARE_ERROR(CreateIndex, IndexErrorBase, "Fail to create index");
 DECLARE_ERROR(InvalidIndexType, IndexErrorBase, "Invalid index column type");
 DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
               "The index is not initialized yet");
-DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "The index is already existed");
+DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "Duplicate index key found");
 DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
 
 // ==== QueryBuilder Error ====
@@ -140,6 +140,7 @@ DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
 DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
 DECLARE_ERROR(AlterPrimaryKey, ExecutionErrorBase, "Fail to alter primary key");
 DECLARE_ERROR(AlterIndex, ExecutionErrorBase, "Fail to alter index");
+DECLARE_ERROR(Insert, ExecutionErrorBase, "Fail to insert record");
 
 }  // namespace Error
 

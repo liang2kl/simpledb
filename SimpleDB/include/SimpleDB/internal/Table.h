@@ -64,7 +64,7 @@ public:
              ColumnBitmap columnBitmap = COLUMN_BITMAP_ALL);
 
     // Insert record, returns (page, slot) of the inserted record.
-    RecordID insert(const Columns &columns,
+    RecordID insert(const Columns &values,
                     ColumnBitmap bitmap = COLUMN_BITMAP_ALL);
 
     // Update record.

@@ -44,10 +44,10 @@ io_statement:
 	| 'DUMP' 'TO' 'FILE' String 'FROM' 'TABLE' Identifier	# dump_data;
 
 table_statement:
-	'CREATE' 'TABLE' Identifier '(' field_list ')'					# create_table
-	| 'DROP' 'TABLE' Identifier										# drop_table
-	| 'DESC' Identifier												# describe_table
-	| 'INSERT' 'INTO' Identifier 'VALUES' value_lists				# insert_into_table
+	'CREATE' 'TABLE' Identifier '(' field_list ')'			# create_table
+	| 'DROP' 'TABLE' Identifier								# drop_table
+	| 'DESC' Identifier										# describe_table
+	| 'INSERT' 'INTO' Identifier 'VALUES' insert_value_list	# insert_into_table
 	| 'DELETE' 'FROM' Identifier 'WHERE' where_and_clause			# delete_from_table
 	| 'UPDATE' Identifier 'SET' set_clause 'WHERE' where_and_clause	# update_table
 	| select_table													# select_table_;
@@ -83,7 +83,11 @@ field:
 
 type_: 'INT' | 'VARCHAR' '(' Integer ')' | 'FLOAT';
 
-value_lists: value_list (',' value_list)*;
+// value_lists: value_list (',' value_list)*;
+
+insert_value: value | 'DEFAULT';
+
+insert_value_list: '(' insert_value (',' insert_value)* ')';
 
 value_list: '(' value (',' value)* ')';
 

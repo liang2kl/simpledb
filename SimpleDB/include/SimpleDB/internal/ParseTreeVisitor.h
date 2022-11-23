@@ -54,6 +54,9 @@ public:
     virtual antlrcpp::Any visitShow_indexes(
         SQLParser::SqlParser::Show_indexesContext *ctx) override;
 
+    virtual antlrcpp::Any visitInsert_into_table(
+        SQLParser::SqlParser::Insert_into_tableContext *ctx) override;
+
 private:
     DBMS *dbms;
 

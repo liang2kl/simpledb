@@ -9,8 +9,10 @@
 
 #include "internal/ParseTreeVisitor.h"
 #include "internal/QueryBuilder.h"
-#include "internal/Service.h"
 #include "internal/Table.h"
+
+// Keep last...
+#include "internal/Service.h"
 
 /** File structures
  *  - /system: System tables
@@ -84,6 +86,10 @@ private:
                                    const std::string &columnName);
     Service::ShowIndexesResult showIndexes(const std::string &tableName);
 
+    // === Data manipulation methods ===
+    Service::PlainResult insert(const std::string &tableName,
+                                const std::vector<Internal::Column> &values,
+                                Internal::ColumnBitmap emptyBits);
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,
                          const std::vector<Internal::ColumnMeta> columns);

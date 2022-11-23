@@ -7,6 +7,7 @@
 
 #include "DBMS.h"
 #include "Error.h"
+#include "internal/Column.h"
 #include "internal/Logger.h"
 #include "internal/ParseHelper.h"
 #include "internal/Table.h"
@@ -247,6 +248,27 @@ antlrcpp::Any ParseTreeVisitor::visitShow_indexes(
 
     ShowIndexesResult result = dbms->showIndexes(tableName);
 
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitInsert_into_table(
+    SQLParser::SqlParser::Insert_into_tableContext *ctx) {
+    const std::string &tableName = ctx->Identifier()->getText();
+    std::vector<Column> columns;
+    ColumnBitmap emptyBits = 0;
+
+    auto insertValues = ctx->insert_value_list()->insert_value();
+
+    for (int i = 0; i < insertValues.size(); i++) {
+        auto &value = insertValues[i];
+        if (value->value() != nullptr) {
+            columns.push_back(ParseHelper::parseColumnValue(value->value()));
+        } else {
+            emptyBits |= (1L << i);
+        }
+    }
+
+    PlainResult result = dbms->insert(tableName, columns, emptyBits);
     return wrap(result);
 }
 

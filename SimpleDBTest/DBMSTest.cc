@@ -264,3 +264,35 @@ TEST_F(DBMSTest, TestAddDropIndex) {
 TEST_F(DBMSTest, TestAddIndexOnDuplicateColumn) {
     // TODO
 }
+
+TEST_F(DBMSTest, TestInsertRecord) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string createTableSql = "CREATE TABLE t1 (c1 INT NOT NULL);";
+    std::string insertSql = "INSERT INTO t1 VALUES (1);";
+    std::string addIndexSql = "ALTER TABLE t1 ADD INDEX (c1);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql));
+    ASSERT_NO_THROW(executeSQL(insertSql));
+    ASSERT_NO_THROW(executeSQL(addIndexSql));
+    ASSERT_THROW(executeSQL(insertSql), Error::InsertError);
+
+    // Test default value.
+    std::string createTableSql2 =
+        "CREATE TABLE t2 (c1 INT NOT NULL DEFAULT 1);";
+    std::string insertSql2 = "INSERT INTO t2 VALUES (DEFAULT);";
+    std::string addIndexSql2 = "ALTER TABLE t2 ADD INDEX (c1);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql2));
+    ASSERT_NO_THROW(executeSQL(addIndexSql2));
+    ASSERT_NO_THROW(executeSQL(insertSql2));
+    ASSERT_THROW(executeSQL(insertSql2), Error::InsertError);
+
+    // Test null value.
+    std::string createTableSql3 = "CREATE TABLE t3 (c1 INT);";
+    std::string insertSql3 = "INSERT INTO t3 VALUES (NULL);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql3));
+    ASSERT_NO_THROW(executeSQL(insertSql3));
+}

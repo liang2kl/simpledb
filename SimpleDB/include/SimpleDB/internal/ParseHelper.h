@@ -94,26 +94,31 @@ public:
         assert(false);
     }
 
-    static ColumnValue parseColumnValue(
-        SQLParser::SqlParser::ValueContext *ctx) {
-        ColumnValue value;
+    static Column parseColumnValue(SQLParser::SqlParser::ValueContext *ctx) {
+        Column column;
         if (ctx->Integer() != nullptr) {
-            value.intValue = parseInt(ctx->Integer()->getText());
+            column.data.intValue = parseInt(ctx->Integer()->getText());
+            column.type = INT;
         } else if (ctx->Float() != nullptr) {
-            value.floatValue = parseFloat(ctx->Float()->getText());
+            column.data.floatValue = parseFloat(ctx->Float()->getText());
+            column.type = FLOAT;
         } else if (ctx->String() != nullptr) {
             parseString(ctx->String()->getText(), MAX_VARCHAR_LEN,
-                        value.stringValue);
+                        column.data.stringValue);
+            column.type = VARCHAR;
+        } else if (ctx->Null() != nullptr) {
+            column.isNull = true;
+            // The data type is unknown here, must be set outside.
         }
-        return value;
+        return column;
     }
 
-    static CompareValueCondition parseCompareValueCondition(
-        const std::string &columnName, const std::string operator_,
-        SQLParser::SqlParser::ValueContext *ctx) {
-        return CompareValueCondition(columnName, parseCompareOp(operator_),
-                                     parseColumnValue(ctx));
-    }
+    // static CompareValueCondition parseCompareValueCondition(
+    //     const std::string &columnName, const std::string operator_,
+    //     SQLParser::SqlParser::ValueContext *ctx) {
+    //     return CompareValueCondition(columnName, parseCompareOp(operator_),
+    //                                  parseColumnValue(ctx).data);
+    // }
 };
 
 }  // namespace Internal

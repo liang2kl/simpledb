@@ -171,7 +171,7 @@ void Table::create(const std::string &file, const std::string &name,
         // Validate column meta.
         bool sizeValid = columns[i].type == VARCHAR
                              ? columns[i].size <= MAX_VARCHAR_LEN
-                             : columns[i].size == 4;
+                             : true;
 
         if (!sizeValid) {
             Logger::log(
@@ -548,19 +548,14 @@ void Table::serialize(const Columns &srcObjects, char *destData,
             destData += meta.columns[i].size;
             continue;
         }
+
         const Column &column = srcObjects[index];
         if (column.type != meta.columns[i].type) {
             Logger::log(ERROR,
                         "Table: column type mismatch when serializing data of "
                         "column %d: expected %d, actual %d\n",
                         i, meta.columns[i].type, column.type);
-            throw Internal::ColumnSerializationError();
-        } else if (column.size != meta.columns[i].size) {
-            Logger::log(ERROR,
-                        "Table: column size mismatch when serializing data of "
-                        "column %d: expected %d, actual %d\n",
-                        i, meta.columns[i].size, column.size);
-            throw Internal::ColumnSerializationError();
+            throw Internal::ColumnSerializationError("mismatched data type");
         }
 
         if (column.isNull) {
@@ -574,9 +569,9 @@ void Table::serialize(const Columns &srcObjects, char *destData,
             recordMeta->nullBitmap |= (1L << i);
         } else {
             recordMeta->nullBitmap &= ~(1L << i);
-            memcpy(destData, column.data.stringValue, column.size);
+            memcpy(destData, column.data.stringValue, meta.columns[i].size);
             if (column.type == VARCHAR) {
-                destData[column.size] = '\0';
+                destData[meta.columns[i].size] = '\0';
             }
         }
 

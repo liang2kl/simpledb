@@ -1,7 +1,10 @@
 #include <SQLParser/SqlLexer.h>
+#include <SimpleDB/internal/Column.h>
 
 #include <any>
+#include <bitset>
 #include <filesystem>
+#include <memory>
 #include <system_error>
 #include <tuple>
 #include <utility>
@@ -238,8 +241,10 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
         openedTables.erase(it);
     }
 
-    // Remove the table from the system table.
+    // Remove the table and other related stuff from the system tables.
     systemTablesTable.remove(id);
+
+    // TODO: Remove index.
 
     // Remove the table file.
     std::filesystem::remove(getUserTablePath(currentDatabase, tableName));
@@ -400,6 +405,89 @@ ShowIndexesResult DBMS::showIndexes(const std::string &tableName) {
     }
 
     return showIndexesResult;
+}
+
+PlainResult DBMS::insert(const std::string &tableName,
+                         const std::vector<Column> &_columns,
+                         ColumnBitmap emptyBits) {
+    checkUseDatabase();
+
+    // Create a mutable copy.
+    std::vector<Column> columns = _columns;
+
+    auto [_, table] = getTable(tableName);
+
+    if (table == nullptr) {
+        throw Error::TableNotExistsError(tableName);
+    }
+
+    // Check if the number of columns is correct.
+    int numDefault = std::bitset<sizeof(ColumnBitmap)>(emptyBits).count();
+    if (numDefault + columns.size() != table->meta.numColumn) {
+        throw Error::InsertError("number of columns does not match");
+    }
+
+    // Create a mapping from index in source columns to index in table.
+    std::vector<int> columnMapping(table->meta.numColumn, -1);
+    int indexOfSource = 0;
+    for (int i = 0; i < table->meta.numColumn; i++) {
+        if ((emptyBits & (1L << i)) == 0) {
+            columnMapping[i] = indexOfSource;
+            // Also, check null value and set corresponding data type.
+            columns[indexOfSource].type = table->meta.columns[i].type;
+            indexOfSource++;
+        }
+    }
+
+    // Check indexes first.
+    std::map<int, std::shared_ptr<Index>> indexes;
+
+    QueryBuilder::Result result = findIndexes(currentDatabase, tableName);
+
+    for (const auto &pair : result) {
+        auto [_, indexColumns] = pair;
+        const std::string &columnName = indexColumns[2].data.stringValue;
+        int columnIndex = table->getColumnIndex(columnName.c_str());
+
+        auto path = getIndexPath(currentDatabase, tableName, columnName);
+
+        std::shared_ptr<Index> index = std::make_shared<Index>();
+        indexes[columnIndex] = index;
+
+        index->open(path);
+
+        RecordID id;
+        if (columnMapping[columnIndex] == -1) {
+            id = index->find(
+                table->meta.columns[columnIndex].defaultValue.stringValue);
+        } else {
+            id = index->find(
+                columns[columnMapping[columnIndex]].data.stringValue);
+        }
+
+        if (id != RecordID::NULL_RECORD) {
+            throw Error::InsertError(
+                "index for duplicate keys is not supported, on column " +
+                columnName);
+        }
+    }
+
+    RecordID id;
+
+    id = table->insert(columns, ~emptyBits);
+
+    // Insert into indexes.
+    for (const auto &[columnIndex, index] : indexes) {
+        if (columnMapping[columnIndex] == -1) {
+            index->insert(
+                table->meta.columns[columnIndex].defaultValue.stringValue, id);
+        } else {
+            const Column &column = columns[columnMapping[columnIndex]];
+            index->insert(column.data.stringValue, id);
+        }
+    }
+
+    return makePlainResult("OK");
 }
 
 void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
