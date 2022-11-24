@@ -295,4 +295,13 @@ TEST_F(DBMSTest, TestInsertRecord) {
 
     ASSERT_NO_THROW(executeSQL(createTableSql3));
     ASSERT_NO_THROW(executeSQL(insertSql3));
+
+    // Test insert into table with primary key.
+    std::string createTableSql4 =
+        "CREATE TABLE t4 (c1 INT NOT NULL, PRIMARY KEY (c1));";
+    std::string insertSql4 = "INSERT INTO t4 VALUES (1);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql4));
+    ASSERT_NO_THROW(executeSQL(insertSql4));
+    ASSERT_THROW(executeSQL(insertSql4), Error::InsertError);
 }

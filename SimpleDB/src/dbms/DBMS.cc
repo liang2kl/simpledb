@@ -439,6 +439,25 @@ PlainResult DBMS::insert(const std::string &tableName,
         }
     }
 
+    // Check primary key.
+    if (table->meta.primaryKeyIndex >= 0) {
+        int primaryKeyIndex = table->meta.primaryKeyIndex;
+        std::string primaryKeyName = table->meta.columns[primaryKeyIndex].name;
+        const char *key =
+            columnMapping[primaryKeyIndex] == -1
+                ? table->meta.columns[primaryKeyIndex].defaultValue.stringValue
+                : columns[columnMapping[primaryKeyIndex]].data.stringValue;
+        // TODO: Index.
+        QueryBuilder builder(table);
+        builder.condition(primaryKeyName, EQ, key).limit(1);
+
+        auto result = builder.execute();
+
+        if (result.size() != 0) {
+            throw Error::InsertError("primary key already exists");
+        }
+    }
+
     // Check indexes first.
     std::map<int, std::shared_ptr<Index>> indexes;
 
