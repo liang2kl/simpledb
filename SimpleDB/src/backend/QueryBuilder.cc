@@ -14,6 +14,9 @@ namespace Internal {
 QueryBuilder::QueryBuilder(QueryDataSource *source) : dataSource(source) {}
 
 QueryBuilder &QueryBuilder::condition(const CompareValueCondition &condition) {
+    if (dataSource->acceptCondition(condition)) {
+        return *this;
+    }
     ValueConditionFilter filter;
     filter.condition = condition;
     valueConditionFilters.push_back(filter);

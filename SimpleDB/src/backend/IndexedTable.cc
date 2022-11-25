@@ -1,7 +1,5 @@
 #include "internal/IndexedTable.h"
 
-#include <sys/_types/_int64_t.h>
-
 #include <algorithm>
 #include <climits>
 #include <cstdint>
@@ -14,6 +12,8 @@ IndexedTable::IndexedTable(Table *table, GetIndexFunc getIndex)
     : table(table), getIndex(getIndex) {}
 
 void IndexedTable::iterate(IterateCallback callback) {
+    collapseRanges();
+
     if (emptySet) {
         return;
     }
@@ -32,38 +32,30 @@ void IndexedTable::iterate(IterateCallback callback) {
     }
 }
 
-std::vector<CompareValueCondition> IndexedTable::acceptConditions(
-    const std::vector<CompareValueCondition> &conditions) {
-    std::vector<CompareValueCondition> untakenConditions;
+bool IndexedTable::acceptCondition(const CompareValueCondition &condition) {
+    int columnIndex = table->getColumnIndex(condition.columnName.c_str());
+    assert(columnIndex != -1);
+    const ColumnMeta &column = table->meta.columns[columnIndex];
 
-    for (const auto &condition : conditions) {
-        int columnIndex = table->getColumnIndex(condition.columnName.c_str());
-        assert(columnIndex != -1);
-        const ColumnMeta &column = table->meta.columns[columnIndex];
-
-        if (column.type != INT) {
-            untakenConditions.push_back(condition);
-            continue;
-        }
-
-        // Only taking the first (indexed) column from the conditions.
-        if (index != nullptr && columnName != condition.columnName) {
-            untakenConditions.push_back(condition);
-            continue;
-        }
-
-        index = getIndex(table->meta.name, condition.columnName);
-        if (index == nullptr) {
-            untakenConditions.push_back(condition);
-            continue;
-        }
-
-        ranges.push_back(makeRange(condition));
+    if (column.type != INT) {
+        return false;
     }
 
-    collapseRanges();
+    if (index == nullptr) {
+        index = getIndex(table->meta.name, condition.columnName);
+        columnName = condition.columnName;
 
-    return untakenConditions;
+        if (index == nullptr) {
+            return false;
+        }
+    } else if (columnName != condition.columnName) {
+        // Only taking the first (indexed) column from the conditions.
+        return false;
+    }
+
+    ranges.push_back(makeRange(condition));
+
+    return true;
 }
 
 std::vector<ColumnInfo> IndexedTable::getColumnInfo() {
@@ -97,6 +89,7 @@ void IndexedTable::collapseRanges() {
         if (range.first > range.second) {
             assert(range.first == range.second + 2);
             neValues.push_back(range.first - 1);
+            continue;
         }
 
         collapsedRange.first = std::max(collapsedRange.first, range.first);
@@ -107,6 +100,8 @@ void IndexedTable::collapseRanges() {
             return;
         }
     }
+
+    ranges.clear();
 
     std::sort(neValues.begin(), neValues.end());
 

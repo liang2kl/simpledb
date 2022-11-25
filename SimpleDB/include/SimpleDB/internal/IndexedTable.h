@@ -20,8 +20,8 @@ public:
 
     virtual void iterate(IterateCallback callback) override;
     virtual std::vector<ColumnInfo> getColumnInfo() override;
-    virtual std::vector<CompareValueCondition> acceptConditions(
-        const std::vector<CompareValueCondition> &conditions) override;
+    virtual bool acceptCondition(
+        const CompareValueCondition &condition) override;
 
 #if !TESTING
 private:
