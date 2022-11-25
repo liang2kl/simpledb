@@ -308,7 +308,6 @@ TEST_F(DBMSTest, TestInsertRecord) {
     ASSERT_NO_THROW(executeSQL(createTableSql));
     ASSERT_NO_THROW(executeSQL(insertSql));
     ASSERT_NO_THROW(executeSQL(addIndexSql));
-    ASSERT_THROW(executeSQL(insertSql), Error::InsertError);
 
     // Test default value.
     std::string createTableSql2 =
@@ -319,7 +318,6 @@ TEST_F(DBMSTest, TestInsertRecord) {
     ASSERT_NO_THROW(executeSQL(createTableSql2));
     ASSERT_NO_THROW(executeSQL(addIndexSql2));
     ASSERT_NO_THROW(executeSQL(insertSql2));
-    ASSERT_THROW(executeSQL(insertSql2), Error::InsertError);
 
     // Test null value.
     std::string createTableSql3 = "CREATE TABLE t3 (c1 INT);";

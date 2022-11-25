@@ -23,6 +23,9 @@ bool RecordID::operator==(const RecordID &rhs) const {
     return page == rhs.page && slot == rhs.slot;
 }
 bool RecordID::operator!=(const RecordID &rhs) const { return !(*this == rhs); }
+bool RecordID::operator>(const RecordID &rhs) const {
+    return page > rhs.page || (page == rhs.page && slot > rhs.slot);
+}
 
 std::string ColumnMeta::typeDesc() const {
     switch (type) {

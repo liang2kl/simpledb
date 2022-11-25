@@ -62,6 +62,7 @@ struct RecordID {
 
     bool operator==(const RecordID &rhs) const;
     bool operator!=(const RecordID &rhs) const;
+    bool operator>(const RecordID &rhs) const;
     static const RecordID NULL_RECORD;
 };
 

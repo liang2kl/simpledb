@@ -358,9 +358,9 @@ PlainResult DBMS::createIndex(const std::string &tableName,
 
     const ColumnMeta &columnMeta = table->meta.columns[columnIndex];
 
-    if (columnMeta.type == VARCHAR) {
+    if (columnMeta.type != INT) {
         throw Error::AlterIndexError(
-            "creating index on VARCHAR is not supported");
+            "creating index on VARCHAR or FLOAT is not supported");
     }
 
     // Now create the index. We are not caching this as it is relatively
@@ -368,19 +368,13 @@ PlainResult DBMS::createIndex(const std::string &tableName,
     Index newIndex;
     auto path = getIndexPath(currentDatabase, tableName, columnName);
     std::filesystem::create_directories(path.parent_path());
-    newIndex.create(path, columnMeta);
+    newIndex.create(path);
 
     // Inser existing records into the index.
-    try {
-        table->iterate([&](RecordID id, Columns &columns) {
-            newIndex.insert(columns[columnIndex].data.stringValue, id);
-            return true;
-        });
-    } catch (IndexKeyExistsError &e) {
-        // Remove current index file.
-        std::filesystem::remove(path);
-        throw Error::AlterIndexError(e.what());
-    }
+    table->iterate([&](RecordID id, Columns &columns) {
+        newIndex.insert(columns[columnIndex].data.intValue, id);
+        return true;
+    });
 
     newIndex.close();
 
@@ -503,7 +497,9 @@ PlainResult DBMS::insert(const std::string &tableName,
         }
     }
 
-    // Check indexes.
+    RecordID id = table->insert(columns, ~emptyBits);
+
+    // Insert into indexes.
     std::map<int, std::shared_ptr<Index>> indexes;
 
     QueryBuilder::Result result = findIndexes(currentDatabase, tableName);
@@ -515,40 +511,13 @@ PlainResult DBMS::insert(const std::string &tableName,
 
         auto path = getIndexPath(currentDatabase, tableName, columnName);
 
-        std::shared_ptr<Index> index = std::make_shared<Index>();
-        indexes[columnIndex] = index;
+        // TODO: Cache index.
+        Index index;
+        index.open(path);
 
-        index->open(path);
-
-        RecordID id;
-        if (columnMapping[columnIndex] == -1) {
-            id = index->find(
-                table->meta.columns[columnIndex].defaultValue.stringValue);
-        } else {
-            id = index->find(
-                columns[columnMapping[columnIndex]].data.stringValue);
-        }
-
-        if (id != RecordID::NULL_RECORD) {
-            throw Error::InsertError(
-                "index for duplicate keys is not supported, on column " +
-                columnName);
-        }
-    }
-
-    RecordID id;
-
-    id = table->insert(columns, ~emptyBits);
-
-    // Insert into indexes.
-    for (const auto &[columnIndex, index] : indexes) {
-        if (columnMapping[columnIndex] == -1) {
-            index->insert(
-                table->meta.columns[columnIndex].defaultValue.stringValue, id);
-        } else {
-            const Column &column = columns[columnMapping[columnIndex]];
-            index->insert(column.data.stringValue, id);
-        }
+        index.insert(table->meta.columns[columnIndex].defaultValue.intValue,
+                     id);
+        index.close();
     }
 
     return makePlainResult("OK");

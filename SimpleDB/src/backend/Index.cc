@@ -42,7 +42,7 @@ void Index::open(const std::string &file) {
     initialized = true;
 }
 
-void Index::create(const std::string &file, ColumnMeta column) {
+void Index::create(const std::string &file) {
     try {
         PF::create(file);
     } catch (Internal::FileExistsError) {
@@ -55,21 +55,14 @@ void Index::create(const std::string &file, ColumnMeta column) {
         throw Internal::CreateIndexError();
     }
 
-    if (meta.type == VARCHAR) {
-        Logger::log(ERROR, "Index: index on varchar is not supported\n");
-        throw Internal::InvalidIndexTypeError();
-    }
-
     fd = PF::open(file);
 
-    meta.type = column.type;
-    meta.size = column.size;
     meta.numNode = 0;
     meta.numEntry = 0;
     meta.firstFreePage = 1;
 
     // Create root node.
-    NodeIndex index = createNewLeafNode(IndexNode::NULL_NODE);
+    NodeIndex index = createNewLeafNode(NULL_NODE_INDEX);
     meta.rootNode = index;
 
     initialized = true;
@@ -89,38 +82,41 @@ void Index::close() {
     // TODO: More cleanup
 }
 
-void Index::insert(const char *key, RecordID id) {
+void Index::insert(int key, RecordID id) {
     Logger::log(VERBOSE,
-                "Index: inserting index (key: %hhx-%hhx-%hhx-%hhx) at page %d, "
-                "slot %d\n",
-                key[0], key[1], key[2], key[3], id.page, id.slot);
+                "Index: inserting index (key: %d) at page %d, slot %d\n", key,
+                id.page, id.slot);
 
     checkInit();
 
-    auto result = findNode(key);
+    auto result = findEntry({key, id}, /*skipInvalid=*/false);
     NodeIndex nodeIndex = std::get<0>(result);
+    int index = std::get<1>(result);
     bool found = std::get<2>(result);
+
+    PageHandle handle = PF::getHandle(fd, nodeIndex);
+    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+
+    assert(node->shared.isLeaf);
 
     if (found) {
         // The record already exists.
+        if (node->valid(index)) {
+            // The record was deleted, simply mark as valid.
+            node->validBitmap |= (1L << index);
+            goto out;
+        }
         throw Internal::IndexKeyExistsError();
     }
 
-    PageHandle handle = PF::getHandle(fd, nodeIndex);
-    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
-
-    // First insert the record.
-    IndexEntry entry;
-    memcpy(entry.key, key, 4);  // FIXME: Hard code size.
-    entry.record = id;
-
     // Insert the record into the node.
-    insertEntry(node, entry);
+    insertEntry(&node->shared, {key, id});
 
     // Check if the insertion breaks the constraints. If so, split recusively to
     // fix them.
     checkOverflowFrom(nodeIndex);
 
+out:
     // Renew the handle and mark dirty.
     handle = PF::renew(handle);
     PF::markDirty(handle);
@@ -128,49 +124,24 @@ void Index::insert(const char *key, RecordID id) {
     meta.numEntry++;
 }
 
-void Index::remove(const char *key) {
-    Logger::log(VERBOSE, "Index: removing record %hhx-%hhx-%hhx-%hhx\n", key[0],
-                key[1], key[2], key[3]);
+void Index::remove(int key, RecordID rid) {
+    Logger::log(VERBOSE, "Index: removing record %d\n", key);
     checkInit();
 
-    auto [nodeIndex, index, found] = findNode(key);
+    auto [nodeIndex, index, found] =
+        findEntry({key, rid}, /*skipInvalid=*/true);
 
     if (!found) {
         throw Internal::IndexKeyNotExistsError();
     }
 
     PageHandle handle = PF::getHandle(fd, nodeIndex);
-    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
+    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
 
-    // Remove the entry.
-    // First, move the entry to the leaf node.
-    if (!node->isLeaf()) {
-        NodeIndex targetNodeIndex = node->children[index + 1];
-        PageHandle targetHandle = getHandle(targetNodeIndex);
-        IndexNode *targetNode = PF::loadRaw<IndexNode *>(targetHandle);
-        while (!targetNode->isLeaf()) {
-            targetNodeIndex = targetNode->children[0];
-            targetNode = PF::loadRaw<IndexNode *>(getHandle(targetNodeIndex));
-        }
-        // Swap the entries (we don't actually care about the target entry).
-        node->entry[index] = targetNode->entry[0];
-        PF::markDirty(handle);
+    assert(node->shared.isLeaf);
 
-        node = targetNode;
-        nodeIndex = targetNodeIndex;
-        index = 0;
-    }
-
-    assert(node->isLeaf());
-
-    // Remove the entry.
-    for (int i = index; i < node->numEntry - 1; i++) {
-        node->entry[i] = node->entry[i + 1];
-    }
-    node->numEntry--;
-
-    // Solve underflow.
-    checkUnderflowFrom(nodeIndex);
+    // Remove the entry (simply mark invalid here).
+    node->validBitmap &= ~(1L << index);
 
     // Mark dirty.
     PF::markDirty(getHandle(nodeIndex));
@@ -178,58 +149,169 @@ void Index::remove(const char *key) {
     meta.numEntry--;
 }
 
-RecordID Index::find(const char *key) {
-    Logger::log(VERBOSE, "Index: finding record %hhx-%hhx-%hhx-%hhx\n", key[0],
-                key[1], key[2], key[3]);
-    checkInit();
+std::vector<RecordID> Index::findEq(int key) {
+    std::vector<RecordID> ret;
 
-    // TODO: Pin the root node.
+    iterateEq(key, [&](RecordID id) {
+        ret.push_back(id);
+        return true;
+    });
 
-    auto [nodeIndex, index, found] = findNode(key);
-
-    if (!found) {
-        return RecordID::NULL_RECORD;
-    }
-
-    PageHandle handle = PF::getHandle(fd, nodeIndex);
-    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
-    return node->entry[index].record;
+    return ret;
 }
 
-std::tuple<Index::NodeIndex, int, bool> Index::findNode(const char *key) {
+void Index::iterateEq(int key, IterateAllFunc func) {
+    Logger::log(VERBOSE, "Index: finding record equals to %d\n", key);
+    checkInit();
+
+    // Just "find" the null record, which must be the start of the sequenece, if
+    // the key matches the target key.
+    auto [nodeIndex, index, _] =
+        findEntry({key, RecordID::NULL_RECORD}, /*skipInvalid=*/true);
+
+    // Iterate from the start of the sequence.
+    PageHandle handle = PF::getHandle(fd, nodeIndex);
+    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+    NodeIndex startIndex = node->shared.index;
+
+    assert(node->shared.isLeaf);
+
+    for (;;) {
+        for (int i = index; i < node->shared.numEntry; i++) {
+            if (node->valid(i) && node->shared.entry[i].key == key) {
+                func(node->shared.entry[i].record);
+            }
+            if (node->shared.entry[i].key > key) {
+                return;
+            }
+        }
+
+        if (node->next == startIndex) {
+            return;
+        }
+
+        handle = PF::getHandle(fd, node->next);
+        node = PF::loadRaw<LeafNode *>(handle);
+        index = 0;
+    }
+}
+
+std::tuple<Index::NodeIndex, int, bool> Index::findEntry(
+    const IndexEntry &entry, bool skipInvalid) {
     // Start from the root node.
     int currentNode = meta.rootNode;
 
     for (;;) {
         PageHandle handle = PF::getHandle(fd, currentNode);
-        IndexNode *node = PF::loadRaw<IndexNode *>(handle);
-
-        int nextChild = node->numEntry;
-
-        for (int i = 0; i < node->numEntry; i++) {
-            if (node->entry[i].eq(key, meta.type)) {
-                // Found the exact node.
-                return {currentNode, i, true};
+        SharedNode *sharedNode = PF::loadRaw<SharedNode *>(handle);
+        if (sharedNode->isLeaf) {
+            LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+            int candidate = sharedNode->numEntry;
+            for (int i = 0; i < sharedNode->numEntry; i++) {
+                if (sharedNode->entry[i] == entry) {
+                    if (!skipInvalid || node->valid(i)) {
+                        return {currentNode, i, true};
+                    }
+                }
+                if (sharedNode->entry[i] > entry) {
+                    candidate = i;
+                    break;
+                }
             }
-            if (node->entry[i].gt(key, meta.type)) {
-                nextChild = i;
+            return {currentNode, candidate, false};
+        }
+
+        InnerNode *node = (InnerNode *)(sharedNode);
+
+        currentNode = node->children[node->numChildren - 1];
+
+        for (int i = 0; i < sharedNode->numEntry; i++) {
+            if (sharedNode->entry[i] > entry) {
+                currentNode = node->children[i];
                 break;
             }
         }
-
-        if (node->isLeaf()) {
-            // The leaf.
-            return {currentNode, nextChild, false};
-        }
-
-        currentNode = node->children[nextChild];
     }
 
     assert(false);
     return {-1, -1, false};
 }
 
-Index::NodeIndex Index::createNewLeafNode(int parent) {
+// std::tuple<Index::NodeIndex, int, bool> Index::findLeftmostNode(int key) {
+//     // Start from the root node.
+//     int currentNode = meta.rootNode;
+
+//     for (;;) {
+//         PageHandle handle = PF::getHandle(fd, currentNode);
+//         IndexNode *node = PF::loadRaw<IndexNode *>(handle);
+
+//         int nextChild = node->numEntry;
+
+//         for (int i = 0; i < node->numEntry; i++) {
+//             if (node->entry[i].key == key) {
+//                 // Go to the left-most node that has the same key.
+//                 int leftmostNode = currentNode;
+//                 int leftmostIndex = i;
+
+//                 currentNode = node->children[i];
+
+//                 while (!node->isLeaf()) {
+//                     node = PF::loadRaw<IndexNode *>(getHandle(currentNode));
+//                     for (int j = 0; j < node->numEntry; j++) {
+//                         if (node->entry[j].key == key) {
+//                             leftmostNode = currentNode;
+//                             leftmostIndex = j;
+//                             currentNode = node->children[j];
+//                             goto continue_while;
+//                         }
+//                     }
+//                     break;
+//                 continue_while:
+//                     continue;
+//                 }
+//                 return {leftmostNode, leftmostIndex, true};
+//             }
+//             if (node->entry[i].key > key) {
+//                 nextChild = i;
+//                 break;
+//             }
+//         }
+
+//         if (node->isLeaf()) {
+//             // The leaf.
+//             return {currentNode, nextChild, false};
+//         }
+
+//         currentNode = node->children[nextChild];
+//     }
+
+//     assert(false);
+//     return {-1, -1, false};
+// }
+
+Index::NodeIndex Index::createNewLeafNode(NodeIndex parent) {
+    SharedNode *sharedNode = getNewNode(parent);
+    sharedNode->isLeaf = true;
+
+    LeafNode *leafNode = (LeafNode *)(sharedNode);
+    leafNode->validBitmap = ~0;
+    leafNode->next = sharedNode->index;
+    leafNode->previous = sharedNode->index;
+
+    return sharedNode->index;
+}
+
+Index::NodeIndex Index::createNewInnerNode(NodeIndex parent) {
+    SharedNode *sharedNode = getNewNode(parent);
+    InnerNode *node = (InnerNode *)sharedNode;
+
+    node->numChildren = 0;
+    sharedNode->isLeaf = false;
+
+    return sharedNode->index;
+}
+
+Index::SharedNode *Index::getNewNode(NodeIndex parent) {
     meta.numNode++;
 
     // Get and update the free page.
@@ -238,7 +320,8 @@ Index::NodeIndex Index::createNewLeafNode(int parent) {
     EmptyPageMeta *pageMeta = PF::loadRaw<EmptyPageMeta *>(handle);
 
     if (pageMeta->headCanary == EMPTY_INDEX_PAGE_CANARY &&
-        pageMeta->tailCanary == EMPTY_INDEX_PAGE_CANARY) {
+        pageMeta->tailCanary == EMPTY_INDEX_PAGE_CANARY &&
+        pageMeta->nextPage <= meta.numNode) {
         // A valid empty page meta.
         meta.firstFreePage = pageMeta->nextPage;
     } else {
@@ -246,68 +329,88 @@ Index::NodeIndex Index::createNewLeafNode(int parent) {
         meta.firstFreePage++;
     }
 
-    IndexNode *node = PF::loadRaw<IndexNode *>(handle);
-    node->numChildren = 0;
+    SharedNode *node = PF::loadRaw<SharedNode *>(handle);
+
     node->numEntry = 0;
-    node->parent = parent;
     node->index = index;
+    node->parent = parent;
 
     PF::markDirty(handle);
 
-    return index;
+    return node;
 }
 
-int Index::insertEntry(IndexNode *node, const IndexEntry &entry) {
+int Index::insertEntry(SharedNode *sharedNode, const IndexEntry &entry) {
     // Find the insert position.
-    int index = node->numEntry;
-    for (int i = 0; i < node->numEntry; i++) {
-        if (node->entry[i].gt(entry.key, meta.type)) {
+    int index = sharedNode->numEntry;
+    for (int i = 0; i < sharedNode->numEntry; i++) {
+        if (sharedNode->entry[i] > entry) {
             index = i;
             break;
         }
     }
 
     // Shift the entries.
-    for (int i = node->numEntry; i > index; i--) {
-        node->entry[i] = node->entry[i - 1];
+    for (int i = sharedNode->numEntry; i > index; i--) {
+        sharedNode->entry[i] = sharedNode->entry[i - 1];
     }
 
-    node->entry[index] = entry;
-    node->numEntry++;
+    sharedNode->entry[index] = entry;
+    sharedNode->numEntry++;
 
     return index;
 }
 
 void Index::checkOverflowFrom(Index::NodeIndex index) {
     PageHandle nodeHandle = getHandle(index);
-    IndexNode *node = PF::loadRaw<IndexNode *>(nodeHandle);
+    SharedNode *sharedNode = PF::loadRaw<SharedNode *>(nodeHandle);
 
-    if (node->numEntry <= MAX_NUM_ENTRY_PER_NODE) {
+    if (sharedNode->numEntry <= MAX_NUM_ENTRY_PER_NODE) {
         return;
     }
 
-#ifdef _DEBUG
-    if (!node->isLeaf()) {
-        assert(node->numChildren == node->numEntry + 1);
+#if DEBUG
+    if (!sharedNode->isLeaf) {
+        assert(((InnerNode *)sharedNode)->numChildren ==
+               sharedNode->numEntry + 1);
     }
 #endif
 
     // Select a victim entry at the middle.
-    int victimIndex = node->numEntry / 2;
-    IndexEntry victimEntry = node->entry[victimIndex];
+    int victimIndex = sharedNode->numEntry / 2;
+    IndexEntry victimEntry = sharedNode->entry[victimIndex];
     // Split the node.
-    NodeIndex siblingIndex = createNewLeafNode(node->parent);
+    NodeIndex siblingIndex = sharedNode->isLeaf
+                                 ? createNewLeafNode(sharedNode->parent)
+                                 : createNewInnerNode(sharedNode->parent);
     PageHandle siblingHandle = getHandle(siblingIndex);
-    IndexNode *siblingNode = PF::loadRaw<IndexNode *>(siblingHandle);
+    SharedNode *siblingSharedNode = PF::loadRaw<SharedNode *>(siblingHandle);
 
-    // Move the "right" entries to the sibling node.
-    siblingNode->numEntry = node->numEntry - victimIndex - 1;
-    memcpy(siblingNode->entry, &node->entry[victimIndex + 1],
-           sizeof(IndexEntry) * siblingNode->numEntry);
-    node->numEntry = victimIndex;
+    // Move the "right" (+victim) entries to the sibling node.
+    siblingSharedNode->numEntry =
+        sharedNode->numEntry - victimIndex - (sharedNode->isLeaf ? 0 : 1);
+    memcpy(siblingSharedNode->entry,
+           &sharedNode->entry[victimIndex + (sharedNode->isLeaf ? 0 : 1)],
+           sizeof(IndexEntry) * siblingSharedNode->numEntry);
+    sharedNode->numEntry = victimIndex;
+
+    // Set the "next" and "previous" pointer in the leaf node.
+    if (sharedNode->isLeaf) {
+        LeafNode *leafNode = (LeafNode *)sharedNode;
+        LeafNode *siblingLeafNode = (LeafNode *)siblingSharedNode;
+        if (leafNode->previous == sharedNode->index) {
+            leafNode->previous = siblingIndex;
+        }
+        siblingLeafNode->next = leafNode->next;
+        leafNode->next = siblingIndex;
+        siblingLeafNode->previous = sharedNode->index;
+    }
 
     // Move the children.
-    if (!node->isLeaf()) {
+    if (!sharedNode->isLeaf) {
+        InnerNode *siblingNode = (InnerNode *)siblingSharedNode;
+        InnerNode *node = (InnerNode *)sharedNode;
+
         siblingNode->numChildren = node->numChildren - victimIndex - 1;
         memcpy(siblingNode->children, &node->children[victimIndex + 1],
                sizeof(NodeIndex) * siblingNode->numChildren);
@@ -317,33 +420,33 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
         // FIXME: This requires lots of IO.
         for (int i = 0; i < siblingNode->numChildren; i++) {
             PageHandle childHandle = getHandle(siblingNode->children[i]);
-            IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
+            SharedNode *childNode = PF::loadRaw<SharedNode *>(childHandle);
             childNode->parent = siblingIndex;
             PF::markDirty(childHandle);
         }
 
-#ifdef _DEBUG
-        assert(node->numChildren == node->numEntry + 1);
-        assert(siblingNode->numChildren == siblingNode->numEntry + 1);
+#if DEBUG
+        assert(node->numChildren == sharedNode->numEntry + 1);
+        assert(siblingNode->numChildren == siblingSharedNode->numEntry + 1);
 #endif
     }
 
     // Insert the victim entry into the parent node.
 
     // The victim entry is all the root node.
-    if (node->parent == IndexNode::NULL_NODE) {
-        NodeIndex newRootIndex = createNewLeafNode(IndexNode::NULL_NODE);
+    if (sharedNode->parent == NULL_NODE_INDEX) {
+        NodeIndex newRootIndex = createNewInnerNode(NULL_NODE_INDEX);
         PageHandle newRootHandle = getHandle(newRootIndex);
-        IndexNode *newRootNode = PF::loadRaw<IndexNode *>(newRootHandle);
-        newRootNode->numEntry = 1;
+        InnerNode *newRootNode = PF::loadRaw<InnerNode *>(newRootHandle);
+        newRootNode->shared.numEntry = 1;
         newRootNode->numChildren = 2;
-        newRootNode->entry[0] = victimEntry;
+        newRootNode->shared.entry[0] = victimEntry;
         newRootNode->children[0] = index;
         newRootNode->children[1] = siblingIndex;
 
         // Don't forget to update the parent of the children.
-        node->parent = newRootIndex;
-        siblingNode->parent = newRootIndex;
+        sharedNode->parent = newRootIndex;
+        siblingSharedNode->parent = newRootIndex;
 
         // Mark dirty.
         PF::markDirty(siblingHandle);
@@ -357,15 +460,15 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     }
 
     // The parent node exists.
-    PageHandle parentHandle = PF::getHandle(fd, node->parent);
-    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
-    int insertIndex = insertEntry(parentNode, victimEntry);
+    PageHandle parentHandle = PF::getHandle(fd, sharedNode->parent);
+    InnerNode *parentNode = PF::loadRaw<InnerNode *>(parentHandle);
+    int insertIndex = insertEntry(&parentNode->shared, victimEntry);
 
     // Update the children of the parent node.
     for (int i = parentNode->numChildren; i > insertIndex + 1; i--) {
         parentNode->children[i] = parentNode->children[i - 1];
     }
-    parentNode->children[insertIndex + 1] = siblingNode->index;
+    parentNode->children[insertIndex + 1] = siblingSharedNode->index;
     parentNode->numChildren++;
 
     // Mark dirty.
@@ -374,221 +477,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     PF::markDirty(parentHandle);
 
     // Check recursively if the parent node overflows.
-    checkOverflowFrom(node->parent);
-}
-
-void Index::checkUnderflowFrom(NodeIndex index) {
-    PageHandle nodeHandle = getHandle(index);
-    IndexNode *node = PF::loadRaw<IndexNode *>(nodeHandle);
-
-    if (node->numEntry >= MIN_NUM_ENTRY_PER_NODE ||
-        node->parent == IndexNode::NULL_NODE) {
-        return;
-    }
-
-    // Find the index of the node in the parent node.
-    PageHandle parentHandle = getHandle(node->parent);
-    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
-    int indexInParent = -1;
-    for (int i = 0; i < parentNode->numChildren; i++) {
-        if (parentNode->children[i] == index) {
-            indexInParent = i;
-            break;
-        }
-    }
-
-    assert(indexInParent >= 0);
-
-    if (indexInParent > 0) {
-        // Got a left sibling.
-        PageHandle leftSiblingHandle =
-            getHandle(parentNode->children[indexInParent - 1]);
-        IndexNode *leftSiblingNode =
-            PF::loadRaw<IndexNode *>(leftSiblingHandle);
-
-        if (leftSiblingNode->numEntry > MIN_NUM_ENTRY_PER_NODE) {
-            // Transfer an entry from the parent to the node.
-            insertEntry(node, parentNode->entry[indexInParent - 1]);
-            // Transfer an entry from the left sibling to the parent.
-            parentNode->entry[indexInParent - 1] =
-                leftSiblingNode->entry[leftSiblingNode->numEntry - 1];
-            leftSiblingNode->numEntry--;
-
-            // Transfer the rightmost child of the left sibling to the node.
-            if (!leftSiblingNode->isLeaf()) {
-                // First, shift the children of the node.
-                for (int i = node->numChildren; i > 0; i--) {
-                    node->children[i] = node->children[i - 1];
-                }
-                node->children[0] =
-                    leftSiblingNode->children[leftSiblingNode->numChildren - 1];
-                node->numChildren++;
-                leftSiblingNode->numChildren--;
-                // Update the parent of the child.
-                PageHandle childHandle = getHandle(node->children[0]);
-                IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
-                childNode->parent = node->index;
-                PF::markDirty(childHandle);
-            }
-
-            // Mark dirty.
-            PF::markDirty(leftSiblingHandle);
-            PF::markDirty(nodeHandle);
-            PF::markDirty(parentHandle);
-
-            return;
-        }
-    }
-
-    assert(parentHandle.validate());
-    assert(nodeHandle.validate());
-
-    if (indexInParent < parentNode->numChildren - 1) {
-        // Got a right sibling.
-        PageHandle rightSiblingHandle =
-            getHandle(parentNode->children[indexInParent + 1]);
-        IndexNode *rightSiblingNode =
-            PF::loadRaw<IndexNode *>(rightSiblingHandle);
-
-        if (rightSiblingNode->numEntry > MIN_NUM_ENTRY_PER_NODE) {
-            // Transfer an entry from the parent to the node.
-            insertEntry(node, parentNode->entry[indexInParent]);
-            // Transfer an entry from the right sibling to the parent.
-            parentNode->entry[indexInParent] = rightSiblingNode->entry[0];
-            // Shift the entries of the right sibling.
-            for (int i = 0; i < rightSiblingNode->numEntry - 1; i++) {
-                rightSiblingNode->entry[i] = rightSiblingNode->entry[i + 1];
-            }
-            rightSiblingNode->numEntry--;
-
-            // Transfer the leftmost child of the right sibling to the node.
-            if (!rightSiblingNode->isLeaf()) {
-                node->children[node->numChildren] =
-                    rightSiblingNode->children[0];
-                node->numChildren++;
-                // Shift the children of the right sibling.
-                for (int i = 0; i < rightSiblingNode->numChildren - 1; i++) {
-                    rightSiblingNode->children[i] =
-                        rightSiblingNode->children[i + 1];
-                }
-                rightSiblingNode->numChildren--;
-                // Update the parent of the child.
-                PageHandle childHandle =
-                    getHandle(node->children[node->numChildren - 1]);
-                IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
-                childNode->parent = node->index;
-                PF::markDirty(childHandle);
-            }
-
-            // Mark dirty.
-            PF::markDirty(nodeHandle);
-            PF::markDirty(parentHandle);
-            PF::markDirty(rightSiblingHandle);
-
-            return;
-        }
-    }
-
-    assert(parentHandle.validate());
-    assert(nodeHandle.validate());
-
-    if (indexInParent > 0) {
-        // Collapse with the left sibling.
-        collapse(parentNode->children[indexInParent - 1], index,
-                 indexInParent - 1);
-    } else if (indexInParent < parentNode->numChildren - 1) {
-        // Collapse with the right sibling.
-        collapse(index, parentNode->children[indexInParent + 1], indexInParent);
-    } else {
-        // The parent only have one child (thus having no entry). Do some
-        // compression.
-
-        // All the ANCESTORS of this node should be empty.
-        for (;;) {
-            assert(parentNode->numEntry == 0);
-
-            NodeIndex currentIndex = parentNode->index;
-            if (parentNode->parent == IndexNode::NULL_NODE) {
-                release(currentIndex);
-                break;
-            }
-
-            parentHandle = getHandle(parentNode->parent);
-            parentNode = PF::loadRaw<IndexNode *>(parentHandle);
-            release(currentIndex);
-        }
-
-        // Now the parent is the root node, and the child node becomes the new
-        // root.
-        meta.rootNode = index;
-        meta.numNode--;
-        node->parent = IndexNode::NULL_NODE;
-
-        nodeHandle = PF::renew(nodeHandle);
-
-        PF::markDirty(nodeHandle);
-
-        return;
-    }
-
-    assert(parentHandle.validate());
-    assert(nodeHandle.validate());
-
-    checkUnderflowFrom(node->parent);
-}
-
-void Index::collapse(NodeIndex left, NodeIndex right, int parentEntryIndex) {
-    PageHandle leftHandle = getHandle(left);
-    IndexNode *leftNode = PF::loadRaw<IndexNode *>(leftHandle);
-
-    PageHandle rightHandle = getHandle(right);
-    IndexNode *rightNode = PF::loadRaw<IndexNode *>(rightHandle);
-
-    PageHandle parentHandle = getHandle(leftNode->parent);
-    IndexNode *parentNode = PF::loadRaw<IndexNode *>(parentHandle);
-
-    // Remove the entry from the parent.
-    IndexEntry entry = parentNode->entry[parentEntryIndex];
-    for (int i = parentEntryIndex; i < parentNode->numEntry - 1; i++) {
-        parentNode->entry[i] = parentNode->entry[i + 1];
-    }
-    parentNode->numEntry--;
-
-    // Insert it into the left sibling.
-    insertEntry(leftNode, entry);
-
-    // Remove the right node as a child of the parent.
-    for (int i = parentEntryIndex + 1; i < parentNode->numChildren - 1; i++) {
-        parentNode->children[i] = parentNode->children[i + 1];
-    }
-    parentNode->numChildren--;
-
-    // Merge the children of the right node into the left sibling.
-    for (int i = 0; i < rightNode->numChildren; i++) {
-        leftNode->children[leftNode->numChildren + i] = rightNode->children[i];
-        // Update the parent of the child.
-        // FIXME: This requires lots of IO.
-        PageHandle childHandle =
-            getHandle(leftNode->children[leftNode->numChildren + i]);
-        IndexNode *childNode = PF::loadRaw<IndexNode *>(childHandle);
-        childNode->parent = leftNode->index;
-        PF::markDirty(childHandle);
-    }
-    leftNode->numChildren += rightNode->numChildren;
-
-    // Merge the entries of the right node into the left sibling.
-    for (int i = 0; i < rightNode->numEntry; i++) {
-        leftNode->entry[leftNode->numEntry + i] = rightNode->entry[i];
-    }
-    leftNode->numEntry += rightNode->numEntry;
-
-    // Release the page of the deleted node.
-    release(right);
-
-    // Mark dirty.
-    PF::markDirty(leftHandle);
-    PF::markDirty(rightHandle);
-    PF::markDirty(parentHandle);
+    checkOverflowFrom(sharedNode->parent);
 }
 
 void Index::release(NodeIndex index) {
@@ -617,7 +506,7 @@ void Index::checkInit() {
     }
 }
 
-#ifdef _DEBUG
+#if DEBUG
 void Index::dump() {
     std::queue<NodeIndex> q;
     q.push(meta.rootNode);
@@ -627,44 +516,35 @@ void Index::dump() {
         q.pop();
 
         PageHandle handle = getHandle(index);
-        IndexNode *node = PF::loadRaw<IndexNode *>(handle);
+        SharedNode *node = PF::loadRaw<SharedNode *>(handle);
 
         printf("Node %d: ", index);
         for (int i = 0; i < node->numEntry; i++) {
-            printf("%d ", *(int *)(node->entry[i].key));
+            printf("[%d, %d-%d] ", node->entry[i].key,
+                   node->entry[i].record.page, node->entry[i].record.slot);
         }
         printf("( %d : ", node->parent);
 
-        for (int i = 0; i < node->numChildren; i++) {
-            q.push(node->children[i]);
-            printf("%d ", node->children[i]);
+        if (!node->isLeaf) {
+            InnerNode *innerNode = (InnerNode *)node;
+            for (int i = 0; i < innerNode->numChildren; i++) {
+                q.push(innerNode->children[i]);
+                printf("%d ", innerNode->children[i]);
+            }
         }
+
         printf(")\n");
     }
 }
 #endif
 
 // ==== IndexEntry ====
-bool Index::IndexEntry::gt(const char *value, DataType type) const {
-    switch (type) {
-        case INT:
-            return *(int *)key > *(int *)value;
-        case FLOAT:
-            return Internal::_Float(value) > Internal::_Float(value);
-        default:
-            assert(false);
-    }
+bool Index::IndexEntry::operator>(const IndexEntry &rhs) const {
+    return key > rhs.key || (key == rhs.key && record > rhs.record);
 }
 
-bool Index::IndexEntry::eq(const char *value, DataType type) const {
-    switch (type) {
-        case INT:
-            return *(int *)key == *(int *)value;
-        case FLOAT:
-            return Internal::_Float(value) == Internal::_Float(value);
-        default:
-            assert(false);
-    }
+bool Index::IndexEntry::operator==(const IndexEntry &rhs) const {
+    return key == rhs.key && record == rhs.record;
 }
 
 }  // namespace Internal

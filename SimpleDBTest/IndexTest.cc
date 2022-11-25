@@ -29,22 +29,9 @@ protected:
 
     Index index;
 
-    ColumnMeta columnMetas[4] = {
-        {.type = INT, .size = 4, .nullable = false, .name = "int_val"},
-        {.type = FLOAT, .size = 4, .nullable = false, .name = "float_val"},
-        {.type = VARCHAR,
-         .size = 100,
-         .nullable = false,
-         .name = "varchar_val"},
-        // A nullable column.
-        {.type = INT, .size = 4, .nullable = true, .name = "int_val_nullable"},
-    };
-
     const char *indexFile = "tmp/index";
 
-    void initIndex() {
-        ASSERT_NO_THROW(index.create(indexFile, columnMetas[0]));
-    }
+    void initIndex() { ASSERT_NO_THROW(index.create(indexFile)); }
 
     void reloadIndex() {
         index.close();
@@ -54,12 +41,9 @@ protected:
 
 TEST_F(IndexTest, TestUninitializeAccess) {
     int key = 1;
-    EXPECT_THROW(index.insert((const char *)&key, {0, 0}),
-                 Internal::IndexNotInitializedError);
-    EXPECT_THROW(index.remove((const char *)&key),
-                 Internal::IndexNotInitializedError);
-    EXPECT_THROW(index.find((const char *)&key),
-                 Internal::IndexNotInitializedError);
+    EXPECT_THROW(index.insert(key, {0, 0}), Internal::IndexNotInitializedError);
+    EXPECT_THROW(index.remove(key, {0, 0}), Internal::IndexNotInitializedError);
+    EXPECT_THROW(index.findEq(key), Internal::IndexNotInitializedError);
 }
 
 TEST_F(IndexTest, TestCreateNewIndex) {
@@ -68,7 +52,6 @@ TEST_F(IndexTest, TestCreateNewIndex) {
 
     EXPECT_EQ(index.meta.numNode, 1);
     EXPECT_EQ(index.meta.rootNode, 1);
-    EXPECT_EQ(index.meta.size, 4);
 }
 
 TEST_F(IndexTest, TestInitFromInvalidFile) {
@@ -92,18 +75,15 @@ TEST_F(IndexTest, TestInsertGet) {
 
     for (auto key : keys) {
         entries.push_back({key, {rand(), rand()}});
+        entries.push_back({key, {rand(), rand()}});
     }
 
     std::shuffle(entries.begin(), entries.end(), std::mt19937(0));
 
     for (int i = 0; i < entries.size(); i++) {
         auto [key, rid] = entries[i];
-        ASSERT_NO_THROW(index.insert((const char *)&key, rid));
+        ASSERT_NO_THROW(index.insert(key, rid));
         EXPECT_EQ(index.meta.numEntry, i + 1);
-
-        // Test duplidate keys.
-        ASSERT_THROW(index.insert((const char *)&key, rid),
-                     Internal::IndexKeyExistsError);
     }
 
     reloadIndex();
@@ -113,9 +93,10 @@ TEST_F(IndexTest, TestInsertGet) {
 
     for (auto entry : entries) {
         int key = entry.first;
-        RecordID rid;
-        ASSERT_NO_THROW(rid = index.find((const char *)&key));
-        EXPECT_EQ(rid, entry.second);
+        std::vector<RecordID> rids;
+        ASSERT_NO_THROW(rids = index.findEq(key));
+        ASSERT_EQ(rids.size(), 2);
+        EXPECT_TRUE(rids[0] == entry.second || rids[1] == entry.second);
     }
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);
@@ -143,7 +124,7 @@ TEST_F(IndexTest, TestRemove) {
     for (auto entry : entries) {
         int key = entry.first;
         RecordID rid = entry.second;
-        ASSERT_NO_THROW(index.insert((const char *)&key, rid));
+        ASSERT_NO_THROW(index.insert(key, rid));
     }
 
     // Remove the entries.
@@ -152,12 +133,11 @@ TEST_F(IndexTest, TestRemove) {
     for (int i = 0; i < entries.size(); i++) {
         auto [key, rid] = entries[i];
 
-        ASSERT_NO_THROW(index.remove((const char *)&key));
+        ASSERT_NO_THROW(index.remove(key, rid));
         EXPECT_EQ(index.meta.numEntry, entries.size() - i - 1);
 
         // Test remove non-exist key.
-        ASSERT_THROW(index.remove((const char *)&key),
-                     Internal::IndexKeyNotExistsError);
+        ASSERT_THROW(index.remove(key, rid), Internal::IndexKeyNotExistsError);
     }
 
     FileCoordinator::shared.cacheManager->discardAll(index.fd);
