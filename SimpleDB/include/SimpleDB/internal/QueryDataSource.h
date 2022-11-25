@@ -15,6 +15,10 @@ public:
     virtual ~QueryDataSource() = default;
     virtual void iterate(IterateCallback callback) = 0;
     virtual std::vector<ColumnInfo> getColumnInfo() = 0;
+    virtual std::vector<struct CompareValueCondition> acceptConditions(
+        const std::vector<struct CompareValueCondition> &conditions) {
+            return conditions;
+        }
 };
 
 }  // namespace Internal

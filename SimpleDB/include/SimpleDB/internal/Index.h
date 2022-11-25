@@ -28,7 +28,11 @@ public:
 
     void insert(int key, RecordID id);
     void remove(int key, RecordID rid);
+
+    using Range = std::pair<int, int>;  // [first, second]
+
     void iterateEq(int key, IterateAllFunc func);
+    void iterateRange(Range, IterateAllFunc func);
     std::vector<RecordID> findEq(int key);
 
 #ifndef TESTING

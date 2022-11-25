@@ -363,6 +363,12 @@ PlainResult DBMS::createIndex(const std::string &tableName,
             "creating index on VARCHAR or FLOAT is not supported");
     }
 
+    if (columnMeta.nullable) {
+        throw Error::AlterIndexError(
+            "creating index on nullable column is not "
+            "supported");
+    }
+
     // Now create the index. We are not caching this as it is relatively
     // lightweight.
     Index newIndex;

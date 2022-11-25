@@ -237,58 +237,6 @@ std::tuple<Index::NodeIndex, int, bool> Index::findEntry(
     return {-1, -1, false};
 }
 
-// std::tuple<Index::NodeIndex, int, bool> Index::findLeftmostNode(int key) {
-//     // Start from the root node.
-//     int currentNode = meta.rootNode;
-
-//     for (;;) {
-//         PageHandle handle = PF::getHandle(fd, currentNode);
-//         IndexNode *node = PF::loadRaw<IndexNode *>(handle);
-
-//         int nextChild = node->numEntry;
-
-//         for (int i = 0; i < node->numEntry; i++) {
-//             if (node->entry[i].key == key) {
-//                 // Go to the left-most node that has the same key.
-//                 int leftmostNode = currentNode;
-//                 int leftmostIndex = i;
-
-//                 currentNode = node->children[i];
-
-//                 while (!node->isLeaf()) {
-//                     node = PF::loadRaw<IndexNode *>(getHandle(currentNode));
-//                     for (int j = 0; j < node->numEntry; j++) {
-//                         if (node->entry[j].key == key) {
-//                             leftmostNode = currentNode;
-//                             leftmostIndex = j;
-//                             currentNode = node->children[j];
-//                             goto continue_while;
-//                         }
-//                     }
-//                     break;
-//                 continue_while:
-//                     continue;
-//                 }
-//                 return {leftmostNode, leftmostIndex, true};
-//             }
-//             if (node->entry[i].key > key) {
-//                 nextChild = i;
-//                 break;
-//             }
-//         }
-
-//         if (node->isLeaf()) {
-//             // The leaf.
-//             return {currentNode, nextChild, false};
-//         }
-
-//         currentNode = node->children[nextChild];
-//     }
-
-//     assert(false);
-//     return {-1, -1, false};
-// }
-
 Index::NodeIndex Index::createNewLeafNode(NodeIndex parent) {
     SharedNode *sharedNode = getNewNode(parent);
     sharedNode->isLeaf = true;

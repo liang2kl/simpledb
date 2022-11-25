@@ -43,6 +43,7 @@ struct ColumnMeta {
 class Table : public QueryDataSource {
     friend class QueryBuilder;
     friend class ::SimpleDB::DBMS;
+    friend class IndexedTable;
 
 public:
     // The metadata is not initialized in this constructor.
