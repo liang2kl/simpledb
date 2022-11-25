@@ -114,5 +114,7 @@ message ShowIndexesResult {
 }
 
 message IndexDescription {
-  string column = 1;
+  string table = 1;
+  string column = 2;
+  bool is_pk = 3;
 }

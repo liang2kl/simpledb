@@ -22,7 +22,6 @@ std::vector<Internal::ColumnMeta> DBMS::systemTablesTableColumns = {
      .name = "database",
      .hasDefault = false},
     {.type = INT,
-     .size = 4,
      .nullable = true,
      .name = "primary_key",
      .hasDefault = false}};
@@ -42,6 +41,9 @@ std::vector<Internal::ColumnMeta> DBMS::systemIndexesTableColumns = {
      .size = MAX_COLUMN_NAME_LEN,
      .nullable = false,
      .name = "field",
-     .hasDefault = false}};
+     .hasDefault = false},
+    /* type 0: primary key index; type 1: ordinary index; type 2: migrated from
+       ordinary index to primary key index */
+    {.type = INT, .nullable = false, .name = "type", .hasDefault = false}};
 
 }  // namespace SimpleDB

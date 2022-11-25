@@ -190,6 +190,7 @@ void Table::create(const std::string &file, const std::string &name,
         }
 
         meta.columns[i] = columns[i];
+        meta.columns[i].size = columns[i].type == VARCHAR ? columns[i].size : 4;
         columnNameMap[columns[i].name] = i;
 
         totalSize += columns[i].size;
@@ -523,9 +524,6 @@ void Table::deserialize(const char *srcData, Columns &destObjects,
     };
 
     destObjects.resize(index);
-#if DEBUG
-    assert(destObjects.size() == index);
-#endif
 }
 
 void Table::serialize(const Columns &srcObjects, char *destData,
@@ -577,6 +575,13 @@ void Table::serialize(const Columns &srcObjects, char *destData,
 
         destData += meta.columns[i].size;
         index++;
+    }
+
+    if (index != srcObjects.size()) {
+        Logger::log(WARNING,
+                    "Table: column bitmap does not match the number of "
+                    "columns: expected %d, actual %ld\n",
+                    index, srcObjects.size());
     }
 }
 

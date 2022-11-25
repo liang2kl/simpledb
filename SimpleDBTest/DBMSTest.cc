@@ -242,8 +242,6 @@ TEST_F(DBMSTest, TestAddDropPrimaryKey) {
     ASSERT_THROW(executeSQL(addSql), Error::AlterPrimaryKeyError);
     ASSERT_NO_THROW(executeSQL(dropSql));
     ASSERT_THROW(executeSQL(addSql2), Error::AlterPrimaryKeyError);
-
-    // TODO: Insert rows with duplicate c2.
 }
 
 TEST_F(DBMSTest, TestAddDropIndex) {
@@ -259,6 +257,40 @@ TEST_F(DBMSTest, TestAddDropIndex) {
     ASSERT_THROW(executeSQL(addIndexSql), Error::AlterIndexError);
     ASSERT_NO_THROW(executeSQL(dropIndexSql));
     ASSERT_THROW(executeSQL(dropIndexSql), Error::AlterIndexError);
+}
+
+TEST_F(DBMSTest, TestPrimaryKeyIndex) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string sql1 = "CREATE TABLE t1 (c1 INT NOT NULL, PRIMARY KEY (c1));";
+    std::string addIndexSql = "ALTER TABLE t1 ADD INDEX (c1);";
+    std::string dropIndexSql = "ALTER TABLE t1 DROP INDEX (c1);";
+
+    ASSERT_NO_THROW(executeSQL(sql1));
+    auto resultRow = dbms.findIndex(testDbName, "t1", "c1").second;
+    ASSERT_EQ(resultRow[3].data.intValue, 0 /*primary*/);
+    ASSERT_THROW(executeSQL(addIndexSql), Error::AlterIndexError);
+    ASSERT_THROW(executeSQL(dropIndexSql), Error::AlterIndexError);
+
+    std::string sql2 = "CREATE TABLE t2 (c1 INT NOT NULL);";
+    std::string addIndexSql2 = "ALTER TABLE t2 ADD INDEX (c1);";
+    std::string addPkSql2 = "ALTER TABLE t2 ADD CONSTRAINT PRIMARY KEY (c1);";
+    std::string dropIndexSql2 = "ALTER TABLE t2 DROP INDEX (c1);";
+
+    ASSERT_NO_THROW(executeSQL(sql2));
+
+    ASSERT_NO_THROW(executeSQL(addIndexSql2));
+    resultRow = dbms.findIndex(testDbName, "t2", "c1").second;
+    ASSERT_EQ(resultRow[3].data.intValue, 1 /*ordinary*/);
+
+    ASSERT_NO_THROW(executeSQL(addPkSql2));
+    resultRow = dbms.findIndex(testDbName, "t2", "c1").second;
+    ASSERT_EQ(resultRow[3].data.intValue, 2 /*ord -> pri*/);
+
+    ASSERT_NO_THROW(executeSQL(dropIndexSql2));
+    resultRow = dbms.findIndex(testDbName, "t2", "c1").second;
+    ASSERT_EQ(resultRow[3].data.intValue, 0 /*pri*/);
 }
 
 TEST_F(DBMSTest, TestAddIndexOnDuplicateColumn) {

@@ -3,6 +3,7 @@
 
 #include <any>
 #include <bitset>
+#include <cstdio>
 #include <filesystem>
 #include <memory>
 #include <system_error>
@@ -221,6 +222,11 @@ PlainResult DBMS::createTable(const std::string &tableName,
          table->meta.primaryKeyIndex >= 0 ? Column(table->meta.primaryKeyIndex)
                                           : Column::nullIntColumn()});
 
+    // Create index on primary key.
+    if (!primaryKey.empty()) {
+        createIndex(tableName, primaryKey, /*isPrimaryKey=*/true);
+    }
+
     return makePlainResult("OK");
 }
 
@@ -303,9 +309,16 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
 
     try {
         if (drop) {
+            std::string actualPk = primaryKey;
+            if (actualPk.empty() && table->meta.primaryKeyIndex >= 0) {
+                actualPk =
+                    table->meta.columns[table->meta.primaryKeyIndex].name;
+            }
             table->dropPrimaryKey(primaryKey);
+            dropIndex(tableName, actualPk, /*isPrimaryKey=*/true);
         } else {
             table->setPrimaryKey(primaryKey);
+            createIndex(tableName, primaryKey, /*isPrimaryKey=*/true);
         }
     } catch (Internal::TableErrorBase &e) {
         throw Error::AlterPrimaryKeyError(e.what());
@@ -321,11 +334,18 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
 }
 
 PlainResult DBMS::createIndex(const std::string &tableName,
-                              const std::string &columnName) {
+                              const std::string &columnName,
+                              bool isPrimaryKey) {
     checkUseDatabase();
     auto [id, record] = findIndex(currentDatabase, tableName, columnName);
 
     if (id != RecordID::NULL_RECORD) {
+        if (isPrimaryKey) {
+            // Just alter the index type.
+            systemIndexesTable.update(id, {Column(2 /*ordinary -> primary*/)},
+                                      0b1000);
+            return makePlainResult("OK");
+        }
         throw Error::AlterIndexError("index exists for " + columnName);
     }
 
@@ -368,18 +388,41 @@ PlainResult DBMS::createIndex(const std::string &tableName,
     systemIndexesTable.insert(
         {Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN),
          Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
-         Column(columnName.c_str(), MAX_COLUMN_NAME_LEN)});
+         Column(columnName.c_str(), MAX_COLUMN_NAME_LEN),
+         Column(isPrimaryKey ? 0 : 1)});
 
     return makePlainResult("OK");
 }
 
 PlainResult DBMS::dropIndex(const std::string &tableName,
-                            const std::string &columnName) {
+                            const std::string &columnName, bool isPrimaryKey) {
     checkUseDatabase();
     auto [id, record] = findIndex(currentDatabase, tableName, columnName);
 
     if (id == RecordID::NULL_RECORD) {
         throw Error::AlterIndexError("index does not exist: " + columnName);
+    }
+
+    int indexType = record[3].data.intValue;
+
+    if (isPrimaryKey && indexType == 2 /*primary -> ordinary*/) {
+        // Just alter the index type.
+        systemIndexesTable.update(id, {Column(1 /*ordinary*/)}, 0b1000);
+        return makePlainResult("OK");
+    }
+
+    if (!isPrimaryKey) {
+        if (indexType == 0) {
+            // Drop the primary key's index is not allowed.
+            throw Error::AlterIndexError("cannot drop primary key's index");
+        }
+
+        if (indexType == 2) {
+            // Dropping ordinary index from a primary key results only in type
+            // change.
+            systemIndexesTable.update(id, {Column(0 /*primary*/)}, 0b1000);
+            return makePlainResult("OK");
+        }
     }
 
     // Remove record from system table.
@@ -399,9 +442,11 @@ ShowIndexesResult DBMS::showIndexes(const std::string &tableName) {
 
     ShowIndexesResult showIndexesResult;
 
-    for (const auto &pair : result) {
+    for (const auto &[_, row] : result) {
         auto *index = showIndexesResult.add_indexes();
-        index->set_column(pair.second[2].data.stringValue);
+        index->set_column(row[2].data.stringValue);
+        index->set_table(row[1].data.stringValue);
+        index->set_is_pk(row[3].data.intValue == 0);
     }
 
     return showIndexesResult;
@@ -447,7 +492,7 @@ PlainResult DBMS::insert(const std::string &tableName,
             columnMapping[primaryKeyIndex] == -1
                 ? table->meta.columns[primaryKeyIndex].defaultValue.stringValue
                 : columns[columnMapping[primaryKeyIndex]].data.stringValue;
-        // TODO: Index.
+        // TODO: Index-based search.
         QueryBuilder builder(table);
         builder.condition(primaryKeyName, EQ, key).limit(1);
 
@@ -458,7 +503,7 @@ PlainResult DBMS::insert(const std::string &tableName,
         }
     }
 
-    // Check indexes first.
+    // Check indexes.
     std::map<int, std::shared_ptr<Index>> indexes;
 
     QueryBuilder::Result result = findIndexes(currentDatabase, tableName);
