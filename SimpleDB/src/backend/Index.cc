@@ -171,8 +171,8 @@ void Index::iterateRange(Range range, IterateAllFunc func) {
     Logger::log(VERBOSE, "Index: finding record in [%d, %d]\n", lo, hi);
     checkInit();
 
-    // Just "find" the null record, which must be the start of the sequenece, if
-    // the key matches the target key.
+    // Just "find" the {INT_MIN, INT_MIN} record, which must be the start of the
+    // sequenece, if the key matches the target key.
     auto [nodeIndex, index, _] =
         findEntry({lo, {INT_MIN, INT_MIN}}, /*skipInvalid=*/true);
 

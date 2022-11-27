@@ -151,6 +151,9 @@ PlainResult DBMS::dropDatabase(const std::string &dbName) {
 }
 
 PlainResult DBMS::useDatabase(const std::string &dbName) {
+    if (dbName == currentDatabase) {
+        return makePlainResult("Already in database " + dbName);
+    }
     bool found = findDatabase(dbName).first != RecordID::NULL_RECORD;
     if (!found) {
         throw Error::DatabaseNotExistError(dbName);

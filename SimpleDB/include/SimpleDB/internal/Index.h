@@ -81,7 +81,8 @@ private:
             return (validBitmap & (1L << index)) != 0;
         }
 
-        static_assert(sizeof(decltype(validBitmap)) >= MAX_NUM_ENTRY_PER_NODE);
+        static_assert(sizeof(decltype(validBitmap)) * 8 >=
+                      MAX_NUM_ENTRY_PER_NODE);
 
         // TODO: Pointer to the next leaf node
     };

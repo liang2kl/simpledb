@@ -11,7 +11,7 @@ message ExecutionRequest {
 
 message ExecutionBatchResponse {
   repeated ExecutionResponse responses = 1;
-  Stats stats = 2;
+  Stats stats = 4;
 }
 
 message ExecutionResponse {
@@ -19,7 +19,7 @@ message ExecutionResponse {
     ExecutionResult result = 1;
     ExecutionError error = 2;
   }
-  Stats stats = 3;
+  string current_db = 3;
 }
 
 message Stats {

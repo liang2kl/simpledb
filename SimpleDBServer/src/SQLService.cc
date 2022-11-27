@@ -5,9 +5,11 @@
 #include <grpcpp/server_context.h>
 #include <grpcpp/support/status.h>
 
+#include <chrono>
 #include <exception>
 #include <iostream>
 #include <mutex>
+#include <ratio>
 #include <sstream>
 #include <vector>
 
@@ -33,13 +35,25 @@ Status SQLService::ExecuteSQLProgram(ServerContext* context,
     const std::string sql = request->sql();
     std::istringstream stream(sql);
 
+    using std::chrono::duration_cast;
+    using std::chrono::steady_clock;
+
     try {
+        steady_clock::time_point begin = steady_clock::now();
+
         std::vector<ExecutionResult> results = dbms->executeSQL(stream);
+
+        steady_clock::time_point end = steady_clock::now();
+        auto duration =
+            duration_cast<std::chrono::microseconds>(end - begin).count();
+
         for (const auto& result : results) {
-            ExecutionResponse resp;
-            resp.mutable_result()->CopyFrom(result);
-            response->mutable_responses()->Add(std::move(resp));
+            ExecutionResponse* resp = response->add_responses();
+            *resp->mutable_current_db() = dbms->getCurrentDatabase();
+            resp->mutable_result()->CopyFrom(result);
         }
+
+        response->mutable_stats()->set_elapse(duration);
     } catch (SyntaxError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_SYNTAX,
                   e.what());

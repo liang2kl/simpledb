@@ -45,6 +45,7 @@ public:
     // @param stream The input stream to read the SQL statement from.
     // @throw Error::ExecutionErrorBase
     std::vector<Service::ExecutionResult> executeSQL(std::istream &stream);
+    std::string getCurrentDatabase() const { return currentDatabase; }
 #if !TESTING
 private:
 #endif

@@ -6,7 +6,7 @@ from prompt_toolkit.lexers import PygmentsLexer
 import SimpleDBService.query_pb2 as query_pb2
 import grpc
 
-from util import print_html, print_bold, print_table, print
+from util import print_html, print_bold, print_table, print_duration
 from client import SimpleDBClient
 
 lexer = PygmentsLexer(SqlLexer)
@@ -22,6 +22,7 @@ STARTUP_PROMPT = """\
 """
 
 client: SimpleDBClient = None
+current_db = ""
 
 def connect_server(addr: str):
     global client
@@ -62,14 +63,34 @@ def print_resp(resp):
                     [[x.table, x.column, "PRIMARY" if x.is_pk else x.column]
                         for x in resp.result.show_indexes.indexes])
     elif resp.result.HasField("query"):
+        num = len(resp.result.query.rows)
+        print_num = num
+        if num > 100:
+            try:
+                text = prompt(f"Too many rows ({num}), print? [y/N/<num>] (default: N) ")
+            except EOFError:
+                return
+            except KeyboardInterrupt:
+                return
+            try:
+                print_num = int(text)
+                if (print_num <= 0):
+                    return
+                print_num = print_num if print_num < num else num
+                print(f"Showing the first {print_num} rows")
+            except ValueError:
+                if text != "y":
+                    return
         print_table([x.name for x in resp.result.query.columns],
-                    [[value_desc(x) for x in row.values] for row in resp.result.query.rows])
+                    [[value_desc(x) for x in row.values] for row in resp.result.query.rows[:print_num]],
+                    true_num=num)
     else:
         print(resp.result)
 
 def send_request(sql: str):
     try:
-        responses = client.execute(sql).responses
+        batch_resp = client.execute(sql)
+        responses = batch_resp.responses
     except grpc.RpcError as e:
         print(f"RPC Error ({e.code()}):", e.details(), end="\n\n")
         return
@@ -80,12 +101,19 @@ def send_request(sql: str):
         for i, resp in enumerate(responses):
             print_bold(f"Result [{i}]")
             print_resp(resp)
+    
+    print_duration(batch_resp.stats.elapse)
     print("")
+    
+    if len(responses) > 0:
+        global current_db
+        current_db = responses[-1].current_db
 
 def main_loop():
     while True:
         try:
-            text = prompt(">>> ", multiline=True, lexer=lexer)
+            text = prompt(">>> " + (f"({current_db}) " if current_db else ""),
+                          multiline=True, lexer=lexer)
             send_request(text)
         except KeyboardInterrupt:
             continue
