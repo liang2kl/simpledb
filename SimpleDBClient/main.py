@@ -32,6 +32,14 @@ def connect_server(addr: str):
         return False
     return True
 
+def value_desc(value) -> str:
+    if value.HasField("int_value"):
+        return str(value.int_value)
+    elif value.HasField("float_value"):
+        return str(value.float_value)
+    elif value.HasField("varchar_value"):
+        return value.varchar_value
+
 def print_resp(resp):
     if (resp.HasField("error")):
         err_name = query_pb2.ExecutionError.Type.Name(resp.error.type)
@@ -53,6 +61,9 @@ def print_resp(resp):
         print_table(["Table", "Column", "Key Name"],
                     [[x.table, x.column, "PRIMARY" if x.is_pk else x.column]
                         for x in resp.result.show_indexes.indexes])
+    elif resp.result.HasField("query"):
+        print_table([x.name for x in resp.result.query.columns],
+                    [[value_desc(x) for x in row.values] for row in resp.result.query.rows])
     else:
         print(resp.result)
 

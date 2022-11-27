@@ -197,11 +197,15 @@ void CacheManager::markDirty(const PageHandle &handle) {
 void CacheManager::writeBack(PageCache *cache) {
     // As we are dealing with a valid pointer to the cache, we assume that the
     // descriptor is valid.
-    Logger::log(VERBOSE, "CacheManager: write back page %d of file %d\n",
-                cache->meta.page, cache->meta.fd.value);
 
     if (cache->dirty) {
+        Logger::log(VERBOSE,
+                    "CacheManager: write back dirty page %d of file %d\n",
+                    cache->meta.page, cache->meta.fd.value);
         fileManager->writePage(cache->meta.fd, cache->meta.page, cache->buf);
+    } else {
+        Logger::log(VERBOSE, "CacheManager: discarding page %d of file %d\n",
+                    cache->meta.page, cache->meta.fd.value);
     }
 
     // Discard the cache and add it back to the free list.

@@ -57,6 +57,16 @@ public:
     virtual antlrcpp::Any visitInsert_into_table(
         SQLParser::SqlParser::Insert_into_tableContext *ctx) override;
 
+    virtual antlrcpp::Any visitWhere_and_clause(
+        SQLParser::SqlParser::Where_and_clauseContext *ctx) override;
+    virtual antlrcpp::Any visitWhere_operator_expression(
+        SQLParser::SqlParser::Where_operator_expressionContext *ctx) override;
+    virtual antlrcpp::Any visitWhere_null(
+        SQLParser::SqlParser::Where_nullContext *ctx) override;
+
+    virtual antlrcpp::Any visitSelect_table_(
+        SQLParser::SqlParser::Select_table_Context *ctx) override;
+
 private:
     DBMS *dbms;
 
@@ -72,6 +82,7 @@ private:
     DECLARE_WRAPPER(ShowTable, show_table);
     DECLARE_WRAPPER(DescribeTable, describe_table);
     DECLARE_WRAPPER(ShowIndexes, show_indexes);
+    DECLARE_WRAPPER(Query, query);
 
 #undef DECLARE_WRAPPER
 };

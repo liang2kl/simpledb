@@ -71,15 +71,17 @@ private:
 
     struct LeafNode {
         /* Keep first */
-        SharedNode shared = {true};
+        SharedNode shared;
 
-        int16_t validBitmap;
+        int32_t validBitmap;
         NodeIndex next;
         NodeIndex previous;
 
         inline bool valid(int index) {
             return (validBitmap & (1L << index)) != 0;
         }
+
+        static_assert(sizeof(decltype(validBitmap)) >= MAX_NUM_ENTRY_PER_NODE);
 
         // TODO: Pointer to the next leaf node
     };
@@ -88,7 +90,7 @@ private:
         static const int NULL_NODE = -1;
 
         /* Keep first */
-        SharedNode shared = {true};
+        SharedNode shared;
 
         int children[MAX_NUM_CHILD_PER_NODE + 1];
         int numChildren;

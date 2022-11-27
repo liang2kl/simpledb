@@ -1,6 +1,7 @@
 #ifndef _SIMPLEDB_INDEXED_TABLE_H
 #define _SIMPLEDB_INDEXED_TABLE_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -14,8 +15,8 @@ namespace Internal {
 
 class IndexedTable : public QueryDataSource {
 public:
-    using GetIndexFunc = std::function<Index *(const std::string &table,
-                                               const std::string &column)>;
+    using GetIndexFunc = std::function<std::shared_ptr<Index>(
+        const std::string &table, const std::string &column)>;
     IndexedTable(Table *table, GetIndexFunc getIndex);
 
     virtual void iterate(IterateCallback callback) override;
@@ -28,7 +29,7 @@ private:
 #endif
     Table *table;
     GetIndexFunc getIndex;
-    Index *index = nullptr;
+    std::shared_ptr<Index> index;
     std::string columnName;
     std::vector<Index::Range> ranges;
     bool emptySet = false;

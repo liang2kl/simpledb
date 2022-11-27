@@ -1,5 +1,6 @@
 #include "internal/Index.h"
 
+#include <climits>
 #include <queue>
 
 #include "internal/Comparer.h"
@@ -161,13 +162,19 @@ std::vector<RecordID> Index::findEq(int key) {
 }
 
 void Index::iterateEq(int key, IterateAllFunc func) {
-    Logger::log(VERBOSE, "Index: finding record equals to %d\n", key);
+    iterateRange({key, key}, func);
+}
+
+void Index::iterateRange(Range range, IterateAllFunc func) {
+    auto [lo, hi] = range;
+
+    Logger::log(VERBOSE, "Index: finding record in [%d, %d]\n", lo, hi);
     checkInit();
 
     // Just "find" the null record, which must be the start of the sequenece, if
     // the key matches the target key.
     auto [nodeIndex, index, _] =
-        findEntry({key, RecordID::NULL_RECORD}, /*skipInvalid=*/true);
+        findEntry({lo, {INT_MIN, INT_MIN}}, /*skipInvalid=*/true);
 
     // Iterate from the start of the sequence.
     PageHandle handle = PF::getHandle(fd, nodeIndex);
@@ -178,10 +185,11 @@ void Index::iterateEq(int key, IterateAllFunc func) {
 
     for (;;) {
         for (int i = index; i < node->shared.numEntry; i++) {
-            if (node->valid(i) && node->shared.entry[i].key == key) {
+            int key = node->shared.entry[i].key;
+            if (node->valid(i) && key >= lo && key <= hi) {
                 func(node->shared.entry[i].record);
             }
-            if (node->shared.entry[i].key > key) {
+            if (node->shared.entry[i].key > hi) {
                 return;
             }
         }

@@ -5,8 +5,10 @@
 
 #include <filesystem>
 #include <map>
+#include <memory>
 #include <string>
 
+#include "internal/IndexedTable.h"
 #include "internal/ParseTreeVisitor.h"
 #include "internal/QueryBuilder.h"
 #include "internal/Table.h"
@@ -92,13 +94,12 @@ private:
     Service::PlainResult insert(const std::string &tableName,
                                 const std::vector<Internal::Column> &values,
                                 Internal::ColumnBitmap emptyBits);
-    // Service::QueryResult select(
-    //     const std::string &tableName, const std::vector<std::string>
-    //     &columns, const std::vector<Internal::Condition> &conditions, const
-    //     std::vector<Internal::OrderBy> &orderBys, const
-    //     std::vector<Internal::GroupBy> &groupBys, const
-    //     std::vector<Internal::Having> &havings, const
-    //     std::vector<Internal::Limit> &limits);
+    Service::QueryResult select(Internal::QueryBuilder &builder);
+    Internal::QueryBuilder select(
+        const std::string &tableName, const std::vector<std::string> &columns,
+        const std::vector<Internal::CompareValueCondition> &conditions,
+        const std::vector<Internal::CompareNullCondition> &nullConditions,
+        int limit);
 
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,
@@ -129,6 +130,11 @@ private:
                                                const std::string &table);
     std::pair<Internal::RecordID, Internal::Table *> getTable(
         const std::string &tableName);
+    std::pair<Internal::RecordID, std::shared_ptr<Internal::Index>> getIndex(
+        const std::string &database, const std::string &table,
+        const std::string &column);
+    std::shared_ptr<Internal::IndexedTable> newIndexedTable(
+        Internal::Table *table);
 };
 
 };  // namespace SimpleDB

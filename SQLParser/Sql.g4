@@ -14,6 +14,8 @@ Min: 'MIN';
 Sum: 'SUM';
 Null: 'NULL';
 
+WhereNot: 'NOT';
+
 Identifier: [a-zA-Z_] [a-zA-Z_0-9]*;
 Integer: [0-9]+;
 String: '\'' (~'\'')* '\'';
@@ -98,7 +100,7 @@ where_and_clause: where_clause ('AND' where_clause)*;
 where_clause:
 	column operator_ expression				# where_operator_expression
 	| column operator_ '(' select_table ')'	# where_operator_select
-	| column 'IS' ('NOT')? Null				# where_null
+	| column 'IS' (WhereNot)? Null			# where_null
 	| column 'IN' value_list				# where_in_list
 	| column 'IN' '(' select_table ')'		# where_in_select
 	| column 'LIKE' String					# where_like_string;

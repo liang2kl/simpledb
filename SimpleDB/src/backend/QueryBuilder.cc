@@ -11,10 +11,18 @@
 namespace SimpleDB {
 namespace Internal {
 
-QueryBuilder::QueryBuilder(QueryDataSource *source) : dataSource(source) {}
+QueryBuilder::QueryBuilder(QueryDataSource *source)
+    : dataSourceRawPtr(source), isRaw(true) {}
+
+QueryBuilder::QueryBuilder(std::shared_ptr<QueryDataSource> source)
+    : dataSourceSharedPtr(source), isRaw(false) {}
+
+QueryDataSource *QueryBuilder::getDataSource() {
+    return isRaw ? dataSourceRawPtr : dataSourceSharedPtr.get();
+}
 
 QueryBuilder &QueryBuilder::condition(const CompareValueCondition &condition) {
-    if (dataSource->acceptCondition(condition)) {
+    if (getDataSource()->acceptCondition(condition)) {
         return *this;
     }
     ValueConditionFilter filter;
@@ -78,7 +86,7 @@ void QueryBuilder::iterate(IterateCallback callback) {
 
     AggregatedFilter filter = aggregateAllFilters();
 
-    dataSource->iterate([&](RecordID rid, Columns &columns) {
+    getDataSource()->iterate([&](RecordID rid, Columns &columns) {
         auto [accept, continue_] = filter.apply(columns);
         if (accept) {
             return callback(rid, columns) && continue_;
@@ -89,7 +97,7 @@ void QueryBuilder::iterate(IterateCallback callback) {
 
 std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
     checkDataSource();
-    auto columnMetas = dataSource->getColumnInfo();
+    auto columnMetas = getDataSource()->getColumnInfo();
     std::vector<ColumnInfo> result;
 
     // We should "apply" SelectFilter here.
@@ -105,14 +113,14 @@ std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
 }
 
 void QueryBuilder::checkDataSource() {
-    if (dataSource == nullptr) {
+    if (getDataSource() == nullptr) {
         throw NoScanDataSourceError();
     }
 }
 
 AggregatedFilter QueryBuilder::aggregateAllFilters() {
     // Create a virtual table.
-    virtualTable = VirtualTable(dataSource->getColumnInfo());
+    virtualTable = VirtualTable(getDataSource()->getColumnInfo());
 
     AggregatedFilter filter;
     // Condition filters comes before selectors.

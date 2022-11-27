@@ -1,6 +1,7 @@
 #ifndef _SIMPLEDB_QUERY_BUILDER_H
 #define _SIMPLEDB_QUERY_BUILDER_H
 
+#include <memory>
 #include <string>
 #include <vector>
 
@@ -15,6 +16,7 @@ class QueryBuilder : public QueryDataSource {
 public:
     using Result = std::vector<std::pair<RecordID, Columns>>;
     QueryBuilder(QueryDataSource *dataSource);
+    QueryBuilder(std::shared_ptr<QueryDataSource> dataSource);
     QueryBuilder &condition(const CompareValueCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
                             const char *string);
@@ -35,7 +37,10 @@ private:
     SelectFilter selectFilter;
     LimitFilter limitFilter;
 
-    QueryDataSource *dataSource = nullptr;
+    QueryDataSource *dataSourceRawPtr = nullptr;
+    std::shared_ptr<QueryDataSource> dataSourceSharedPtr;
+    bool isRaw;
+    QueryDataSource *getDataSource();
     VirtualTable virtualTable;
 
     void checkDataSource();

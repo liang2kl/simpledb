@@ -272,5 +272,100 @@ antlrcpp::Any ParseTreeVisitor::visitInsert_into_table(
     return wrap(result);
 }
 
+antlrcpp::Any ParseTreeVisitor::visitWhere_and_clause(
+    SqlParser::Where_and_clauseContext *ctx) {
+    std::vector<CompareValueCondition> conditions;
+    std::vector<CompareNullCondition> nullConditions;
+
+    // TODO: Other clauses.
+
+    for (auto &condition : ctx->where_clause()) {
+        if (dynamic_cast<SQLParser::SqlParser::Where_operator_expressionContext
+                             *>(condition)) {
+            auto valueCondition =
+                condition->accept(this).as<CompareValueCondition>();
+            conditions.push_back(valueCondition);
+        } else if (dynamic_cast<SQLParser::SqlParser::Where_nullContext *>(
+                       condition)) {
+            auto nullCondition =
+                condition->accept(this).as<CompareNullCondition>();
+            nullConditions.push_back(nullCondition);
+        } else {
+            assert(false);
+        }
+    }
+
+    return std::make_tuple(conditions, nullConditions);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitWhere_operator_expression(
+    SqlParser::Where_operator_expressionContext *ctx) {
+    CompareValueCondition condition;
+    condition.columnName = ctx->column()->getText();
+
+    // TODO: Implement other comparisions.
+    condition.value =
+        ParseHelper::parseColumnValue(ctx->expression()->value()).data;
+    condition.op = ParseHelper::parseCompareOp(ctx->operator_()->getText());
+
+    return condition;
+}
+
+antlrcpp::Any ParseTreeVisitor::visitWhere_null(
+    SqlParser::Where_nullContext *ctx) {
+    CompareNullCondition condition;
+    condition.columnName = ctx->column()->getText();
+    condition.isNull = ctx->WhereNot() == nullptr;
+
+    return condition;
+}
+
+antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
+    SqlParser::Select_table_Context *ctx) {
+    using ConditionTuple = std::tuple<std::vector<CompareValueCondition>,
+                                      std::vector<CompareNullCondition>>;
+
+    auto selectTable = ctx->select_table();
+    ConditionTuple tuple;
+
+    if (selectTable->where_and_clause() != nullptr) {
+        tuple =
+            selectTable->where_and_clause()->accept(this).as<ConditionTuple>();
+    }
+
+    auto &[valConds, nullConds] = tuple;
+
+    const std::string tableName =
+        selectTable->identifiers()->Identifier(0)->getText();
+
+    // Get columns.
+    std::vector<std::string> columns;
+
+    for (const auto &selector : selectTable->selectors()->selector()) {
+        if (selector->column() != nullptr) {
+            columns.push_back(selector->column()->getText());
+        } else {
+            // TODO: Aggregate functions.
+        }
+    }
+
+    auto integers = selectTable->Integer();
+    int limit = -1;
+
+    if (integers.size() >= 1) {
+        // Limit.
+        limit = ParseHelper::parseInt(integers[0]->getText());
+        limit = limit < 0 ? -1 : limit;
+    }
+    // TODO: Offset
+
+    // TODO: Multiple tables
+    QueryBuilder builder =
+        dbms->select(tableName, columns, valConds, nullConds, limit);
+
+    QueryResult result = dbms->select(builder);
+    return wrap(result);
+}
+
 }  // namespace Internal
 }

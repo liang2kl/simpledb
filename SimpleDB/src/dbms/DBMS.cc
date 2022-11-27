@@ -467,7 +467,10 @@ PlainResult DBMS::insert(const std::string &tableName,
     }
 
     // Check if the number of columns is correct.
-    int numDefault = std::bitset<sizeof(ColumnBitmap)>(emptyBits).count();
+    constexpr int bitwidth = std::numeric_limits<ColumnBitmap>::digits +
+                             std::numeric_limits<ColumnBitmap>::is_signed;
+    int numDefault = std::bitset<bitwidth>(emptyBits).count();
+
     if (numDefault + columns.size() != table->meta.numColumn) {
         throw Error::InsertError("number of columns does not match");
     }
@@ -521,12 +524,95 @@ PlainResult DBMS::insert(const std::string &tableName,
         Index index;
         index.open(path);
 
-        index.insert(table->meta.columns[columnIndex].defaultValue.intValue,
-                     id);
+        int key = columnMapping[columnIndex] == -1
+                      ? table->meta.columns[columnIndex].defaultValue.intValue
+                      : columns[columnMapping[columnIndex]].data.intValue;
+
+        index.insert(key, id);
         index.close();
     }
 
     return makePlainResult("OK");
+}
+
+QueryBuilder DBMS::select(
+    const std::string &tableName, const std::vector<std::string> &columns,
+    const std::vector<Internal::CompareValueCondition> &conditions,
+    const std::vector<Internal::CompareNullCondition> &nullConditions,
+    int limit) {
+    // Find table.
+    Table *table = getTable(tableName).second;
+
+    if (table == nullptr) {
+        throw Error::TableNotExistsError(tableName);
+    }
+
+    std::shared_ptr<IndexedTable> indexedTable = newIndexedTable(table);
+    QueryBuilder builder(indexedTable);
+
+    for (const auto &cond : conditions) {
+        builder.condition(cond);
+    }
+
+    for (const auto &cond : nullConditions) {
+        builder.nullCondition(cond);
+    }
+
+    if (limit >= 0) {
+        builder.limit(limit);
+    }
+
+    for (const auto &col : columns) {
+        builder.select(col);
+    }
+
+    return builder;
+}
+
+QueryResult DBMS::select(Internal::QueryBuilder &builder) {
+    QueryBuilder::Result result = builder.execute();
+    std::vector<ColumnInfo> columns = builder.getColumnInfo();
+
+    QueryResult queryResult;
+
+    // Insert columns.
+    for (const ColumnInfo &info : columns) {
+        auto *column = queryResult.add_columns();
+        column->set_name(info.name);
+        switch (info.type) {
+            case INT:
+                column->set_type(QueryColumn_Type_TYPE_INT);
+                break;
+            case FLOAT:
+                column->set_type(QueryColumn_Type_TYPE_FLOAT);
+                break;
+            case VARCHAR:
+                column->set_type(QueryColumn_Type_TYPE_VARCHAR);
+                break;
+        }
+    }
+
+    // Add rows.
+    for (const auto &pair : result) {
+        auto [_, columns] = pair;
+        auto *row = queryResult.add_rows();
+        for (const auto &column : columns) {
+            QueryValue *val = row->add_values();
+            switch (column.type) {
+                case INT:
+                    val->set_int_value(column.data.intValue);
+                    break;
+                case FLOAT:
+                    val->set_float_value(column.data.floatValue);
+                    break;
+                case VARCHAR:
+                    val->set_varchar_value(column.data.stringValue);
+                    break;
+            }
+        }
+    }
+
+    return queryResult;
 }
 
 void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
@@ -635,6 +721,31 @@ std::pair<RecordID, Table *> DBMS::getTable(const std::string &tableName) {
     }
 
     return {id, table};
+}
+
+std::pair<RecordID, std::shared_ptr<Index>> DBMS::getIndex(
+    const std::string &database, const std::string &table,
+    const std::string &column) {
+    auto [id, columns] = findIndex(currentDatabase, table, column);
+    if (id == RecordID::NULL_RECORD) {
+        return {id, nullptr};
+    }
+    auto path = getIndexPath(currentDatabase, table, column);
+    std::shared_ptr<Index> index = std::make_shared<Index>();
+    index->open(path);
+
+    return {id, index};
+}
+
+std::shared_ptr<IndexedTable> DBMS::newIndexedTable(Table *table) {
+    std::shared_ptr<IndexedTable> indexedTable = std::make_shared<IndexedTable>(
+        table,
+        [this](const std::string &table,
+               const std::string &column) -> std::shared_ptr<Index> {
+            return this->getIndex(currentDatabase, table, column).second;
+        });
+
+    return indexedTable;
 }
 
 void DBMS::checkUseDatabase() {

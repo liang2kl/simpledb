@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <climits>
+#include <memory>
 #include <tuple>
 #include <vector>
 
@@ -18,7 +19,8 @@ protected:
     void SetUp() override {
         std::filesystem::create_directory("tmp");
         table.create("test", "test", schema);
-        index.create("index");
+        index = std::make_shared<Index>();
+        index->create("index");
         srand(0);
     }
     void TearDown() override { std::filesystem::remove_all("tmp"); }
@@ -29,7 +31,7 @@ protected:
     };
 
     Table table;
-    Index index;
+    std::shared_ptr<Index> index;
 
     CompareValueCondition cond(CompareOp op, int i) {
         ColumnValue v;
@@ -58,7 +60,7 @@ TEST_F(IndexedTableTest, TestRangeCollapse) {
         auto &[conditions, expected] = testCase;
         IndexedTable t = IndexedTable(
             &table,
-            [&](const std::string &, const std::string &) { return &index; });
+            [&](const std::string &, const std::string &) { return index; });
         for (const auto &condition : conditions) {
             bool accepted = t.acceptCondition(condition);
             ASSERT_TRUE(accepted);
