@@ -19,15 +19,8 @@ const int MAX_TABLE_NAME_LEN = 64;
 const int MAX_DATABASE_NAME_LEN = MAX_VARCHAR_LEN;
 const int MAX_FOREIGN_KEYS = 12;
 
-// Can be fit into a single page.
-const int RECORD_SLOT_SIZE = 512;
-static_assert(RECORD_SLOT_SIZE <= PAGE_SIZE);
-
-const int NUM_SLOT_PER_PAGE = PAGE_SIZE / RECORD_SLOT_SIZE;
-// Should update when NUM_SLOT_PER_PAGE changes.
-const int SLOT_OCCUPY_MASK = 0b1111111111111110;
-static_assert((SLOT_OCCUPY_MASK & 1) == 0);
-const int16_t SLOT_FULL_MASK = 0xFFFF;
+const int MAX_SLOT_PER_PAGE = 64;
+const int64_t SLOT_FULL_MASK = ~0;
 const int16_t COLUMN_BITMAP_ALL = 0b111111111111;
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;

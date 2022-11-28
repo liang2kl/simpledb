@@ -1,13 +1,16 @@
 #include <SimpleDB/DBMS.h>
 #include <SimpleDB/Error.h>
 #include <SimpleDB/SimpleDB.h>
+#include <SimpleDB/internal/Logger.h>
 #include <SimpleDBService/query.grpc.pb.h>
 #include <gflags/gflags.h>
 #include <grpc/grpc.h>
 #include <grpcpp/server.h>
 #include <grpcpp/server_builder.h>
+#include <stdio.h>
 
 #include <csignal>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
@@ -27,6 +30,7 @@ DEFINE_bool(verbose, false, "Output verbose logs");
 DEFINE_bool(debug, false, "Output debug logs");
 DEFINE_bool(silent, false, "Silence all logs");
 DEFINE_string(addr, "127.0.0.1:9100", "Server bind address");
+DEFINE_string(log, "", "Log file path");
 DEFINE_validator(dir, [](const char *flagName, const std::string &value) {
     if (value.empty()) {
         std::cerr << "ERROR: --" << flagName << " must be specified"
@@ -75,6 +79,16 @@ void initFromCLIFlags(int argc, char *argv[]) {
     }
 
     SimpleDB::Internal::Logger::setLogLevel(logLevel);
+
+    if (!FLAGS_log.empty()) {
+        FILE *file = fopen(FLAGS_log.c_str(), "w");
+        if (file == nullptr) {
+            std::cerr << "ERROR: Failed to open log file: " << FLAGS_log
+                      << std::endl;
+            exit(-1);
+        }
+        SimpleDB::Internal::Logger::setErrorStream(file);
+    }
 
     dbms = new SimpleDB::DBMS(FLAGS_dir);
 }

@@ -199,13 +199,15 @@ void Table::create(const std::string &file, const std::string &name,
         totalSize += columns[i].size;
     }
 
-    if (totalSize > RECORD_SLOT_SIZE - sizeof(RecordMeta)) {
+    if (totalSize > PAGE_SIZE - sizeof(RecordMeta)) {
         Logger::log(ERROR,
                     "Table: total size of columns is %d, which is larger than "
                     "maximum size %d\n",
-                    totalSize, RECORD_SLOT_SIZE - int(sizeof(RecordMeta)));
+                    totalSize, PAGE_SIZE - int(sizeof(RecordMeta)));
         throw Internal::InvalidColumnSizeError();
     }
+
+    meta.recordSize = totalSize;
 
     initialized = true;
 }
@@ -239,7 +241,7 @@ void Table::get(RecordID id, Columns &columns, ColumnBitmap columnBitmap) {
         throw Internal::InvalidSlotError();
     }
 
-    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + id.slot * slotSize();
     deserialize(start, columns, columnBitmap);
 }
 
@@ -262,7 +264,7 @@ RecordID Table::insert(const Columns &columns, ColumnBitmap bitmap) {
     validateColumnBitmap(columns, bitmap, /*isUpdate=*/false);
 
     PageHandle *handle = getHandle(id.page);
-    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + id.slot * slotSize();
 
     serialize(columns, start, bitmap, /*all=*/true);
 
@@ -294,7 +296,7 @@ void Table::update(RecordID id, const Columns &columns, ColumnBitmap bitmap) {
     // Validate the bitmap.
     validateColumnBitmap(columns, bitmap, /*isUpdate=*/true);
 
-    char *start = PF::loadRaw(*handle) + id.slot * RECORD_SLOT_SIZE;
+    char *start = PF::loadRaw(*handle) + id.slot * slotSize();
     serialize(columns, start, bitmap, /*all=*/false);
 
     // Mark dirty.
@@ -321,7 +323,7 @@ void Table::remove(RecordID id) {
     PageMeta *pageMeta = PF::loadRaw<PageMeta *>(*handle);
 
     // Check previous occupation.
-    if (pageMeta->occupied == SLOT_FULL_MASK) {
+    if (isPageFull(pageMeta)) {
         // The page now will have an empty slot. Add it to the free list.
         pageMeta->nextFree = meta.firstFree;
         meta.firstFree = id.page;
@@ -329,10 +331,6 @@ void Table::remove(RecordID id) {
 
     // Mark the slot as unoccupied.
     pageMeta->occupied &= ~(1L << id.slot);
-
-    if ((pageMeta->occupied & SLOT_OCCUPY_MASK) == 0) {
-        // TODO: If the page is empty, we can free it.
-    }
 
     // As we are dealing with the pointer directly, we don't need to flush.
     PF::markDirty(*handle);
@@ -431,7 +429,7 @@ void Table::iterate(IterateCallback callback) {
 
     for (int page = 1; page < meta.numUsedPages; page++) {
         PageHandle *handle = getHandle(page);
-        for (int slot = 1; slot < NUM_SLOT_PER_PAGE; slot++) {
+        for (int slot = 1; slot < numSlotPerPage(); slot++) {
             if (occupied(*handle, slot)) {
                 RecordID rid = {page, slot};
 
@@ -596,13 +594,13 @@ bool Table::occupied(const PageHandle &handle, int slot) {
 void Table::validateSlot(int page, int slot) {
     // The first slot of each page (except 0) is for metadata.
     bool valid = page >= 1 && page < meta.numUsedPages && slot >= 1 &&
-                 slot < NUM_SLOT_PER_PAGE;
+                 slot < numSlotPerPage();
     if (!valid) {
         Logger::log(
             ERROR,
             "Table: page/slot pair (%d, %d) is not valid, must be in range [0, "
             "%d) X [1, %d)\n",
-            page, slot, meta.numUsedPages, NUM_SLOT_PER_PAGE);
+            page, slot, meta.numUsedPages, numSlotPerPage());
         throw Internal::InvalidSlotError();
     }
 }
@@ -668,9 +666,9 @@ RecordID Table::getEmptySlot() {
             throw Internal::InvalidPageMetaError();
         }
 
-        int index = ffs(int(~pageMeta->occupied) & SLOT_OCCUPY_MASK);
+        int index = ffsll(~pageMeta->occupied & SLOT_FULL_MASK);
 
-        if (index == 0) {
+        if (index == 0 || index > numSlotPerPage()) {
             Logger::log(
                 ERROR, "Table: page %d is full but not marked as full\n", page);
             throw Internal::InvalidPageMetaError();
@@ -678,9 +676,9 @@ RecordID Table::getEmptySlot() {
 
         index--;
 
-        pageMeta->occupied |= (1L << index);
+        pageMeta->occupied |= (1LL << index);
 
-        if (pageMeta->occupied == SLOT_FULL_MASK) {
+        if (isPageFull(pageMeta)) {
             // This page is full, modify meta.
             meta.firstFree = pageMeta->nextFree;
         }
@@ -691,6 +689,18 @@ RecordID Table::getEmptySlot() {
 
         return {page, index};
     }
+}
+
+int Table::slotSize() { return sizeof(PageMeta) + meta.recordSize; }
+
+int Table::numSlotPerPage() {
+    int nativeNum = PAGE_SIZE / slotSize();
+    return nativeNum > MAX_SLOT_PER_PAGE ? MAX_SLOT_PER_PAGE : nativeNum;
+}
+
+bool Table::isPageFull(PageMeta *pageMeta) {
+    int index = ffsll(~pageMeta->occupied & SLOT_FULL_MASK);
+    return index == 0 || index > numSlotPerPage();
 }
 
 // ==== Column ====

@@ -90,7 +90,7 @@ TEST_F(TableTest, TestInsertGet) {
 
     // Write a few pages.
     for (int page = 1; page <= 3; page++) {
-        for (int i = 0; i < NUM_SLOT_PER_PAGE - 1; i++) {
+        for (int i = 0; i < table.numSlotPerPage() - 1; i++) {
             RecordID id;
             ASSERT_NO_THROW(id = table.insert(testColumns));
 
@@ -157,7 +157,7 @@ TEST_F(TableTest, TestReleasePage) {
     initTable();
 
     // Write two pages (1, 2).
-    for (int i = 0; i < 2 * (NUM_SLOT_PER_PAGE - 1); i++) {
+    for (int i = 0; i < 2 * (table.numSlotPerPage() - 1); i++) {
         ASSERT_NO_THROW(table.insert(testColumns));
     }
 

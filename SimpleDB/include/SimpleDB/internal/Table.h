@@ -103,6 +103,7 @@ private:
         ForeignKey foreignKeys[MAX_FOREIGN_KEYS];
         uint16_t numUsedPages;
         uint16_t firstFree;
+        int recordSize;
 
         // Keep last.
         uint16_t tailCanary = TABLE_META_CANARY;
@@ -112,10 +113,10 @@ private:
         // Keep first.
         uint16_t headCanary = PAGE_META_CANARY;
 
-        using BitmapType = int16_t;
+        using BitmapType = int64_t;
         BitmapType occupied = 0;
 
-        static_assert(sizeof(BitmapType) * 8 >= NUM_SLOT_PER_PAGE);
+        static_assert(sizeof(BitmapType) * 8 >= MAX_SLOT_PER_PAGE);
         static_assert(sizeof(BitmapType) == sizeof(SLOT_FULL_MASK));
 
         uint16_t nextFree;
@@ -126,7 +127,7 @@ private:
 
     // The metadata should be fit into the first slot.
     static_assert(sizeof(TableMeta) < PAGE_SIZE);
-    static_assert(sizeof(PageMeta) < RECORD_SLOT_SIZE);
+    static_assert(sizeof(PageMeta) < PAGE_SIZE);
 
     struct RecordMeta {
         ColumnBitmap nullBitmap;
@@ -156,6 +157,11 @@ private:
     // Side effect: might create a new page, thus modifying meta,
     // firstFreePagMeta, etc.
     RecordID getEmptySlot();
+
+    int slotSize();
+    int numSlotPerPage();
+
+    bool isPageFull(PageMeta *pageMeta);
 
     void validateSlot(int page, int slot);
     void validateColumnBitmap(const Columns &columns, ColumnBitmap bitmap,

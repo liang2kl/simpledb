@@ -40,6 +40,10 @@ void Index::open(const std::string &file) {
         throw Internal::ReadIndexError();
     }
 
+    Logger::log(VERBOSE,
+                "Index: the index uses %d pages, containing %d records\n",
+                meta.numNode, meta.numEntry);
+
     initialized = true;
 }
 
@@ -161,11 +165,11 @@ std::vector<RecordID> Index::findEq(int key) {
     return ret;
 }
 
-void Index::iterateEq(int key, IterateAllFunc func) {
+void Index::iterateEq(int key, IterateFunc func) {
     iterateRange({key, key}, func);
 }
 
-void Index::iterateRange(Range range, IterateAllFunc func) {
+void Index::iterateRange(Range range, IterateFunc func) {
     auto [lo, hi] = range;
 
     Logger::log(VERBOSE, "Index: finding record in [%d, %d]\n", lo, hi);
@@ -187,7 +191,10 @@ void Index::iterateRange(Range range, IterateAllFunc func) {
         for (int i = index; i < node->shared.numEntry; i++) {
             int key = node->shared.entry[i].key;
             if (node->valid(i) && key >= lo && key <= hi) {
-                func(node->shared.entry[i].record);
+                bool continue_ = func(node->shared.entry[i].record);
+                if (!continue_) {
+                    return;
+                }
             }
             if (node->shared.entry[i].key > hi) {
                 return;

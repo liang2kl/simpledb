@@ -543,6 +543,7 @@ QueryBuilder DBMS::select(
     const std::vector<Internal::CompareValueCondition> &conditions,
     const std::vector<Internal::CompareNullCondition> &nullConditions,
     int limit) {
+    checkUseDatabase();
     // Find table.
     Table *table = getTable(tableName).second;
 

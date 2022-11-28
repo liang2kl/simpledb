@@ -17,7 +17,7 @@ namespace Internal {
 class Index {
 private:
     using NodeIndex = int;
-    using IterateAllFunc = std::function<void(RecordID)>;
+    using IterateFunc = std::function<bool(RecordID)>;
 
 public:
     Index() = default;
@@ -31,8 +31,8 @@ public:
 
     using Range = std::pair<int, int>;  // [first, second]
 
-    void iterateEq(int key, IterateAllFunc func);
-    void iterateRange(Range, IterateAllFunc func);
+    void iterateEq(int key, IterateFunc func);
+    void iterateRange(Range, IterateFunc func);
     std::vector<RecordID> findEq(int key);
 
 #ifndef TESTING

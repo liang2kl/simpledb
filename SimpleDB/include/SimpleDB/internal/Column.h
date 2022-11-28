@@ -43,8 +43,6 @@ struct Column {
     Column() = default;
 };
 
-static_assert(sizeof(Column) <= RECORD_SLOT_SIZE);
-
 using Columns = std::vector<Column>;
 using ColumnBitmap = int16_t;
 
