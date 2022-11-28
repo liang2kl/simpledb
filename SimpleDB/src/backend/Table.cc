@@ -666,7 +666,7 @@ RecordID Table::getEmptySlot() {
             throw Internal::InvalidPageMetaError();
         }
 
-        int index = ffsll(~pageMeta->occupied & SLOT_FULL_MASK);
+        int index = ffsll(~pageMeta->occupied);
 
         if (index == 0 || index > numSlotPerPage()) {
             Logger::log(
@@ -699,7 +699,7 @@ int Table::numSlotPerPage() {
 }
 
 bool Table::isPageFull(PageMeta *pageMeta) {
-    int index = ffsll(~pageMeta->occupied & SLOT_FULL_MASK);
+    int index = ffsll(~pageMeta->occupied);
     return index == 0 || index > numSlotPerPage();
 }
 

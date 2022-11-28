@@ -117,7 +117,6 @@ private:
         BitmapType occupied = 0;
 
         static_assert(sizeof(BitmapType) * 8 >= MAX_SLOT_PER_PAGE);
-        static_assert(sizeof(BitmapType) == sizeof(SLOT_FULL_MASK));
 
         uint16_t nextFree;
 

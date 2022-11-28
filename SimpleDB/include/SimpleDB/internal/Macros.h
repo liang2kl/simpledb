@@ -20,7 +20,6 @@ const int MAX_DATABASE_NAME_LEN = MAX_VARCHAR_LEN;
 const int MAX_FOREIGN_KEYS = 12;
 
 const int MAX_SLOT_PER_PAGE = 64;
-const int64_t SLOT_FULL_MASK = ~0;
 const int16_t COLUMN_BITMAP_ALL = 0b111111111111;
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
