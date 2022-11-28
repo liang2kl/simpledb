@@ -34,7 +34,9 @@ void IndexedTable::iterate(IterateCallback callback) {
 
 bool IndexedTable::acceptCondition(const CompareValueCondition &condition) {
     int columnIndex = table->getColumnIndex(condition.columnName.c_str());
-    assert(columnIndex != -1);
+    if (columnIndex < 0) {
+        return false;
+    }
     const ColumnMeta &column = table->meta.columns[columnIndex];
 
     if (column.type != INT) {

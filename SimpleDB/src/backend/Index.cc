@@ -190,6 +190,9 @@ void Index::iterateRange(Range range, IterateFunc func) {
     for (;;) {
         for (int i = index; i < node->shared.numEntry; i++) {
             int key = node->shared.entry[i].key;
+            if (key < lo) {
+                return;
+            }
             if (node->valid(i) && key >= lo && key <= hi) {
                 bool continue_ = func(node->shared.entry[i].record);
                 if (!continue_) {
