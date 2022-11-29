@@ -8,12 +8,6 @@ http_archive(
     sha256 = "b82dda7e5f9fe2addf972eee106f787b4966d398fcdb06bb0e9942a190e7cfc2"
 )
 
-new_local_repository(
-    name = "usr_local",
-    path = "/usr/local",
-    build_file = "bazel/usr_local.BUILD",
-)
-
 # rules_proto_grpc
 http_archive(
     name = "rules_proto_grpc",
