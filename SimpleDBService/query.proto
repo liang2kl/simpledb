@@ -54,6 +54,7 @@ message ExecutionError {
 
 message PlainResult {
   string msg = 1;
+  int32 affected_rows = 2;
 }
 
 // Query result: result for queries.

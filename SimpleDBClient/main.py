@@ -47,7 +47,11 @@ def print_resp(resp):
         print_bold(f"ERROR", end="")
         print_bold(f"({err_name}):", resp.error.message)
     elif resp.result.HasField("plain"):
-        print(resp.result.plain.msg)
+        print(resp.result.plain.msg, end = "")
+        if resp.result.plain.affected_rows >= 0:
+            print(f", {resp.result.plain.affected_rows} rows affected")
+        else:
+            print("")
     elif resp.result.HasField("show_databases"):
         print_table(["Database"],
                     [[x] for x in resp.result.show_databases.databases])

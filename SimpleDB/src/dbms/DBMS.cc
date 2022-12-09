@@ -535,7 +535,7 @@ PlainResult DBMS::insert(const std::string &tableName,
         index.close();
     }
 
-    return makePlainResult("OK");
+    return makePlainResult("OK", 1);
 }
 
 QueryBuilder DBMS::select(
@@ -634,9 +634,10 @@ void DBMS::initSystemTable(Internal::Table *table, const std::string &name,
     }
 }
 
-PlainResult DBMS::makePlainResult(const std::string &msg) {
+PlainResult DBMS::makePlainResult(const std::string &msg, int affectedRows) {
     PlainResult result;
     result.set_msg(msg);
+    result.set_affected_rows(affectedRows);
     return result;
 }
 

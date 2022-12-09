@@ -117,7 +117,8 @@ private:
                                        const std::string &table,
                                        const std::string &column);
 
-    Service::PlainResult makePlainResult(const std::string &msg);
+    Service::PlainResult makePlainResult(const std::string &msg,
+                                         int affectedRows = -1);
 
     std::pair<Internal::RecordID, Internal::Columns> findDatabase(
         const std::string &dbName);
