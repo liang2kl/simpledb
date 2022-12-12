@@ -58,15 +58,25 @@ struct CompareNullCondition {
     CompareNullCondition() = default;
 };
 
+struct QuerySelector {
+    enum Type { COLUMN, COUNT_STAR, COUNT_COL, AVG, MAX, MIN, SUM };
+    Type type;
+    std::string columnName;
+
+    std::string getColumnName() const;
+};
+
 struct VirtualTable {
     VirtualTable() = default;
     VirtualTable(const std::vector<ColumnInfo> &columns) {
+        this->columns = columns;
         for (int i = 0; i < columns.size(); i++) {
             columnNameMap[columns[i].name] = i;
         }
     }
 
     std::map<std::string, int> columnNameMap;
+    std::vector<ColumnInfo> columns;
 
     int getColumnIndex(const std::string name) {
         auto it = columnNameMap.find(name);
@@ -77,6 +87,7 @@ struct VirtualTable {
 struct BaseFilter {
     virtual ~BaseFilter() {}
     virtual std::pair<bool, bool> apply(Columns &columns) = 0;
+    virtual bool finalize(Columns &columns) { return false; }
 };
 
 struct ValueConditionFilter : public BaseFilter {
@@ -96,10 +107,35 @@ struct NullConditionFilter : public BaseFilter {
 };
 
 struct SelectFilter : public BaseFilter {
+    struct Context {
+        union {
+            int intValue;
+            float floatValue;
+        } value;
+        bool isNull = true;
+        void initializeInt(int value) {
+            if (isNull) {
+                isNull = false;
+                this->value.intValue = value;
+            }
+        }
+        void initializeFloat(float value) {
+            if (isNull) {
+                isNull = false;
+                this->value.floatValue = value;
+            }
+        }
+    };
     SelectFilter() = default;
     ~SelectFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
-    std::set<std::string> columnNames;
+    void build();
+    virtual bool finalize(Columns &columns) override;
+    std::vector<QuerySelector> selectors;
+    std::vector<int> selectIndexes;
+    std::vector<Context> selectContexts;
+    bool isAggregated;
+    int count = 0;
     VirtualTable *table;
 };
 
@@ -122,6 +158,7 @@ struct OffsetFilter : public BaseFilter {
 struct AggregatedFilter : public BaseFilter {
     AggregatedFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
+    virtual bool finalize(Columns &columns) override;
     std::vector<BaseFilter *> filters;
 };
 

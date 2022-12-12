@@ -22,6 +22,7 @@ public:
                             const char *string);
     QueryBuilder &nullCondition(const CompareNullCondition &condition);
     QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
+    QueryBuilder &select(const QuerySelector &selector);
     QueryBuilder &select(const std::string &column);
     QueryBuilder &limit(int count);
     QueryBuilder &offset(int offset);

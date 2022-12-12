@@ -12,7 +12,6 @@
 #include "internal/ParseTreeVisitor.h"
 #include "internal/QueryBuilder.h"
 #include "internal/Table.h"
-
 // Keep last...
 #include "internal/Service.h"
 
@@ -97,7 +96,8 @@ private:
                                 Internal::ColumnBitmap emptyBits);
     Service::QueryResult select(Internal::QueryBuilder &builder);
     Internal::QueryBuilder select(
-        const std::string &tableName, const std::vector<std::string> &columns,
+        const std::string &tableName,
+        const std::vector<Internal::QuerySelector> &selectors,
         const std::vector<Internal::CompareValueCondition> &conditions,
         const std::vector<Internal::CompareNullCondition> &nullConditions,
         int limit, int offset);

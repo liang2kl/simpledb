@@ -339,13 +339,51 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
         selectTable->identifiers()->Identifier(0)->getText();
 
     // Get columns.
-    std::vector<std::string> columns;
+    std::vector<QuerySelector> selectors;
+    bool hasAggregator = false;
+    bool hasNonAggregator = false;
 
     for (const auto &selector : selectTable->selectors()->selector()) {
-        if (selector->column() != nullptr) {
-            columns.push_back(selector->column()->getText());
+        if (selector->column() != nullptr &&
+            selector->aggregator() == nullptr) {
+            if (hasAggregator) {
+                throw Error::SelectError(
+                    "aggregated query cannot have non-aggregated column");
+            }
+            hasNonAggregator = true;
+
+            selectors.push_back(
+                {QuerySelector::COLUMN, selector->column()->getText()});
         } else {
-            // TODO: Aggregate functions.
+            if (hasNonAggregator) {
+                throw Error::SelectError(
+                    "aggregated query cannot have non-aggregated column");
+            }
+            hasAggregator = true;
+
+            if (selector->aggregator() != nullptr) {
+                // COUNT, AVERAGE, MAX, MIN, SUM
+                auto *aggregator = selector->aggregator();
+                std::string columnName = selector->column()->getText();
+                if (aggregator->Count() != nullptr) {
+                    selectors.push_back({QuerySelector::COUNT_COL, columnName});
+                } else if (aggregator->Sum() != nullptr) {
+                    selectors.push_back({QuerySelector::SUM, columnName});
+                } else if (aggregator->Average() != nullptr) {
+                    selectors.push_back({QuerySelector::AVG, columnName});
+                } else if (aggregator->Max() != nullptr) {
+                    selectors.push_back({QuerySelector::MAX, columnName});
+                } else if (aggregator->Min() != nullptr) {
+                    selectors.push_back({QuerySelector::MIN, columnName});
+                } else {
+                    assert(false);
+                }
+            } else if (selector->Count() != nullptr) {
+                // COUNT(*)
+                selectors.push_back({QuerySelector::COUNT_STAR});
+            } else {
+                assert(false);
+            }
         }
     }
 
@@ -369,7 +407,7 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
 
     // TODO: Multiple tables
     QueryBuilder builder =
-        dbms->select(tableName, columns, valConds, nullConds, limit, offset);
+        dbms->select(tableName, selectors, valConds, nullConds, limit, offset);
 
     QueryResult result = dbms->select(builder);
     return wrap(result);

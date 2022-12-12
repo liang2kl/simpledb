@@ -1,5 +1,7 @@
 #include "internal/QueryFilter.h"
 
+#include <cstdint>
+#include <limits>
 #include <regex>
 
 #include "Error.h"
@@ -23,6 +25,15 @@ std::pair<bool, bool> AggregatedFilter::apply(Columns &columns) {
         }
     }
     return {true, !stop};
+}
+bool AggregatedFilter::finalize(Columns &columns) {
+    bool ret = false;
+    for (auto filter : filters) {
+        if (filter->finalize(columns)) {
+            ret = true;
+        }
+    }
+    return ret;
 }
 // ====== End AggregatedFilter ======
 
@@ -56,21 +67,152 @@ std::pair<bool, bool> OffsetFilter::apply(Columns &columns) {
 // ====== End OffsetFilter ======
 
 // ===== Begin SelectFilter =====
+void SelectFilter::build() {
+    for (int i = 0; i < selectors.size(); i++) {
+        const auto &selector = selectors[i];
+        if (selector.type == QuerySelector::COLUMN) {
+            isAggregated = false;
+            auto index = table->getColumnIndex(selector.columnName);
+            if (index < 0) {
+                throw ColumnNotFoundError(selector.columnName);
+            }
+            selectIndexes.push_back(index);
+        } else {
+            // Aggregated column.
+            isAggregated = true;
+            if (selector.type != QuerySelector::COUNT_STAR) {
+                auto index = table->getColumnIndex(selector.columnName);
+                if (index < 0) {
+                    throw ColumnNotFoundError(selector.columnName);
+                }
+                if (table->columns[index].type == VARCHAR) {
+                    throw AggregatorError(
+                        "Cannot aggregate on VARCHAR columns");
+                }
+                selectIndexes.push_back(index);
+            } else {
+                selectIndexes.push_back(-1);
+            }
+        }
+    }
+
+    if (isAggregated) {
+        selectContexts.resize(selectors.size());
+    }
+}
+
 std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
     Columns newColumns;
     // TODO: Optimization.
 
-    for (auto &name : columnNames) {
-        int index = table->getColumnIndex(name);
-        if (index != -1) {
+    if (!isAggregated) {
+        for (int index : selectIndexes) {
             newColumns.push_back(columns[index]);
-        } else {
-            throw ColumnNotFoundError(name);
         }
+    } else {
+        count++;
+        for (size_t i = 0; i < selectors.size(); i++) {
+            auto &selector = selectors[i];
+            auto &context = selectContexts[i];
+            if (selector.type == QuerySelector::COUNT_STAR) {
+                // COUNT(*)
+                context.initializeInt(0);
+                context.value.intValue++;
+            } else {
+                assert(columns.size() == table->columns.size());
+                const auto &columnInfo = table->columns[selectIndexes[i]];
+#define AGGREGATE(_type, _Type)                                         \
+    auto value = columns[selectIndexes[i]].data._type;                  \
+    switch (selector.type) {                                            \
+        case QuerySelector::COUNT_COL:                                  \
+            context.initializeInt(0);                                   \
+            context.value.intValue +=                                   \
+                (columns[selectIndexes[i]].isNull ? 0 : 1);             \
+            break;                                                      \
+        case QuerySelector::MIN:                                        \
+            context.initialize##_Type(value);                           \
+            context.value._type = std::min(context.value._type, value); \
+            break;                                                      \
+        case QuerySelector::MAX:                                        \
+            context.initialize##_Type(value);                           \
+            context.value._type = std::max(context.value._type, value); \
+            break;                                                      \
+        case QuerySelector::SUM:                                        \
+            context.initialize##_Type(0);                               \
+            context.value._type += value;                               \
+            break;                                                      \
+        case QuerySelector::AVG:                                        \
+            context.initializeFloat(0);                                 \
+            context.value.floatValue += value;                          \
+            break;                                                      \
+        default:                                                        \
+            assert(false);                                              \
+    }
+                if (columnInfo.type == INT) {
+                    AGGREGATE(intValue, Int);
+                } else {
+                    AGGREGATE(floatValue, Float);
+                }
+#undef AGGREGATE
+            }
+        }
+        // Not accepting aggregated columns before finalizing.
+        return {false, true};
     }
 
     columns = newColumns;
     return {true, true};
+}
+
+bool SelectFilter::finalize(Columns &columns) {
+    if (!isAggregated) {
+        return false;
+    }
+    columns.resize(selectors.size());
+    for (int i = 0; i < selectors.size(); i++) {
+        const auto &context = selectContexts[i];
+        const auto &selector = selectors[i];
+        columns[i].isNull = context.isNull;
+
+        if (!context.isNull) {
+            DataType dataType = INT;
+            if (selectIndexes[i] != -1) {
+                const auto columnInfo = table->columns[selectIndexes[i]];
+                dataType = columnInfo.type;
+            }
+
+#define CALC_AGGREGATION(_type)                                            \
+    switch (selector.type) {                                               \
+        case QuerySelector::AVG:                                           \
+            columns[i].data.floatValue = context.value.floatValue / count; \
+            break;                                                         \
+        case QuerySelector::MIN:                                           \
+        case QuerySelector::MAX:                                           \
+        case QuerySelector::SUM:                                           \
+            columns[i].data._type = context.value._type;                   \
+            break;                                                         \
+        case QuerySelector::COUNT_COL:                                     \
+        case QuerySelector::COUNT_STAR:                                    \
+            columns[i].data.intValue = context.value.intValue;             \
+            break;                                                         \
+        default:                                                           \
+            assert(false);                                                 \
+    }
+            printf("%d, %f\n", context.value.intValue,
+                   context.value.floatValue);
+
+            if (dataType == INT) {
+                CALC_AGGREGATION(intValue);
+                columns[i].type = INT;
+            } else {
+                CALC_AGGREGATION(floatValue);
+                columns[i].type = FLOAT;
+            }
+#undef CALC_AGGREGATION
+        }
+    }
+
+    return true;
 }
 // ====== End SelectFilter ======
 
@@ -95,9 +237,8 @@ std::pair<bool, bool> NullConditionFilter::apply(Columns &columns) {
 // #ifdef DEBUG
 //     if (op != LIKE) {
 //         Logger::log(ERROR,
-//                     "RecordScanner: internal error: invalid compare op %d "
-//                     "for LIKE comparision\n",
-//                     op);
+//                     "RecordScanner: internal error: invalid compare op %d
+//                     " "for LIKE comparision\n", op);
 //         throw Internal::UnexpedtedOperatorError();
 //     }
 // #endif
@@ -171,6 +312,25 @@ std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
             true};
 }
 // ====== End ValueConditionFilter ======
+
+std::string QuerySelector::getColumnName() const {
+    switch (type) {
+        case COLUMN:
+            return columnName;
+        case COUNT_STAR:
+            return "COUNT(*)";
+        case COUNT_COL:
+            return "COUNT(" + columnName + ")";
+        case SUM:
+            return "SUM(" + columnName + ")";
+        case AVG:
+            return "AVG(" + columnName + ")";
+        case MIN:
+            return "MIN(" + columnName + ")";
+        case MAX:
+            return "MAX(" + columnName + ")";
+    }
+}
 
 }  // namespace Internal
 }  // namespace SimpleDB

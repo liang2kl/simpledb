@@ -49,9 +49,13 @@ QueryBuilder &QueryBuilder::nullCondition(const std::string &columnName,
     return nullCondition(CompareNullCondition(columnName.c_str(), isNull));
 }
 
+QueryBuilder &QueryBuilder::select(const QuerySelector &selector) {
+    selectFilter.selectors.push_back(selector);
+    return *this;
+}
+
 QueryBuilder &QueryBuilder::select(const std::string &column) {
-    // TODO: Pre-check.
-    selectFilter.columnNames.insert(column);
+    selectFilter.selectors.push_back({QuerySelector::COLUMN, column});
     return *this;
 }
 
@@ -89,6 +93,8 @@ QueryBuilder::Result QueryBuilder::execute() {
 void QueryBuilder::iterate(IterateCallback callback) {
     checkDataSource();
 
+    // TODO: Check if is all about COUNT(*)
+
     AggregatedFilter filter = aggregateAllFilters();
 
     getDataSource()->iterate([&](RecordID rid, Columns &columns) {
@@ -98,19 +104,54 @@ void QueryBuilder::iterate(IterateCallback callback) {
         }
         return continue_;
     });
+
+    Columns columns;
+    bool ret = filter.finalize(columns);
+    if (ret) {
+        callback(RecordID::NULL_RECORD, columns);
+    }
 }
 
 std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
     checkDataSource();
     auto columnMetas = getDataSource()->getColumnInfo();
+
     std::vector<ColumnInfo> result;
 
-    // We should "apply" SelectFilter here.
-    for (auto &columnMeta : columnMetas) {
-        if (selectFilter.columnNames.empty() ||
-            selectFilter.columnNames.find(columnMeta.name) !=
-                selectFilter.columnNames.end()) {
-            result.push_back(columnMeta);
+    if (selectFilter.selectors.size() == 0) {
+        return columnMetas;
+    }
+
+    for (const auto &selector : selectFilter.selectors) {
+        int index = -1;
+        for (int i = 0; i < columnMetas.size(); i++) {
+            if (columnMetas[i].name == selector.columnName) {
+                index = i;
+                break;
+            }
+        }
+        if (selector.type == QuerySelector::COUNT_STAR) {
+            result.push_back({selector.getColumnName(), INT});
+        } else {
+            if (index == -1) {
+                throw ColumnNotFoundError(selector.columnName);
+            }
+            if (selector.type == QuerySelector::COLUMN) {
+                result.push_back(columnMetas[index]);
+            } else {
+                DataType type;
+                switch (selector.type) {
+                    case QuerySelector::AVG:
+                        type = FLOAT;
+                        break;
+                    case QuerySelector::COUNT_COL:
+                    case QuerySelector::COUNT_STAR:
+                        type = INT;
+                    default:
+                        type = columnMetas[index].type;
+                }
+                result.push_back({selector.getColumnName(), type});
+            }
         }
     }
 
@@ -137,14 +178,19 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
         valueConditionFilters[i].table = &virtualTable;
         filter.filters.push_back(&valueConditionFilters[i]);
     }
-    // The select filter comes after.
-    if (selectFilter.columnNames.size() > 0) {
+    // The select filters comes after.
+    if (selectFilter.selectors.size() > 0) {
         selectFilter.table = &virtualTable;
+        selectFilter.build();
         filter.filters.push_back(&selectFilter);
     }
-    // Add offset and limit filter at the back.
-    filter.filters.push_back(&offsetFilter);
-    filter.filters.push_back(&limitFilter);
+
+    // Only apply limit and offset filters when is not aggregated.
+    if (!selectFilter.isAggregated) {
+        // Only apply limit and offset filters when is not aggregated.
+        filter.filters.push_back(&offsetFilter);
+        filter.filters.push_back(&limitFilter);
+    }
 
     return filter;
 }

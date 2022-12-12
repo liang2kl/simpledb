@@ -51,7 +51,6 @@ static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 struct ColumnInfo {
     std::string name;
     DataType type;
-    ColumnSizeType size;
 };
 
 struct RecordID {

@@ -1,5 +1,4 @@
 #include <SQLParser/SqlLexer.h>
-#include <SimpleDB/internal/Column.h>
 
 #include <any>
 #include <bitset>
@@ -12,6 +11,7 @@
 #include <vector>
 
 #include "Error.h"
+#include "internal/Column.h"
 #include "internal/Index.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
@@ -539,7 +539,7 @@ PlainResult DBMS::insert(const std::string &tableName,
 }
 
 QueryBuilder DBMS::select(
-    const std::string &tableName, const std::vector<std::string> &columns,
+    const std::string &tableName, const std::vector<QuerySelector> &selectors,
     const std::vector<Internal::CompareValueCondition> &conditions,
     const std::vector<Internal::CompareNullCondition> &nullConditions,
     int limit, int offset) {
@@ -570,8 +570,8 @@ QueryBuilder DBMS::select(
         builder.offset(offset);
     }
 
-    for (const auto &col : columns) {
-        builder.select(col);
+    for (const auto &selector : selectors) {
+        builder.select(selector);
     }
 
     return builder;
