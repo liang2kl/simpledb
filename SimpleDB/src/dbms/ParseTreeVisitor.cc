@@ -357,11 +357,19 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
         limit = ParseHelper::parseInt(integers[0]->getText());
         limit = limit < 0 ? -1 : limit;
     }
-    // TODO: Offset
+
+    int offset = 0;
+    if (integers.size() >= 2) {
+        // Offset.
+        offset = ParseHelper::parseInt(integers[1]->getText());
+        if (offset < 0) {
+            throw Error::IncompatableValueError("offset must be non-negative");
+        }
+    }
 
     // TODO: Multiple tables
     QueryBuilder builder =
-        dbms->select(tableName, columns, valConds, nullConds, limit);
+        dbms->select(tableName, columns, valConds, nullConds, limit, offset);
 
     QueryResult result = dbms->select(builder);
     return wrap(result);

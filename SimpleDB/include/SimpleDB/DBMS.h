@@ -100,7 +100,7 @@ private:
         const std::string &tableName, const std::vector<std::string> &columns,
         const std::vector<Internal::CompareValueCondition> &conditions,
         const std::vector<Internal::CompareNullCondition> &nullConditions,
-        int limit);
+        int limit, int offset);
 
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,

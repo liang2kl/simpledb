@@ -542,7 +542,7 @@ QueryBuilder DBMS::select(
     const std::string &tableName, const std::vector<std::string> &columns,
     const std::vector<Internal::CompareValueCondition> &conditions,
     const std::vector<Internal::CompareNullCondition> &nullConditions,
-    int limit) {
+    int limit, int offset) {
     checkUseDatabase();
     // Find table.
     Table *table = getTable(tableName).second;
@@ -564,6 +564,10 @@ QueryBuilder DBMS::select(
 
     if (limit >= 0) {
         builder.limit(limit);
+    }
+
+    if (offset >= 1) {
+        builder.offset(offset);
     }
 
     for (const auto &col : columns) {

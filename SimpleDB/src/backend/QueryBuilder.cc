@@ -69,6 +69,11 @@ QueryBuilder &QueryBuilder::limit(int count) {
     return *this;
 }
 
+QueryBuilder &QueryBuilder::offset(int offset) {
+    offsetFilter.offset = offset;
+    return *this;
+}
+
 QueryBuilder::Result QueryBuilder::execute() {
     Result result;
 
@@ -137,7 +142,8 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
         selectFilter.table = &virtualTable;
         filter.filters.push_back(&selectFilter);
     }
-    // Add limit filter at the back.
+    // Add offset and limit filter at the back.
+    filter.filters.push_back(&offsetFilter);
     filter.filters.push_back(&limitFilter);
 
     return filter;

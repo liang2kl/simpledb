@@ -45,6 +45,16 @@ std::pair<bool, bool> LimitFilter::apply(Columns &columns) {
 }
 // ====== End LimitFilter ======
 
+// ===== Begin OffsetFilter =====
+std::pair<bool, bool> OffsetFilter::apply(Columns &columns) {
+    count++;
+    if (count <= offset) {
+        return {false, true};
+    }
+    return {true, true};
+}
+// ====== End OffsetFilter ======
+
 // ===== Begin SelectFilter =====
 std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
     Columns newColumns;

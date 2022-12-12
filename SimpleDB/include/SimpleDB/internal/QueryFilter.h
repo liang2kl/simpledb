@@ -111,6 +111,14 @@ struct LimitFilter : public BaseFilter {
     int count = 0;
 };
 
+struct OffsetFilter : public BaseFilter {
+    OffsetFilter() : offset(0) {}
+    ~OffsetFilter() = default;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
+    int offset;
+    int count = 0;
+};
+
 struct AggregatedFilter : public BaseFilter {
     AggregatedFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;

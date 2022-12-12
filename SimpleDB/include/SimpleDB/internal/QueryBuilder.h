@@ -24,6 +24,7 @@ public:
     QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
     QueryBuilder &select(const std::string &column);
     QueryBuilder &limit(int count);
+    QueryBuilder &offset(int offset);
 
     [[nodiscard]] Result execute();
 
@@ -36,6 +37,7 @@ private:
     std::vector<NullConditionFilter> nullConditionFilters;
     SelectFilter selectFilter;
     LimitFilter limitFilter;
+    OffsetFilter offsetFilter;
 
     QueryDataSource *dataSourceRawPtr = nullptr;
     std::shared_ptr<QueryDataSource> dataSourceSharedPtr;
