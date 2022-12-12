@@ -198,9 +198,6 @@ bool SelectFilter::finalize(Columns &columns) {
         default:                                                           \
             assert(false);                                                 \
     }
-            printf("%d, %f\n", context.value.intValue,
-                   context.value.floatValue);
-
             if (dataType == INT) {
                 CALC_AGGREGATION(intValue);
                 columns[i].type = INT;
