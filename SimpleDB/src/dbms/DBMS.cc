@@ -483,6 +483,11 @@ PlainResult DBMS::insert(const std::string &tableName,
     int indexOfSource = 0;
     for (int i = 0; i < table->meta.numColumn; i++) {
         if ((emptyBits & (1L << i)) == 0) {
+            // Check if the data type is matched.
+            if (!columns[indexOfSource].isNull &&
+                table->meta.columns[i].type != columns[indexOfSource].type) {
+                throw Error::InsertError("data type does not match");
+            }
             columnMapping[i] = indexOfSource;
             // Also, check null value and set corresponding data type.
             columns[indexOfSource].type = table->meta.columns[i].type;
@@ -606,6 +611,10 @@ QueryResult DBMS::select(Internal::QueryBuilder &builder) {
         auto *row = queryResult.add_rows();
         for (const auto &column : columns) {
             QueryValue *val = row->add_values();
+            if (column.isNull) {
+                val->set_null_value(true);
+                continue;
+            }
             switch (column.type) {
                 case INT:
                     val->set_int_value(column.data.intValue);

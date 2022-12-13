@@ -83,6 +83,7 @@ message QueryValue {
     int32 int_value = 1;
     float float_value = 2;
     string varchar_value = 3;
+    bool null_value = 4;
   }
 }
 

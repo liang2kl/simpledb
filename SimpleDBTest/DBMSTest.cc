@@ -1,5 +1,6 @@
 #include <SimpleDB/Error.h>
 
+#include <string>
 #include <tuple>
 #ifndef TESTING
 #define TESTING 1
@@ -334,4 +335,116 @@ TEST_F(DBMSTest, TestInsertRecord) {
     ASSERT_NO_THROW(executeSQL(createTableSql4));
     ASSERT_NO_THROW(executeSQL(insertSql4));
     ASSERT_THROW(executeSQL(insertSql4), Error::InsertError);
+}
+
+TEST_F(DBMSTest, TestSelect) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string createTableSql = "CREATE TABLE t1 (c1 INT NOT NULL, c2 FLOAT);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql));
+
+    int sum = 0, min = 0, max = 0, count = 0;
+    float sumf = 0, minf = 0, maxf = 0;
+    float avg = 0, avgf = 0;
+
+    const int INSERT_NUM = 1000;
+
+    // Insert 1000 records into the table.
+    for (int i = 0; i < INSERT_NUM; i++) {
+        std::string intVal = std::to_string(i);
+        std::string floatVal = std::to_string(i * 1.0);
+        std::string insertSql =
+            "INSERT INTO t1 VALUES (" + intVal + "," + floatVal + ");";
+        ASSERT_NO_THROW(executeSQL(insertSql));
+        sum += i;
+        sumf += i;
+        min = std::min(i, min);
+        max = std::max(i, max);
+        minf = std::min((float)i, minf);
+        maxf = std::max((float)i, maxf);
+        count++;
+    }
+
+    avg = float(sum) / count;
+    avgf = sumf / count;
+
+    // Test select all.
+    std::string selectSql = "SELECT * FROM t1;";
+    auto result = executeSQL(selectSql);
+    ASSERT_EQ(result.size(), 1);
+    ASSERT_EQ(result[0].query().columns_size(), 2);
+    ASSERT_EQ(result[0].query().rows_size(), INSERT_NUM);
+
+    // Test select column.
+    std::string selectSql2 = "SELECT c1 FROM t1;";
+    auto result2 = executeSQL(selectSql2);
+    ASSERT_EQ(result2.size(), 1);
+    ASSERT_EQ(result2[0].query().columns_size(), 1);
+    ASSERT_EQ(result2[0].query().rows_size(), INSERT_NUM);
+
+    // Test select with condition.
+    std::string selectSql3 = "SELECT * FROM t1 WHERE c1 > 500 AND c1 < 700;";
+    auto result3 = executeSQL(selectSql3);
+    ASSERT_EQ(result3.size(), 1);
+    ASSERT_EQ(result3[0].query().columns_size(), 2);
+    ASSERT_EQ(result3[0].query().rows_size(), 199);
+
+    // Test aggregators with non-null values.
+    std::string selectSql4 =
+        "SELECT SUM(c1), MIN(c1), MAX(c1), COUNT(c1), AVG(c1), SUM(c2), "
+        "MIN(c2), MAX(c2), COUNT(c2), AVG(c2) FROM t1;";
+    auto result4 = executeSQL(selectSql4);
+    ASSERT_EQ(result4.size(), 1);
+    ASSERT_EQ(result4[0].query().columns_size(), 10);
+    auto &row = result4[0].query().rows(0);
+    ASSERT_TRUE(row.values(0).has_int_value());
+    ASSERT_TRUE(row.values(1).has_int_value());
+    ASSERT_TRUE(row.values(2).has_int_value());
+    ASSERT_TRUE(row.values(3).has_int_value());
+    ASSERT_TRUE(row.values(4).has_float_value());
+    ASSERT_TRUE(row.values(5).has_float_value());
+    ASSERT_TRUE(row.values(6).has_float_value());
+    ASSERT_TRUE(row.values(7).has_float_value());
+    ASSERT_TRUE(row.values(8).has_int_value());
+    ASSERT_TRUE(row.values(9).has_float_value());
+
+    EXPECT_EQ(row.values(0).int_value(), sum);
+    EXPECT_EQ(row.values(1).int_value(), min);
+    EXPECT_EQ(row.values(2).int_value(), max);
+    EXPECT_EQ(row.values(3).int_value(), count);
+    EXPECT_EQ(row.values(4).float_value(), avg);
+    EXPECT_EQ(row.values(5).float_value(), sumf);
+    EXPECT_EQ(row.values(6).float_value(), minf);
+    EXPECT_EQ(row.values(7).float_value(), maxf);
+    EXPECT_EQ(row.values(8).int_value(), count);
+    EXPECT_EQ(row.values(9).float_value(), avgf);
+
+    // Insert several null values.
+    for (int i = INSERT_NUM; i < INSERT_NUM + 10; i++) {
+        std::string intVal = std::to_string(i);
+        std::string insertSql = "INSERT INTO t1 VALUES (" + intVal + ", NULL);";
+        ASSERT_NO_THROW(executeSQL(insertSql));
+    }
+
+    // Now count(f), minf, maxf, sumf and avgf should remain unchanged.
+    auto result5 = executeSQL(selectSql4);
+    ASSERT_EQ(result5.size(), 1);
+    ASSERT_EQ(result5[0].query().columns_size(), 10);
+    auto &row2 = result5[0].query().rows(0);
+
+    ASSERT_TRUE(row2.values(5).has_float_value());
+    ASSERT_TRUE(row2.values(6).has_float_value());
+    ASSERT_TRUE(row2.values(7).has_float_value());
+    ASSERT_TRUE(row2.values(8).has_int_value());
+    ASSERT_TRUE(row2.values(9).has_float_value());
+
+    EXPECT_EQ(row2.values(5).float_value(), sumf);
+    EXPECT_EQ(row2.values(6).float_value(), minf);
+    EXPECT_EQ(row2.values(7).float_value(), maxf);
+    EXPECT_EQ(row2.values(8).int_value(), count);
+    EXPECT_EQ(row2.values(9).float_value(), avgf);
+
+    // TODO: Test aggregators with conditions.
 }

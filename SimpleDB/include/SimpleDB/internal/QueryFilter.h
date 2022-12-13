@@ -113,6 +113,7 @@ struct SelectFilter : public BaseFilter {
             float floatValue;
         } value;
         bool isNull = true;
+        int count = 0;
         void initializeInt(int value) {
             if (isNull) {
                 isNull = false;
@@ -135,7 +136,6 @@ struct SelectFilter : public BaseFilter {
     std::vector<int> selectIndexes;
     std::vector<Context> selectContexts;
     bool isAggregated;
-    int count = 0;
     VirtualTable *table;
 };
 

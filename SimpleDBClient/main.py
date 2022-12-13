@@ -40,6 +40,8 @@ def value_desc(value) -> str:
         return str(value.float_value)
     elif value.HasField("varchar_value"):
         return value.varchar_value
+    elif value.HasField("null_value"):
+        return "NULL"
 
 def print_resp(resp):
     if (resp.HasField("error")):

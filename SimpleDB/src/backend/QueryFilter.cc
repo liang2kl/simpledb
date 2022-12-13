@@ -110,7 +110,6 @@ std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
             newColumns.push_back(columns[index]);
         }
     } else {
-        count++;
         for (size_t i = 0; i < selectors.size(); i++) {
             auto &selector = selectors[i];
             auto &context = selectContexts[i];
@@ -121,32 +120,39 @@ std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
             } else {
                 assert(columns.size() == table->columns.size());
                 const auto &columnInfo = table->columns[selectIndexes[i]];
-#define AGGREGATE(_type, _Type)                                         \
-    auto value = columns[selectIndexes[i]].data._type;                  \
-    switch (selector.type) {                                            \
-        case QuerySelector::COUNT_COL:                                  \
-            context.initializeInt(0);                                   \
-            context.value.intValue +=                                   \
-                (columns[selectIndexes[i]].isNull ? 0 : 1);             \
-            break;                                                      \
-        case QuerySelector::MIN:                                        \
-            context.initialize##_Type(value);                           \
-            context.value._type = std::min(context.value._type, value); \
-            break;                                                      \
-        case QuerySelector::MAX:                                        \
-            context.initialize##_Type(value);                           \
-            context.value._type = std::max(context.value._type, value); \
-            break;                                                      \
-        case QuerySelector::SUM:                                        \
-            context.initialize##_Type(0);                               \
-            context.value._type += value;                               \
-            break;                                                      \
-        case QuerySelector::AVG:                                        \
-            context.initializeFloat(0);                                 \
-            context.value.floatValue += value;                          \
-            break;                                                      \
-        default:                                                        \
-            assert(false);                                              \
+                bool isNull = columns[selectIndexes[i]].isNull;
+                if (!isNull) {
+                    context.count++;
+                }
+
+#define AGGREGATE(_type, _Type)                                             \
+    auto value = columns[selectIndexes[i]].data._type;                      \
+    switch (selector.type) {                                                \
+        case QuerySelector::COUNT_COL:                                      \
+            context.initializeInt(0);                                       \
+            context.value.intValue += (isNull ? 0 : 1);                     \
+            break;                                                          \
+        case QuerySelector::MIN:                                            \
+            context.initialize##_Type(value);                               \
+            if (!isNull) {                                                  \
+                context.value._type = std::min(context.value._type, value); \
+            }                                                               \
+            break;                                                          \
+        case QuerySelector::MAX:                                            \
+            context.initialize##_Type(value);                               \
+            if (!isNull) {                                                  \
+                context.value._type = std::max(context.value._type, value); \
+            }                                                               \
+            break;                                                          \
+        case QuerySelector::SUM:                                            \
+        case QuerySelector::AVG:                                            \
+            context.initialize##_Type(0);                                   \
+            if (!isNull) {                                                  \
+                context.value._type += value;                               \
+            }                                                               \
+            break;                                                          \
+        default:                                                            \
+            assert(false);                                                  \
     }
                 if (columnInfo.type == INT) {
                     AGGREGATE(intValue, Int);
@@ -175,35 +181,34 @@ bool SelectFilter::finalize(Columns &columns) {
         columns[i].isNull = context.isNull;
 
         if (!context.isNull) {
-            DataType dataType = INT;
-            if (selectIndexes[i] != -1) {
-                const auto columnInfo = table->columns[selectIndexes[i]];
-                dataType = columnInfo.type;
-            }
-
-#define CALC_AGGREGATION(_type)                                            \
-    switch (selector.type) {                                               \
-        case QuerySelector::AVG:                                           \
-            columns[i].data.floatValue = context.value.floatValue / count; \
-            break;                                                         \
-        case QuerySelector::MIN:                                           \
-        case QuerySelector::MAX:                                           \
-        case QuerySelector::SUM:                                           \
-            columns[i].data._type = context.value._type;                   \
-            break;                                                         \
-        case QuerySelector::COUNT_COL:                                     \
-        case QuerySelector::COUNT_STAR:                                    \
-            columns[i].data.intValue = context.value.intValue;             \
-            break;                                                         \
-        default:                                                           \
-            assert(false);                                                 \
+            DataType dataType = selectIndexes[i] == -1
+                                    ? INT
+                                    : table->columns[selectIndexes[i]].type;
+#define CALC_AGGREGATION(_type, _Type)                         \
+    switch (selector.type) {                                   \
+        case QuerySelector::AVG:                               \
+            columns[i].data.floatValue =                       \
+                float(context.value._type) / context.count;    \
+            columns[i].type = FLOAT;                           \
+            break;                                             \
+        case QuerySelector::MIN:                               \
+        case QuerySelector::MAX:                               \
+        case QuerySelector::SUM:                               \
+            columns[i].data._type = context.value._type;       \
+            columns[i].type = _Type;                           \
+            break;                                             \
+        case QuerySelector::COUNT_COL:                         \
+        case QuerySelector::COUNT_STAR:                        \
+            columns[i].data.intValue = context.value.intValue; \
+            columns[i].type = INT;                             \
+            break;                                             \
+        default:                                               \
+            assert(false);                                     \
     }
             if (dataType == INT) {
-                CALC_AGGREGATION(intValue);
-                columns[i].type = INT;
+                CALC_AGGREGATION(intValue, INT);
             } else {
-                CALC_AGGREGATION(floatValue);
-                columns[i].type = FLOAT;
+                CALC_AGGREGATION(floatValue, FLOAT);
             }
 #undef CALC_AGGREGATION
         }
