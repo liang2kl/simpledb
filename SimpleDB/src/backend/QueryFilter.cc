@@ -133,21 +133,21 @@ std::pair<bool, bool> SelectFilter::apply(Columns &columns) {
             context.value.intValue += (isNull ? 0 : 1);                     \
             break;                                                          \
         case QuerySelector::MIN:                                            \
-            context.initialize##_Type(value);                               \
             if (!isNull) {                                                  \
+                context.initialize##_Type(value);                           \
                 context.value._type = std::min(context.value._type, value); \
             }                                                               \
             break;                                                          \
         case QuerySelector::MAX:                                            \
-            context.initialize##_Type(value);                               \
             if (!isNull) {                                                  \
+                context.initialize##_Type(value);                           \
                 context.value._type = std::max(context.value._type, value); \
             }                                                               \
             break;                                                          \
         case QuerySelector::SUM:                                            \
         case QuerySelector::AVG:                                            \
-            context.initialize##_Type(0);                                   \
             if (!isNull) {                                                  \
+                context.initialize##_Type(0);                               \
                 context.value._type += value;                               \
             }                                                               \
             break;                                                          \
