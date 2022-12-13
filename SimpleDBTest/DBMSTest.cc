@@ -446,5 +446,25 @@ TEST_F(DBMSTest, TestSelect) {
     EXPECT_EQ(row2.values(8).int_value(), count);
     EXPECT_EQ(row2.values(9).float_value(), avgf);
 
+    // Test aggregate on empty set.
+    std::string selectSql6 =
+        "SELECT SUM(c1), MIN(c1), MAX(c1), COUNT(c1), AVG(c1), COUNT(*) FROM "
+        "t1 WHERE c1 < 0;";
+
+    auto result6 = executeSQL(selectSql6);
+    ASSERT_EQ(result6.size(), 1);
+    ASSERT_EQ(result6[0].query().columns_size(), 6);
+    auto &row3 = result6[0].query().rows(0);
+
+    ASSERT_TRUE(row3.values(0).has_null_value());
+    ASSERT_TRUE(row3.values(1).has_null_value());
+    ASSERT_TRUE(row3.values(2).has_null_value());
+    ASSERT_TRUE(row3.values(3).has_int_value());
+    ASSERT_TRUE(row3.values(4).has_null_value());
+    ASSERT_TRUE(row3.values(5).has_int_value());
+
+    EXPECT_EQ(row3.values(3).int_value(), 0);
+    EXPECT_EQ(row3.values(5).int_value(), 0);
+
     // TODO: Test aggregators with conditions.
 }

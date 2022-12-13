@@ -211,6 +211,12 @@ bool SelectFilter::finalize(Columns &columns) {
                 CALC_AGGREGATION(floatValue, FLOAT);
             }
 #undef CALC_AGGREGATION
+        } else { /* context.isNull */
+            if (selector.type == QuerySelector::COUNT_COL ||
+                selector.type == QuerySelector::COUNT_STAR) {
+                columns[i].isNull = false;
+                columns[i].data.intValue = 0;
+            }
         }
     }
 
