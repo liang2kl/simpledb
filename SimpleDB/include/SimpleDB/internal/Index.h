@@ -42,7 +42,7 @@ private:
         uint16_t headCanary = INDEX_META_CANARY;
         int numNode;
         int numEntry;
-        int firstFreePage;
+        int firstFreeSlot;
         NodeIndex rootNode;
         uint16_t tailCanary = INDEX_META_CANARY;
     };
@@ -53,12 +53,6 @@ private:
 
         bool operator==(const IndexEntry &rhs) const;
         bool operator>(const IndexEntry &rhs) const;
-    };
-
-    struct EmptyPageMeta {
-        uint16_t headCanary = EMPTY_INDEX_PAGE_CANARY;
-        int nextPage;
-        uint16_t tailCanary = EMPTY_INDEX_PAGE_CANARY;
     };
 
     struct SharedNode {
@@ -124,9 +118,15 @@ private:
     int insertEntry(SharedNode *sharedNode, const IndexEntry &entry);
     void checkOverflowFrom(NodeIndex index);
     inline PageHandle getHandle(NodeIndex index) {
-        return PF::getHandle(fd, index);
+        int page = index / NUM_INDEX_SLOT;
+        return PF::getHandle(fd, page + 1);
     }
-    void release(NodeIndex index);
+    template <typename T>
+    T load(NodeIndex index, PageHandle handle) {
+        char *ptr = PF::loadRaw<char *>(handle);
+        ptr += (index % NUM_INDEX_SLOT) * INDEX_SLOT_SIZE;
+        return (T)ptr;
+    }
 
 #if DEBUG
     void dump();

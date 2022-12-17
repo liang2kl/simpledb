@@ -51,7 +51,7 @@ TEST_F(IndexTest, TestCreateNewIndex) {
     reloadIndex();
 
     EXPECT_EQ(index.meta.numNode, 1);
-    EXPECT_EQ(index.meta.rootNode, 1);
+    EXPECT_EQ(index.meta.rootNode, 0);
 }
 
 TEST_F(IndexTest, TestInitFromInvalidFile) {
@@ -84,6 +84,7 @@ TEST_F(IndexTest, TestInsertGet) {
         auto [key, rid] = entries[i];
         ASSERT_NO_THROW(index.insert(key, rid));
         EXPECT_EQ(index.meta.numEntry, i + 1);
+        // index.dump();
     }
 
     reloadIndex();

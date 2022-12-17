@@ -64,7 +64,7 @@ void Index::create(const std::string &file) {
 
     meta.numNode = 0;
     meta.numEntry = 0;
-    meta.firstFreePage = 1;
+    meta.firstFreeSlot = 0;
 
     // Create root node.
     NodeIndex index = createNewLeafNode(NULL_NODE_INDEX);
@@ -99,8 +99,8 @@ void Index::insert(int key, RecordID id) {
     int index = std::get<1>(result);
     bool found = std::get<2>(result);
 
-    PageHandle handle = PF::getHandle(fd, nodeIndex);
-    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+    PageHandle handle = getHandle(nodeIndex);
+    LeafNode *node = load<LeafNode *>(nodeIndex, handle);
 
     assert(node->shared.isLeaf);
 
@@ -140,8 +140,8 @@ void Index::remove(int key, RecordID rid) {
         throw Internal::IndexKeyNotExistsError();
     }
 
-    PageHandle handle = PF::getHandle(fd, nodeIndex);
-    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+    PageHandle handle = getHandle(nodeIndex);
+    LeafNode *node = load<LeafNode *>(nodeIndex, handle);
 
     assert(node->shared.isLeaf);
 
@@ -149,7 +149,7 @@ void Index::remove(int key, RecordID rid) {
     node->validBitmap &= ~(1L << index);
 
     // Mark dirty.
-    PF::markDirty(getHandle(nodeIndex));
+    PF::markDirty(handle);
 
     meta.numEntry--;
 }
@@ -181,8 +181,8 @@ void Index::iterateRange(Range range, IterateFunc func) {
         findEntry({lo, {INT_MIN, INT_MIN}}, /*skipInvalid=*/true);
 
     // Iterate from the start of the sequence.
-    PageHandle handle = PF::getHandle(fd, nodeIndex);
-    LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+    PageHandle handle = getHandle(nodeIndex);
+    LeafNode *node = load<LeafNode *>(nodeIndex, handle);
     NodeIndex startIndex = node->shared.index;
 
     assert(node->shared.isLeaf);
@@ -208,8 +208,8 @@ void Index::iterateRange(Range range, IterateFunc func) {
             return;
         }
 
-        handle = PF::getHandle(fd, node->next);
-        node = PF::loadRaw<LeafNode *>(handle);
+        handle = getHandle(node->next);
+        node = load<LeafNode *>(node->next, handle);
         index = 0;
     }
 }
@@ -220,10 +220,10 @@ std::tuple<Index::NodeIndex, int, bool> Index::findEntry(
     int currentNode = meta.rootNode;
 
     for (;;) {
-        PageHandle handle = PF::getHandle(fd, currentNode);
-        SharedNode *sharedNode = PF::loadRaw<SharedNode *>(handle);
+        PageHandle handle = getHandle(currentNode);
+        SharedNode *sharedNode = load<SharedNode *>(currentNode, handle);
         if (sharedNode->isLeaf) {
-            LeafNode *node = PF::loadRaw<LeafNode *>(handle);
+            LeafNode *node = (LeafNode *)sharedNode;
             int candidate = sharedNode->numEntry;
             for (int i = 0; i < sharedNode->numEntry; i++) {
                 if (sharedNode->entry[i] == entry) {
@@ -278,30 +278,20 @@ Index::NodeIndex Index::createNewInnerNode(NodeIndex parent) {
 }
 
 Index::SharedNode *Index::getNewNode(NodeIndex parent) {
-    meta.numNode++;
+    // Get and update the free slot.
+    NodeIndex index = meta.firstFreeSlot;
+    PageHandle handle = getHandle(meta.firstFreeSlot);
 
-    // Get and update the free page.
-    NodeIndex index = meta.firstFreePage;
-    PageHandle handle = PF::getHandle(fd, index);
-    EmptyPageMeta *pageMeta = PF::loadRaw<EmptyPageMeta *>(handle);
-
-    if (pageMeta->headCanary == EMPTY_INDEX_PAGE_CANARY &&
-        pageMeta->tailCanary == EMPTY_INDEX_PAGE_CANARY &&
-        pageMeta->nextPage <= meta.numNode) {
-        // A valid empty page meta.
-        meta.firstFreePage = pageMeta->nextPage;
-    } else {
-        // Just bump the `nextFreePage`.
-        meta.firstFreePage++;
-    }
-
-    SharedNode *node = PF::loadRaw<SharedNode *>(handle);
+    SharedNode *node = load<SharedNode *>(index, handle);
 
     node->numEntry = 0;
     node->index = index;
     node->parent = parent;
 
     PF::markDirty(handle);
+
+    meta.numNode++;
+    meta.firstFreeSlot++;
 
     return node;
 }
@@ -329,7 +319,7 @@ int Index::insertEntry(SharedNode *sharedNode, const IndexEntry &entry) {
 
 void Index::checkOverflowFrom(Index::NodeIndex index) {
     PageHandle nodeHandle = getHandle(index);
-    SharedNode *sharedNode = PF::loadRaw<SharedNode *>(nodeHandle);
+    SharedNode *sharedNode = load<SharedNode *>(index, nodeHandle);
 
     if (sharedNode->numEntry <= MAX_NUM_ENTRY_PER_NODE) {
         return;
@@ -350,7 +340,8 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
                                  ? createNewLeafNode(sharedNode->parent)
                                  : createNewInnerNode(sharedNode->parent);
     PageHandle siblingHandle = getHandle(siblingIndex);
-    SharedNode *siblingSharedNode = PF::loadRaw<SharedNode *>(siblingHandle);
+    SharedNode *siblingSharedNode =
+        load<SharedNode *>(siblingIndex, siblingHandle);
 
     // Move the "right" (+victim) entries to the sibling node.
     siblingSharedNode->numEntry =
@@ -385,8 +376,9 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
         // Update the parent of the children.
         // FIXME: This requires lots of IO.
         for (int i = 0; i < siblingNode->numChildren; i++) {
-            PageHandle childHandle = getHandle(siblingNode->children[i]);
-            SharedNode *childNode = PF::loadRaw<SharedNode *>(childHandle);
+            NodeIndex childIndex = siblingNode->children[i];
+            PageHandle childHandle = getHandle(childIndex);
+            SharedNode *childNode = load<SharedNode *>(childIndex, childHandle);
             childNode->parent = siblingIndex;
             PF::markDirty(childHandle);
         }
@@ -403,7 +395,7 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     if (sharedNode->parent == NULL_NODE_INDEX) {
         NodeIndex newRootIndex = createNewInnerNode(NULL_NODE_INDEX);
         PageHandle newRootHandle = getHandle(newRootIndex);
-        InnerNode *newRootNode = PF::loadRaw<InnerNode *>(newRootHandle);
+        InnerNode *newRootNode = load<InnerNode *>(newRootIndex, newRootHandle);
         newRootNode->shared.numEntry = 1;
         newRootNode->numChildren = 2;
         newRootNode->shared.entry[0] = victimEntry;
@@ -426,8 +418,8 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
     }
 
     // The parent node exists.
-    PageHandle parentHandle = PF::getHandle(fd, sharedNode->parent);
-    InnerNode *parentNode = PF::loadRaw<InnerNode *>(parentHandle);
+    PageHandle parentHandle = getHandle(sharedNode->parent);
+    InnerNode *parentNode = load<InnerNode *>(sharedNode->parent, parentHandle);
     int insertIndex = insertEntry(&parentNode->shared, victimEntry);
 
     // Update the children of the parent node.
@@ -444,19 +436,6 @@ void Index::checkOverflowFrom(Index::NodeIndex index) {
 
     // Check recursively if the parent node overflows.
     checkOverflowFrom(sharedNode->parent);
-}
-
-void Index::release(NodeIndex index) {
-    PageHandle handle = getHandle(index);
-    EmptyPageMeta newMeta;
-    newMeta.nextPage = meta.firstFreePage;
-
-    EmptyPageMeta *pageMeta = PF::loadRaw<EmptyPageMeta *>(handle);
-    *pageMeta = newMeta;
-
-    meta.firstFreePage = index;
-
-    PF::markDirty(handle);
 }
 
 void Index::flushMeta() {
@@ -482,7 +461,7 @@ void Index::dump() {
         q.pop();
 
         PageHandle handle = getHandle(index);
-        SharedNode *node = PF::loadRaw<SharedNode *>(handle);
+        SharedNode *node = load<SharedNode *>(index, handle);
 
         printf("Node %d: ", index);
         for (int i = 0; i < node->numEntry; i++) {
