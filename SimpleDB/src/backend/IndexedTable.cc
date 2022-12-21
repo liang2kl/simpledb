@@ -33,7 +33,8 @@ void IndexedTable::iterate(IterateCallback callback) {
 }
 
 bool IndexedTable::acceptCondition(const CompareValueCondition &condition) {
-    int columnIndex = table->getColumnIndex(condition.columnName.c_str());
+    int columnIndex =
+        table->getColumnIndex(condition.columnId.columnName.c_str());
     if (columnIndex < 0) {
         return false;
     }
@@ -44,13 +45,13 @@ bool IndexedTable::acceptCondition(const CompareValueCondition &condition) {
     }
 
     if (index == nullptr) {
-        index = getIndex(table->meta.name, condition.columnName);
-        columnName = condition.columnName;
+        index = getIndex(table->meta.name, condition.columnId.columnName);
+        columnName = condition.columnId.columnName;
 
         if (index == nullptr) {
             return false;
         }
-    } else if (columnName != condition.columnName) {
+    } else if (columnName != condition.columnId.columnName) {
         // Only taking the first (indexed) column from the conditions.
         return false;
     }

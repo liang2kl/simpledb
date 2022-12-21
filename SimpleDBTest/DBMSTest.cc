@@ -384,6 +384,13 @@ TEST_F(DBMSTest, TestSelect) {
     ASSERT_EQ(result2[0].query().columns_size(), 1);
     ASSERT_EQ(result2[0].query().rows_size(), INSERT_NUM);
 
+    // Test select column with table name.
+    std::string selectSql21 = "SELECT t1.c1 FROM t1;";
+    auto result21 = executeSQL(selectSql2);
+    ASSERT_EQ(result21.size(), 1);
+    ASSERT_EQ(result21[0].query().columns_size(), 1);
+    ASSERT_EQ(result21[0].query().rows_size(), INSERT_NUM);
+
     // Test select with condition.
     std::string selectSql3 = "SELECT * FROM t1 WHERE c1 > 500 AND c1 < 700;";
     auto result3 = executeSQL(selectSql3);

@@ -36,7 +36,7 @@ protected:
     CompareValueCondition cond(CompareOp op, int i) {
         ColumnValue v;
         v.intValue = i;
-        return CompareValueCondition(colName, op, v);
+        return CompareValueCondition({.columnName = colName}, op, v);
     }
 };
 

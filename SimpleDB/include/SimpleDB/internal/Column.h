@@ -49,8 +49,17 @@ using ColumnBitmap = int16_t;
 static_assert(sizeof(ColumnBitmap) == sizeof(COLUMN_BITMAP_ALL));
 
 struct ColumnInfo {
-    std::string name;
+    std::string tableName;
+    std::string columnName;
     DataType type;
+
+    bool operator==(const ColumnInfo &rhs) {
+        return tableName == rhs.tableName && columnName == rhs.columnName;
+    }
+
+    std::string getDesc() const {
+        return tableName.empty() ? columnName : tableName + "." + columnName;
+    }
 };
 
 struct RecordID {

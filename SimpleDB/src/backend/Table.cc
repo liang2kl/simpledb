@@ -448,7 +448,9 @@ std::vector<ColumnInfo> Table::getColumnInfo() {
     std::vector<ColumnInfo> columns;
     for (int i = 0; i < meta.numColumn; i++) {
         auto &column = meta.columns[i];
-        columns.push_back({.name = column.name, .type = column.type});
+        columns.push_back({.tableName = meta.name,
+                           .columnName = column.name,
+                           .type = column.type});
     }
     return columns;
 }

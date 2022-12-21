@@ -33,7 +33,12 @@ QueryBuilder &QueryBuilder::condition(const CompareValueCondition &condition) {
 
 QueryBuilder &QueryBuilder::condition(const std::string &columnName,
                                       CompareOp op, const char *string) {
-    return condition(CompareValueCondition(columnName.c_str(), op, string));
+    return condition(ColumnId{.columnName = columnName.c_str()}, op, string);
+}
+
+QueryBuilder &QueryBuilder::condition(const ColumnId &id, CompareOp op,
+                                      const char *string) {
+    return condition(CompareValueCondition(id, op, string));
 }
 
 QueryBuilder &QueryBuilder::nullCondition(
@@ -46,7 +51,11 @@ QueryBuilder &QueryBuilder::nullCondition(
 
 QueryBuilder &QueryBuilder::nullCondition(const std::string &columnName,
                                           bool isNull) {
-    return nullCondition(CompareNullCondition(columnName.c_str(), isNull));
+    return nullCondition({.columnName = columnName.c_str()}, isNull);
+}
+
+QueryBuilder &QueryBuilder::nullCondition(const ColumnId &id, bool isNull) {
+    return nullCondition(CompareNullCondition(id, isNull));
 }
 
 QueryBuilder &QueryBuilder::select(const QuerySelector &selector) {
@@ -55,7 +64,11 @@ QueryBuilder &QueryBuilder::select(const QuerySelector &selector) {
 }
 
 QueryBuilder &QueryBuilder::select(const std::string &column) {
-    selectFilter.selectors.push_back({QuerySelector::COLUMN, column});
+    return select(ColumnId{.columnName = column.c_str()});
+}
+
+QueryBuilder &QueryBuilder::select(const ColumnId &id) {
+    selectFilter.selectors.push_back({QuerySelector::COLUMN, id});
     return *this;
 }
 
@@ -123,18 +136,26 @@ std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
     }
 
     for (const auto &selector : selectFilter.selectors) {
-        int index = -1;
-        for (int i = 0; i < columnMetas.size(); i++) {
-            if (columnMetas[i].name == selector.columnName) {
-                index = i;
-                break;
-            }
-        }
         if (selector.type == QuerySelector::COUNT_STAR) {
-            result.push_back({selector.getColumnName(), INT});
+            result.push_back({.tableName = std::string(), /* TODO */
+                              .columnName = selector.getColumnName(),
+                              .type = INT});
         } else {
+            int index = -1;
+            for (int i = 0; i < columnMetas.size(); i++) {
+                if (columnMetas[i].columnName == selector.column.columnName) {
+                    if (index != -1) {
+                        throw AmbiguousColumnError(selector.column.getDesc());
+                    }
+                    if (selector.column.tableName.empty() ||
+                        selector.column.tableName == columnMetas[i].tableName) {
+                        index = i;
+                    }
+                }
+            }
+
             if (index == -1) {
-                throw ColumnNotFoundError(selector.columnName);
+                throw ColumnNotFoundError(selector.column.getDesc());
             }
             if (selector.type == QuerySelector::COLUMN) {
                 result.push_back(columnMetas[index]);
@@ -150,7 +171,9 @@ std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
                     default:
                         type = columnMetas[index].type;
                 }
-                result.push_back({selector.getColumnName(), type});
+                result.push_back({.tableName = std::string(), /* TODO */
+                                  .columnName = selector.getColumnName(),
+                                  .type = type});
             }
         }
     }
@@ -181,7 +204,6 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
     // The select filters comes after.
     if (selectFilter.selectors.size() > 0) {
         selectFilter.table = &virtualTable;
-        selectFilter.build();
         filter.filters.push_back(&selectFilter);
     }
 
@@ -191,6 +213,8 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
         filter.filters.push_back(&offsetFilter);
         filter.filters.push_back(&limitFilter);
     }
+
+    filter.build();
 
     return filter;
 }

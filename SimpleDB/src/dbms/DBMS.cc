@@ -591,7 +591,7 @@ QueryResult DBMS::select(Internal::QueryBuilder &builder) {
     // Insert columns.
     for (const ColumnInfo &info : columns) {
         auto *column = queryResult.add_columns();
-        column->set_name(info.name);
+        column->set_name(info.columnName);
         switch (info.type) {
             case INT:
                 column->set_type(QueryColumn_Type_TYPE_INT);

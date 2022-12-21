@@ -111,7 +111,7 @@ DECLARE_ERROR(NoScanDataSource, QueryBuilderErrorBase,
 DECLARE_ERROR(ColumnNotFound, QueryBuilderErrorBase,
               "Column not found in table");
 DECLARE_ERROR(Aggregator, QueryBuilderErrorBase, "Invalid aggregator");
-
+DECLARE_ERROR(AmbiguousColumn, QueryBuilderErrorBase, "Ambigious column");
 }  // namespace Internal
 
 // Exposed errors.

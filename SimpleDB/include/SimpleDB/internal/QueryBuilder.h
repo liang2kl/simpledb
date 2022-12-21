@@ -20,10 +20,14 @@ public:
     QueryBuilder &condition(const CompareValueCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
                             const char *string);
+    QueryBuilder &condition(const ColumnId &columnId, CompareOp op,
+                            const char *string);
     QueryBuilder &nullCondition(const CompareNullCondition &condition);
     QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
+    QueryBuilder &nullCondition(const ColumnId &columnId, bool isNull);
     QueryBuilder &select(const QuerySelector &selector);
     QueryBuilder &select(const std::string &column);
+    QueryBuilder &select(const ColumnId &id);
     QueryBuilder &limit(int count);
     QueryBuilder &offset(int offset);
 

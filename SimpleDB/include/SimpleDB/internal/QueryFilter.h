@@ -22,46 +22,54 @@ enum CompareOp {
     GE,  // >=
 };
 
-struct CompareValueCondition {
+struct ColumnId {
+    std::string tableName;
     std::string columnName;
+
+    std::string getDesc() const {
+        return tableName.empty() ? columnName : tableName + "." + columnName;
+    }
+};
+
+struct CompareValueCondition {
+    ColumnId columnId;
     CompareOp op;
     ColumnValue value;
 
-    CompareValueCondition(const std::string &columnName, CompareOp op,
+    CompareValueCondition(const ColumnId &id, CompareOp op,
                           const ColumnValue &value)
-        : columnName(columnName), op(op), value(value) {}
+        : columnId(id), op(op), value(value) {}
 
-    CompareValueCondition(const std::string &columnName, CompareOp op,
-                          const char *string)
-        : columnName(columnName), op(op) {
+    CompareValueCondition(const ColumnId &id, CompareOp op, const char *string)
+        : columnId(id), op(op) {
         std::strcpy(value.stringValue, string);
     }
 
     CompareValueCondition() = default;
 
-    static CompareValueCondition eq(const char *columnName,
-                                    const ColumnValue &value) {
-        return CompareValueCondition(columnName, EQ, value);
-    }
+    // static CompareValueCondition eq(const char *columnName,
+    //                                 const ColumnValue &value) {
+    //     return CompareValueCondition(columnName, EQ, value);
+    // }
 
-    static CompareValueCondition eq(const char *columnName,
-                                    const char *string) {
-        return CompareValueCondition(columnName, EQ, string);
-    }
+    // static CompareValueCondition eq(const char *columnName,
+    //                                 const char *string) {
+    //     return CompareValueCondition(columnName, EQ, string);
+    // }
 };
 
 struct CompareNullCondition {
-    std::string columnName;
+    ColumnId columnId;
     bool isNull;
-    CompareNullCondition(const std::string &columnName, bool isNull)
-        : columnName(columnName), isNull(isNull) {}
+    CompareNullCondition(const ColumnId &id, bool isNull)
+        : columnId(id), isNull(isNull) {}
     CompareNullCondition() = default;
 };
 
 struct QuerySelector {
     enum Type { COLUMN, COUNT_STAR, COUNT_COL, AVG, MAX, MIN, SUM };
     Type type;
-    std::string columnName;
+    ColumnId column;
 
     std::string getColumnName() const;
 };
@@ -70,40 +78,52 @@ struct VirtualTable {
     VirtualTable() = default;
     VirtualTable(const std::vector<ColumnInfo> &columns) {
         this->columns = columns;
-        for (int i = 0; i < columns.size(); i++) {
-            columnNameMap[columns[i].name] = i;
-        }
     }
 
-    std::map<std::string, int> columnNameMap;
     std::vector<ColumnInfo> columns;
 
-    int getColumnIndex(const std::string name) {
-        auto it = columnNameMap.find(name);
-        return it == columnNameMap.end() ? -1 : it->second;
+    int getColumnIndex(const ColumnId id) {
+        int index = -1;
+        for (int i = 0; i < columns.size(); i++) {
+            if (columns[i].columnName == id.columnName) {
+                if (id.tableName.empty() ||
+                    columns[i].tableName == id.tableName) {
+                    if (index != -1) {
+                        throw AmbiguousColumnError(id.getDesc());
+                    }
+                    index = i;
+                }
+            }
+        }
+        return index;
     }
 };
 
 struct BaseFilter {
     virtual ~BaseFilter() {}
     virtual std::pair<bool, bool> apply(Columns &columns) = 0;
+    virtual void build(){};
     virtual bool finalize(Columns &columns) { return false; }
 };
 
 struct ValueConditionFilter : public BaseFilter {
     ValueConditionFilter() = default;
     ~ValueConditionFilter() = default;
+    virtual void build() override;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
     CompareValueCondition condition;
     VirtualTable *table;
+    int columnIndex;
 };
 
 struct NullConditionFilter : public BaseFilter {
     NullConditionFilter() = default;
     ~NullConditionFilter() = default;
+    virtual void build() override;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
     CompareNullCondition condition;
     VirtualTable *table;
+    int columnIndex;
 };
 
 struct SelectFilter : public BaseFilter {
@@ -130,7 +150,7 @@ struct SelectFilter : public BaseFilter {
     SelectFilter() = default;
     ~SelectFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
-    void build();
+    void build() override;
     virtual bool finalize(Columns &columns) override;
     std::vector<QuerySelector> selectors;
     std::vector<int> selectIndexes;
@@ -159,6 +179,7 @@ struct AggregatedFilter : public BaseFilter {
     AggregatedFilter() = default;
     virtual std::pair<bool, bool> apply(Columns &columns) override;
     virtual bool finalize(Columns &columns) override;
+    virtual void build() override;
     std::vector<BaseFilter *> filters;
 };
 

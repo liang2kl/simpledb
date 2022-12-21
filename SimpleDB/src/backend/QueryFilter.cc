@@ -13,6 +13,12 @@ namespace SimpleDB {
 namespace Internal {
 
 // ===== Begin AggregatedFilter =====
+void AggregatedFilter::build() {
+    for (auto &filter : filters) {
+        filter->build();
+    }
+}
+
 std::pair<bool, bool> AggregatedFilter::apply(Columns &columns) {
     bool stop = false;
     for (auto filter : filters) {
@@ -72,18 +78,18 @@ void SelectFilter::build() {
         const auto &selector = selectors[i];
         if (selector.type == QuerySelector::COLUMN) {
             isAggregated = false;
-            auto index = table->getColumnIndex(selector.columnName);
+            auto index = table->getColumnIndex(selector.column);
             if (index < 0) {
-                throw ColumnNotFoundError(selector.columnName);
+                throw ColumnNotFoundError(selector.column.getDesc());
             }
             selectIndexes.push_back(index);
         } else {
             // Aggregated column.
             isAggregated = true;
             if (selector.type != QuerySelector::COUNT_STAR) {
-                auto index = table->getColumnIndex(selector.columnName);
+                auto index = table->getColumnIndex(selector.column);
                 if (index < 0) {
-                    throw ColumnNotFoundError(selector.columnName);
+                    throw ColumnNotFoundError(selector.column.getDesc());
                 }
                 if (table->columns[index].type == VARCHAR) {
                     throw AggregatorError(
@@ -225,12 +231,14 @@ bool SelectFilter::finalize(Columns &columns) {
 // ====== End SelectFilter ======
 
 // ===== Begin NullConditionFilter =====
-std::pair<bool, bool> NullConditionFilter::apply(Columns &columns) {
-    int columnIndex = table->getColumnIndex(condition.columnName);
+void NullConditionFilter::build() {
+    columnIndex = table->getColumnIndex(condition.columnId);
     if (columnIndex < 0) {
-        throw Internal::ColumnNotFoundError(condition.columnName);
+        throw Internal::ColumnNotFoundError(condition.columnId.getDesc());
     }
+}
 
+std::pair<bool, bool> NullConditionFilter::apply(Columns &columns) {
     const Column &column = columns[columnIndex];
 
     bool accept = (condition.isNull && column.isNull) ||
@@ -288,12 +296,14 @@ static bool _comparer(CompareOp op, const char *lhs, const char *rhs) {
     }
 }
 
-std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
-    int columnIndex = table->getColumnIndex(condition.columnName);
+void ValueConditionFilter::build() {
+    columnIndex = table->getColumnIndex(condition.columnId);
     if (columnIndex < 0) {
-        throw Internal::ColumnNotFoundError(condition.columnName);
+        throw Internal::ColumnNotFoundError(condition.columnId.getDesc());
     }
+}
 
+std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
     const Column &column = columns[columnIndex];
 
     // FIXME: What's the specification to deal with this?
@@ -322,21 +332,22 @@ std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
 // ====== End ValueConditionFilter ======
 
 std::string QuerySelector::getColumnName() const {
+    std::string desc = column.getDesc();
     switch (type) {
         case COLUMN:
-            return columnName;
+            return desc;
         case COUNT_STAR:
             return "COUNT(*)";
         case COUNT_COL:
-            return "COUNT(" + columnName + ")";
+            return "COUNT(" + desc + ")";
         case SUM:
-            return "SUM(" + columnName + ")";
+            return "SUM(" + desc + ")";
         case AVG:
-            return "AVG(" + columnName + ")";
+            return "AVG(" + desc + ")";
         case MIN:
-            return "MIN(" + columnName + ")";
+            return "MIN(" + desc + ")";
         case MAX:
-            return "MAX(" + columnName + ")";
+            return "MAX(" + desc + ")";
     }
 }
 

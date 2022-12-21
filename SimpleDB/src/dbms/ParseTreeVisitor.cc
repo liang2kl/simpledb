@@ -301,7 +301,7 @@ antlrcpp::Any ParseTreeVisitor::visitWhere_and_clause(
 antlrcpp::Any ParseTreeVisitor::visitWhere_operator_expression(
     SqlParser::Where_operator_expressionContext *ctx) {
     CompareValueCondition condition;
-    condition.columnName = ctx->column()->getText();
+    condition.columnId = ctx->column()->accept(this).as<ColumnId>();
 
     // TODO: Implement other comparisions.
     condition.value =
@@ -314,10 +314,22 @@ antlrcpp::Any ParseTreeVisitor::visitWhere_operator_expression(
 antlrcpp::Any ParseTreeVisitor::visitWhere_null(
     SqlParser::Where_nullContext *ctx) {
     CompareNullCondition condition;
-    condition.columnName = ctx->column()->getText();
+    condition.columnId = ctx->column()->accept(this).as<ColumnId>();
     condition.isNull = ctx->WhereNot() == nullptr;
 
     return condition;
+}
+
+antlrcpp::Any ParseTreeVisitor::visitColumn(
+    SQLParser::SqlParser::ColumnContext *ctx) {
+    ColumnId id;
+    if (ctx->Identifier().size() == 2) {
+        id.tableName = ctx->Identifier(0)->getText();
+        id.columnName = ctx->Identifier(1)->getText();
+    } else {
+        id.columnName = ctx->Identifier(0)->getText();
+    }
+    return id;
 }
 
 antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
@@ -353,7 +365,8 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
             hasNonAggregator = true;
 
             selectors.push_back(
-                {QuerySelector::COLUMN, selector->column()->getText()});
+                {QuerySelector::COLUMN,
+                 selector->column()->accept(this).as<ColumnId>()});
         } else {
             if (hasNonAggregator) {
                 throw Error::SelectError(
@@ -364,17 +377,18 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
             if (selector->aggregator() != nullptr) {
                 // COUNT, AVERAGE, MAX, MIN, SUM
                 auto *aggregator = selector->aggregator();
-                std::string columnName = selector->column()->getText();
+                ColumnId columnId =
+                    selector->column()->accept(this).as<ColumnId>();
                 if (aggregator->Count() != nullptr) {
-                    selectors.push_back({QuerySelector::COUNT_COL, columnName});
+                    selectors.push_back({QuerySelector::COUNT_COL, columnId});
                 } else if (aggregator->Sum() != nullptr) {
-                    selectors.push_back({QuerySelector::SUM, columnName});
+                    selectors.push_back({QuerySelector::SUM, columnId});
                 } else if (aggregator->Average() != nullptr) {
-                    selectors.push_back({QuerySelector::AVG, columnName});
+                    selectors.push_back({QuerySelector::AVG, columnId});
                 } else if (aggregator->Max() != nullptr) {
-                    selectors.push_back({QuerySelector::MAX, columnName});
+                    selectors.push_back({QuerySelector::MAX, columnId});
                 } else if (aggregator->Min() != nullptr) {
-                    selectors.push_back({QuerySelector::MIN, columnName});
+                    selectors.push_back({QuerySelector::MIN, columnId});
                 } else {
                     assert(false);
                 }

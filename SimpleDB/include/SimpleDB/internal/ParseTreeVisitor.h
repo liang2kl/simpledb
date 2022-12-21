@@ -63,6 +63,8 @@ public:
         SQLParser::SqlParser::Where_operator_expressionContext *ctx) override;
     virtual antlrcpp::Any visitWhere_null(
         SQLParser::SqlParser::Where_nullContext *ctx) override;
+    virtual antlrcpp::Any visitColumn(
+        SQLParser::SqlParser::ColumnContext *ctx) override;
 
     virtual antlrcpp::Any visitSelect_table_(
         SQLParser::SqlParser::Select_table_Context *ctx) override;
