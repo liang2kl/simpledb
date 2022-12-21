@@ -21,6 +21,7 @@ const int MAX_FOREIGN_KEYS = 12;
 
 const int MAX_SLOT_PER_PAGE = 64;
 const int16_t COLUMN_BITMAP_ALL = 0b111111111111;
+static_assert(MAX_SLOT_PER_PAGE < NUM_BUFFER_PAGE);
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
 const uint16_t PAGE_META_CANARY = 0xDBDB;

@@ -13,6 +13,7 @@
 #include "Error.h"
 #include "internal/Column.h"
 #include "internal/Index.h"
+#include "internal/JoinedTable.h"
 #include "internal/Logger.h"
 #include "internal/Macros.h"
 #include "internal/ParseTreeVisitor.h"
@@ -544,22 +545,36 @@ PlainResult DBMS::insert(const std::string &tableName,
 }
 
 QueryBuilder DBMS::select(
-    const std::string &tableName, const std::vector<QuerySelector> &selectors,
-    const std::vector<Internal::CompareValueCondition> &conditions,
+    const std::vector<std::string> &tableNames,
+    const std::vector<QuerySelector> &selectors,
+    const std::vector<Internal::CompareValueCondition> &valueConditions,
+    const std::vector<Internal::CompareColumnCondition> &columnConditions,
     const std::vector<Internal::CompareNullCondition> &nullConditions,
     int limit, int offset) {
     checkUseDatabase();
-    // Find table.
-    Table *table = getTable(tableName).second;
 
-    if (table == nullptr) {
-        throw Error::TableNotExistsError(tableName);
+    if (tableNames.size() > 2) {
+        throw Error::SelectError("only support table joins with 2 tables");
     }
 
-    std::shared_ptr<IndexedTable> indexedTable = newIndexedTable(table);
-    QueryBuilder builder(indexedTable);
+    std::shared_ptr<JoinedTable> joinedTable = std::make_shared<JoinedTable>();
 
-    for (const auto &cond : conditions) {
+    for (const auto &name : tableNames) {
+        Table *table = getTable(name).second;
+        if (table == nullptr) {
+            throw Error::TableNotExistsError(name);
+        }
+        std::shared_ptr<IndexedTable> indexedTable = newIndexedTable(table);
+        joinedTable->append(indexedTable);
+    }
+
+    QueryBuilder builder(joinedTable);
+
+    for (const auto &cond : valueConditions) {
+        builder.condition(cond);
+    }
+
+    for (const auto &cond : columnConditions) {
         builder.condition(cond);
     }
 

@@ -475,3 +475,48 @@ TEST_F(DBMSTest, TestSelect) {
 
     // TODO: Test aggregators with conditions.
 }
+
+TEST_F(DBMSTest, TestSelectMultipleTable) {
+    initDBMS();
+    createAndUseDatabase();
+
+    // Create table t1.
+    std::string createSql1 = "CREATE TABLE t1 (c1 INT, c2 FLOAT);";
+    ASSERT_NO_THROW(executeSQL(createSql1));
+
+    // Create table t2.
+    std::string createSql2 = "CREATE TABLE t2 (c1 INT, c2 FLOAT);";
+    ASSERT_NO_THROW(executeSQL(createSql2));
+
+    // Insert 1000 rows into t1.
+    for (int i = 0; i < 1000; i++) {
+        std::string intVal = std::to_string(i);
+        std::string floatVal = std::to_string(i * 1.0);
+        std::string insertSql =
+            "INSERT INTO t1 VALUES (" + intVal + ", " + floatVal + ");";
+        ASSERT_NO_THROW(executeSQL(insertSql));
+    }
+
+    // Insert 200 rows into t2.
+    for (int i = 0; i < 200; i++) {
+        std::string intVal = std::to_string(i);
+        std::string floatVal = std::to_string(i * 1.0);
+        std::string insertSql =
+            "INSERT INTO t2 VALUES (" + intVal + ", " + floatVal + ");";
+        ASSERT_NO_THROW(executeSQL(insertSql));
+    }
+
+    // Select from multiple tables.
+    std::string selectSql = "SELECT * FROM t1, t2;";
+    auto result = executeSQL(selectSql);
+    ASSERT_EQ(result.size(), 1);
+    ASSERT_EQ(result[0].query().columns_size(), 4);
+    ASSERT_EQ(result[0].query().rows_size(), 200 * 1000);
+
+    std::string selectSql2 =
+        "SELECT t1.c1, t2.c2 FROM t1, t2 WHERE t1.c1 = t2.c1;";
+    auto result2 = executeSQL(selectSql2);
+    ASSERT_EQ(result2.size(), 1);
+    ASSERT_EQ(result2[0].query().columns_size(), 2);
+    ASSERT_EQ(result2[0].query().rows_size(), 200);
+}

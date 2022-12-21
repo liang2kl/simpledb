@@ -41,6 +41,13 @@ QueryBuilder &QueryBuilder::condition(const ColumnId &id, CompareOp op,
     return condition(CompareValueCondition(id, op, string));
 }
 
+QueryBuilder &QueryBuilder::condition(const CompareColumnCondition &condition) {
+    ColumnConditionFilter filter;
+    filter.condition = condition;
+    columnConditionFilters.push_back(filter);
+    return *this;
+}
+
 QueryBuilder &QueryBuilder::nullCondition(
     const CompareNullCondition &condition) {
     NullConditionFilter filter;
@@ -144,7 +151,7 @@ std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
             int index = -1;
             for (int i = 0; i < columnMetas.size(); i++) {
                 if (columnMetas[i].columnName == selector.column.columnName) {
-                    if (index != -1) {
+                    if (selector.column.tableName.empty() && index != -1) {
                         throw AmbiguousColumnError(selector.column.getDesc());
                     }
                     if (selector.column.tableName.empty() ||
@@ -200,6 +207,10 @@ AggregatedFilter QueryBuilder::aggregateAllFilters() {
     for (int i = 0; i < valueConditionFilters.size(); i++) {
         valueConditionFilters[i].table = &virtualTable;
         filter.filters.push_back(&valueConditionFilters[i]);
+    }
+    for (int i = 0; i < columnConditionFilters.size(); i++) {
+        columnConditionFilters[i].table = &virtualTable;
+        filter.filters.push_back(&columnConditionFilters[i]);
     }
     // The select filters comes after.
     if (selectFilter.selectors.size() > 0) {

@@ -1,6 +1,8 @@
 #include "internal/ParseTreeVisitor.h"
 
 #include <cstdio>
+#include <cstring>
+#include <string>
 #include <tuple>
 #include <utility>
 #include <vector>
@@ -272,19 +274,35 @@ antlrcpp::Any ParseTreeVisitor::visitInsert_into_table(
     return wrap(result);
 }
 
+struct _WhereExpressionResult {
+    ColumnId lhs;
+    ColumnId rhs;
+    ColumnValue value;
+    CompareOp op;
+    bool isValueCondition;
+
+    _WhereExpressionResult(){};
+};
+
 antlrcpp::Any ParseTreeVisitor::visitWhere_and_clause(
     SqlParser::Where_and_clauseContext *ctx) {
     std::vector<CompareValueCondition> conditions;
     std::vector<CompareNullCondition> nullConditions;
+    std::vector<CompareColumnCondition> columnConditions;
 
     // TODO: Other clauses.
 
     for (auto &condition : ctx->where_clause()) {
         if (dynamic_cast<SQLParser::SqlParser::Where_operator_expressionContext
                              *>(condition)) {
-            auto valueCondition =
-                condition->accept(this).as<CompareValueCondition>();
-            conditions.push_back(valueCondition);
+            auto cond = condition->accept(this).as<_WhereExpressionResult>();
+            if (cond.isValueCondition) {
+                conditions.push_back(
+                    CompareValueCondition(cond.lhs, cond.op, cond.value));
+            } else {
+                columnConditions.push_back(
+                    CompareColumnCondition(cond.lhs, cond.op, cond.rhs));
+            }
         } else if (dynamic_cast<SQLParser::SqlParser::Where_nullContext *>(
                        condition)) {
             auto nullCondition =
@@ -295,20 +313,25 @@ antlrcpp::Any ParseTreeVisitor::visitWhere_and_clause(
         }
     }
 
-    return std::make_tuple(conditions, nullConditions);
+    return std::make_tuple(conditions, columnConditions, nullConditions);
 }
 
 antlrcpp::Any ParseTreeVisitor::visitWhere_operator_expression(
     SqlParser::Where_operator_expressionContext *ctx) {
-    CompareValueCondition condition;
-    condition.columnId = ctx->column()->accept(this).as<ColumnId>();
+    _WhereExpressionResult result;
+    result.lhs = ctx->column()->accept(this).as<ColumnId>();
+    result.op = ParseHelper::parseCompareOp(ctx->operator_()->getText());
 
     // TODO: Implement other comparisions.
-    condition.value =
-        ParseHelper::parseColumnValue(ctx->expression()->value()).data;
-    condition.op = ParseHelper::parseCompareOp(ctx->operator_()->getText());
+    auto expressionNode = ctx->expression();
+    if (expressionNode->value() != nullptr) {
+        result.value =
+            ParseHelper::parseColumnValue(ctx->expression()->value()).data;
+    } else if (expressionNode->column() != nullptr) {
+        result.rhs = expressionNode->column()->accept(this).as<ColumnId>();
+    }
 
-    return condition;
+    return result;
 }
 
 antlrcpp::Any ParseTreeVisitor::visitWhere_null(
@@ -335,6 +358,7 @@ antlrcpp::Any ParseTreeVisitor::visitColumn(
 antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
     SqlParser::Select_table_Context *ctx) {
     using ConditionTuple = std::tuple<std::vector<CompareValueCondition>,
+                                      std::vector<CompareColumnCondition>,
                                       std::vector<CompareNullCondition>>;
 
     auto selectTable = ctx->select_table();
@@ -345,10 +369,12 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
             selectTable->where_and_clause()->accept(this).as<ConditionTuple>();
     }
 
-    auto &[valConds, nullConds] = tuple;
+    auto &[valConds, colConds, nullConds] = tuple;
 
-    const std::string tableName =
-        selectTable->identifiers()->Identifier(0)->getText();
+    std::vector<std::string> tableNames;
+    for (const auto id : selectTable->identifiers()->Identifier()) {
+        tableNames.push_back(id->getText());
+    }
 
     // Get columns.
     std::vector<QuerySelector> selectors;
@@ -420,8 +446,8 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
     }
 
     // TODO: Multiple tables
-    QueryBuilder builder =
-        dbms->select(tableName, selectors, valConds, nullConds, limit, offset);
+    QueryBuilder builder = dbms->select(tableNames, selectors, valConds,
+                                        colConds, nullConds, limit, offset);
 
     QueryResult result = dbms->select(builder);
     return wrap(result);

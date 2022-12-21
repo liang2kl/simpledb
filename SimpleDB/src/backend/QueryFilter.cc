@@ -303,6 +303,19 @@ void ValueConditionFilter::build() {
     }
 }
 
+static _Comparer _getComparer(DataType type) {
+    switch (type) {
+        case DataType::INT:
+            return _comparer<Internal::_Int>;
+        case DataType::FLOAT:
+            return _comparer<Internal::_Float>;
+        case DataType::VARCHAR:
+            return _comparer<Internal::_String>;
+        default:
+            assert(false);
+    }
+}
+
 std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
     const Column &column = columns[columnIndex];
 
@@ -311,25 +324,39 @@ std::pair<bool, bool> ValueConditionFilter::apply(Columns &columns) {
         return {false, true};
     }
 
-    _Comparer comparer;
-
-    switch (column.type) {
-        case DataType::INT:
-            comparer = _comparer<Internal::_Int>;
-            break;
-        case DataType::FLOAT:
-            comparer = _comparer<Internal::_Float>;
-            break;
-        case DataType::VARCHAR:
-            comparer = _comparer<Internal::_String>;
-            break;
-    }
+    _Comparer comparer = _getComparer(column.type);
 
     return {comparer(condition.op, column.data.stringValue,
                      condition.value.stringValue),
             true};
 }
 // ====== End ValueConditionFilter ======
+
+// ===== Begin ColumnConditionFilter =====
+void ColumnConditionFilter::build() {
+    columnIndex1 = table->getColumnIndex(condition.lhs);
+    columnIndex2 = table->getColumnIndex(condition.rhs);
+    if (columnIndex1 < 0) {
+        throw Internal::ColumnNotFoundError(condition.lhs.getDesc());
+    }
+    if (columnIndex2 < 0) {
+        throw Internal::ColumnNotFoundError(condition.rhs.getDesc());
+    }
+}
+
+std::pair<bool, bool> ColumnConditionFilter::apply(Columns &columns) {
+    const Column &column1 = columns[columnIndex1];
+    const Column &column2 = columns[columnIndex2];
+
+    // FIXME: Is this necessary?
+    assert(column1.type == column2.type);
+
+    _Comparer comparer = _getComparer(column1.type);
+
+    return {comparer(condition.op, column1.data.stringValue,
+                     column2.data.stringValue),
+            true};
+}
 
 std::string QuerySelector::getColumnName() const {
     std::string desc = column.getDesc();

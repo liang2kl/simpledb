@@ -33,6 +33,10 @@ void IndexedTable::iterate(IterateCallback callback) {
 }
 
 bool IndexedTable::acceptCondition(const CompareValueCondition &condition) {
+    if (!condition.columnId.tableName.empty() &&
+        condition.columnId.tableName != table->meta.name) {
+        return false;
+    }
     int columnIndex =
         table->getColumnIndex(condition.columnId.columnName.c_str());
     if (columnIndex < 0) {

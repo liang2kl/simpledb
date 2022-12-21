@@ -430,6 +430,9 @@ void Table::iterate(IterateCallback callback) {
     for (int page = 1; page < meta.numUsedPages; page++) {
         PageHandle *handle = getHandle(page);
         for (int slot = 1; slot < numSlotPerPage(); slot++) {
+            if (!handle->validate()) {
+                handle = getHandle(page);
+            }
             if (occupied(*handle, slot)) {
                 RecordID rid = {page, slot};
 

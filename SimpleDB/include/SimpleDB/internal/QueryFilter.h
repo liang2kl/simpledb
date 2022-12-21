@@ -66,6 +66,16 @@ struct CompareNullCondition {
     CompareNullCondition() = default;
 };
 
+struct CompareColumnCondition {
+    ColumnId lhs;
+    CompareOp op;
+    ColumnId rhs;
+    CompareColumnCondition(const ColumnId &lhs, CompareOp op,
+                           const ColumnId &rhs)
+        : lhs(lhs), op(op), rhs(rhs) {}
+    CompareColumnCondition() = default;
+};
+
 struct QuerySelector {
     enum Type { COLUMN, COUNT_STAR, COUNT_COL, AVG, MAX, MIN, SUM };
     Type type;
@@ -124,6 +134,17 @@ struct NullConditionFilter : public BaseFilter {
     CompareNullCondition condition;
     VirtualTable *table;
     int columnIndex;
+};
+
+struct ColumnConditionFilter : public BaseFilter {
+    ColumnConditionFilter() = default;
+    ~ColumnConditionFilter() = default;
+    virtual void build() override;
+    virtual std::pair<bool, bool> apply(Columns &columns) override;
+    CompareColumnCondition condition;
+    VirtualTable *table;
+    int columnIndex1;
+    int columnIndex2;
 };
 
 struct SelectFilter : public BaseFilter {

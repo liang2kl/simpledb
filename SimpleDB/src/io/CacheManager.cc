@@ -172,6 +172,11 @@ char *CacheManager::load(const PageHandle &handle) {
 char *CacheManager::loadRaw(const PageHandle &handle) {
 #ifdef DEBUG
     if (!handle.validate()) {
+        Logger::log(ERROR,
+                    "CacheManager: trying to read data with an outdated page "
+                    "handle for page %d of file %d\n",
+                    handle.cache->meta.page, handle.cache->meta.fd.value);
+        assert(false);
         throw Internal::InvalidPageHandleError();
     }
 #endif

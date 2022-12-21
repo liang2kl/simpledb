@@ -22,6 +22,7 @@ public:
                             const char *string);
     QueryBuilder &condition(const ColumnId &columnId, CompareOp op,
                             const char *string);
+    QueryBuilder &condition(const CompareColumnCondition &condition);
     QueryBuilder &nullCondition(const CompareNullCondition &condition);
     QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
     QueryBuilder &nullCondition(const ColumnId &columnId, bool isNull);
@@ -39,6 +40,7 @@ public:
 
 private:
     std::vector<ValueConditionFilter> valueConditionFilters;
+    std::vector<ColumnConditionFilter> columnConditionFilters;
     std::vector<NullConditionFilter> nullConditionFilters;
     SelectFilter selectFilter;
     LimitFilter limitFilter;
