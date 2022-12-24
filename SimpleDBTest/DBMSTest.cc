@@ -488,8 +488,8 @@ TEST_F(DBMSTest, TestSelectMultipleTable) {
     std::string createSql2 = "CREATE TABLE t2 (c1 INT, c2 FLOAT);";
     ASSERT_NO_THROW(executeSQL(createSql2));
 
-    // Insert 1000 rows into t1.
-    for (int i = 0; i < 1000; i++) {
+    // Insert 100 rows into t1.
+    for (int i = 0; i < 100; i++) {
         std::string intVal = std::to_string(i);
         std::string floatVal = std::to_string(i * 1.0);
         std::string insertSql =
@@ -497,8 +497,8 @@ TEST_F(DBMSTest, TestSelectMultipleTable) {
         ASSERT_NO_THROW(executeSQL(insertSql));
     }
 
-    // Insert 200 rows into t2.
-    for (int i = 0; i < 200; i++) {
+    // Insert 100 rows into t2.
+    for (int i = 0; i < 100; i++) {
         std::string intVal = std::to_string(i);
         std::string floatVal = std::to_string(i * 1.0);
         std::string insertSql =
@@ -511,12 +511,12 @@ TEST_F(DBMSTest, TestSelectMultipleTable) {
     auto result = executeSQL(selectSql);
     ASSERT_EQ(result.size(), 1);
     ASSERT_EQ(result[0].query().columns_size(), 4);
-    ASSERT_EQ(result[0].query().rows_size(), 200 * 1000);
+    ASSERT_EQ(result[0].query().rows_size(), 100 * 100);
 
     std::string selectSql2 =
         "SELECT t1.c1, t2.c2 FROM t1, t2 WHERE t1.c1 = t2.c1;";
     auto result2 = executeSQL(selectSql2);
     ASSERT_EQ(result2.size(), 1);
     ASSERT_EQ(result2[0].query().columns_size(), 2);
-    ASSERT_EQ(result2[0].query().rows_size(), 200);
+    ASSERT_EQ(result2[0].query().rows_size(), 100);
 }
