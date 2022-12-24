@@ -47,6 +47,19 @@ message ExecutionError {
     ERR_DATABASE_EXIST = 5;
     ERR_CREATE_DATABASE = 6;
     ERR_DATABASE_NOT_EXIST = 7;
+    ERR_UNINITIALIZED = 8;
+    ERR_INITIALIZATION = 9;
+    ERR_INVAL_DB_NAME = 10;
+    ERR_DB_NOT_SELECTED = 11;
+    ERR_TABLE_EXISTS = 12;
+    ERR_INVAL_TABLE_NAME = 13;
+    ERR_TABLE_NOT_EXISTS = 14;
+    ERR_MUL_PRIKEY = 15;
+    ERR_CREATE_TABLE = 16;
+    ERR_ALT_PRIKEY = 17;
+    ERR_ALT_INDEX = 18;
+    ERR_INSERT = 19;
+    ERR_SELECT = 20;
   }
   string message = 1;
   Type type = 2;

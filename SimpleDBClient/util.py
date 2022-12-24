@@ -43,6 +43,9 @@ def print_table(headers, rows, true_num=-1):
         print("Empty set")
         return
     table = PrettyTable()
+    # prettytable will raise "Field names must be unique" on duplicate column
+    # names, but we just need that.
+    table._validate_field_names = lambda *a, **k: None
     table.field_names = headers
     table.align = "l"
     for r in rows:

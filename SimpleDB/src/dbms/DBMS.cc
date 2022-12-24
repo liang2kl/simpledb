@@ -598,8 +598,15 @@ QueryBuilder DBMS::select(
 }
 
 QueryResult DBMS::select(Internal::QueryBuilder &builder) {
-    QueryBuilder::Result result = builder.execute();
-    std::vector<ColumnInfo> columns = builder.getColumnInfo();
+    QueryBuilder::Result result;
+    std::vector<ColumnInfo> columns;
+
+    try {
+        result = builder.execute();
+        columns = builder.getColumnInfo();
+    } catch (BaseError &e) {
+        throw Error::SelectError(e.what());
+    }
 
     QueryResult queryResult;
 
