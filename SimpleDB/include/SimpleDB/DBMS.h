@@ -94,14 +94,25 @@ private:
     Service::PlainResult insert(const std::string &tableName,
                                 const std::vector<Internal::Column> &values,
                                 Internal::ColumnBitmap emptyBits);
+    Service::PlainResult update(Internal::QueryBuilder &builder,
+                                const std::vector<std::string> &columnNames,
+                                const Internal::Columns &columns);
+    Service::PlainResult delete_(Internal::QueryBuilder &builder);
     Service::QueryResult select(Internal::QueryBuilder &builder);
-    Internal::QueryBuilder select(
+
+    Internal::QueryBuilder buildQuery(
         const std::vector<std::string> &tables,
         const std::vector<Internal::QuerySelector> &selectors,
         const std::vector<Internal::CompareValueCondition> &valueConditions,
         const std::vector<Internal::CompareColumnCondition> &columnConditions,
         const std::vector<Internal::CompareNullCondition> &nullConditions,
-        int limit, int offset);
+        int limit, int offset, bool updateOrDelete = false);
+
+    Internal::QueryBuilder buildQueryForUpdateOrDelete(
+        const std::string &table,
+        const std::vector<Internal::CompareValueCondition> &valueConditions,
+        const std::vector<Internal::CompareColumnCondition> &columnConditions,
+        const std::vector<Internal::CompareNullCondition> &nullConditions);
 
     // === System tables ===
     void initSystemTable(Internal::Table *table, const std::string &name,

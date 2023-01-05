@@ -69,6 +69,8 @@ std::vector<ColumnInfo> IndexedTable::getColumnInfo() {
     return table->getColumnInfo();
 }
 
+Table *IndexedTable::getTable() { return table; }
+
 Index::Range IndexedTable::makeRange(const CompareValueCondition &condition) {
     int value = condition.value.intValue;
 

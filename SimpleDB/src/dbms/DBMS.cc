@@ -456,6 +456,163 @@ ShowIndexesResult DBMS::showIndexes(const std::string &tableName) {
     return showIndexesResult;
 }
 
+PlainResult DBMS::update(QueryBuilder &builder,
+                         const std::vector<std::string> &columnNames,
+                         const Columns &columns) {
+    checkUseDatabase();
+    assert(builder.validForUpdateOrDelete());
+    assert(columnNames.size() == columns.size());
+
+    IndexedTable *indexedTable =
+        dynamic_cast<IndexedTable *>(builder.getDataSource());
+    assert(indexedTable != nullptr);
+
+    Table *table = indexedTable->getTable();
+
+    // Check if the input columns are valid.
+    std::vector<ColumnInfo> columnInfos = builder.getColumnInfo();
+    ColumnBitmap updateBitmap = 0;
+    std::vector<std::shared_ptr<Index>> indexes;
+    std::vector<int> indexMapping;                 // col i -> index i
+    std::vector<int> columnUpdateIndexRevMapping;  // col i -> update i
+    std::vector<int> columnUpdateIndexMapping;     // update i -> col i
+    int primaryKeyIndex = -1;
+
+    indexMapping.assign(columnInfos.size(), -1);
+    columnUpdateIndexRevMapping.assign(columnInfos.size(), -1);
+
+    for (int i = 0; i < columns.size(); i++) {
+        int colIndex = table->getColumnIndex(columnNames[i].c_str());
+        if (colIndex < 0) {
+            throw Error::UpdateError(
+                ColumnNotFoundError(columnNames[i]).what());
+        }
+        updateBitmap |= (1L << colIndex);
+        columnUpdateIndexMapping.push_back(colIndex);
+        columnUpdateIndexRevMapping[colIndex] = i;
+
+        auto index =
+            getIndex(currentDatabase, table->meta.name, columnNames[i]).second;
+
+        if (index != nullptr) {
+            indexes.push_back(index);
+            indexMapping[colIndex] = indexes.size() - 1;
+        }
+
+        if (colIndex == table->meta.primaryKeyIndex) {
+            primaryKeyIndex = i;
+        }
+    }
+
+    // First get id of all records.
+    std::vector<RecordID> rids;
+    std::vector<Columns> oldColumns;
+
+    builder.iterate([&](RecordID id, Columns &record) {
+        rids.push_back(id);
+        oldColumns.emplace_back();
+        // Store the old values of the index.
+        for (int i = 0; i < indexMapping.size(); i++) {
+            if (indexMapping[i] >= 0) {
+                oldColumns[oldColumns.size() - 1].push_back(record[i]);
+            }
+        }
+        return true;
+    });
+
+    // Check constraints.
+    if (primaryKeyIndex >= 0) {
+        if (rids.size() >= 2) {
+            // This update is doomed to cause a duplicate pk.
+            throw Error::UpdateError("duplicate primary key");
+        }
+        assert(indexMapping[primaryKeyIndex] != -1);
+        // The the index of this column.
+        auto index = indexes[indexMapping[primaryKeyIndex]];
+        // Check if the new pk already exists.
+        if (index->has(columns[primaryKeyIndex].data.intValue)) {
+            throw Error::UpdateError("duplicate primary key");
+        }
+    }
+
+    // Perform updates (update index by the way).
+    for (int i = 0; i < rids.size(); i++) {
+        RecordID rid = rids[i];
+        table->update(rid, columns, updateBitmap);
+
+        // Update index.
+        for (int columnIndex : columnUpdateIndexMapping) {
+            if (indexMapping[columnIndex] >= 0) {
+                auto index = indexes[indexMapping[columnIndex]];
+                int updateColIndex = columnUpdateIndexRevMapping[columnIndex];
+                index->remove(oldColumns[i][updateColIndex].data.intValue, rid);
+                index->insert(columns[updateColIndex].data.intValue, rid);
+            }
+        }
+    }
+
+    // TODO: FK...
+
+    return makePlainResult("OK", rids.size());
+}
+
+PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
+    // Happily, we only need to check foreign key references here, no annoying
+    // primary key.
+    // TODO: Check PK.
+
+    checkUseDatabase();
+    assert(builder.validForUpdateOrDelete());
+
+    // Get all indexes.
+    IndexedTable *indexedTable =
+        dynamic_cast<IndexedTable *>(builder.getDataSource());
+    assert(indexedTable != nullptr);
+    Table *table = indexedTable->getTable();
+
+    std::vector<std::shared_ptr<Index>> indexes;
+    std::vector<int> indexMapping;  // indexes.i -> col i
+
+    for (int i = 0; i < table->meta.numColumn; i++) {
+        auto index = getIndex(currentDatabase, table->meta.name,
+                              table->meta.columns[i].name)
+                         .second;
+        if (index == nullptr) {
+            continue;
+        }
+        indexes.push_back(index);
+        indexMapping.push_back(i);
+    }
+
+    // Get all records and index keys.
+    std::vector<RecordID> rids;
+    std::vector<Columns> oldColumns;
+    builder.iterate([&](RecordID id, Columns &record) {
+        rids.push_back(id);
+        oldColumns.emplace_back();
+        for (int i = 0; i < indexMapping.size(); i++) {
+            oldColumns[oldColumns.size() - 1].push_back(
+                record[indexMapping[i]]);
+        }
+        return true;
+    });
+
+    // TODO: Constraints.
+    // Remove records (and update index).
+    for (int i = 0; i < rids.size(); i++) {
+        RecordID rid = rids[i];
+        table->remove(rid);
+
+        // Update index.
+        for (int j = 0; j < indexMapping.size(); j++) {
+            auto index = indexes[j];
+            index->remove(oldColumns[i][j].data.intValue, rid);
+        }
+    }
+
+    return makePlainResult("OK", rids.size());
+}
+
 PlainResult DBMS::insert(const std::string &tableName,
                          const std::vector<Column> &_columns,
                          ColumnBitmap emptyBits) {
@@ -544,31 +701,44 @@ PlainResult DBMS::insert(const std::string &tableName,
     return makePlainResult("OK", 1);
 }
 
-QueryBuilder DBMS::select(
+QueryBuilder DBMS::buildQuery(
     const std::vector<std::string> &tableNames,
     const std::vector<QuerySelector> &selectors,
     const std::vector<Internal::CompareValueCondition> &valueConditions,
     const std::vector<Internal::CompareColumnCondition> &columnConditions,
     const std::vector<Internal::CompareNullCondition> &nullConditions,
-    int limit, int offset) {
+    int limit, int offset, bool updateOrDelete) {
     checkUseDatabase();
 
-    if (tableNames.size() > 2) {
-        throw Error::SelectError("only support table joins with 2 tables");
-    }
+    QueryBuilder builder;
 
-    std::shared_ptr<JoinedTable> joinedTable = std::make_shared<JoinedTable>();
+    if (updateOrDelete) {
+        assert(tableNames.size() == 1);
 
-    for (const auto &name : tableNames) {
-        Table *table = getTable(name).second;
+        Table *table = getTable(tableNames[0]).second;
         if (table == nullptr) {
-            throw Error::TableNotExistsError(name);
+            throw Error::TableNotExistsError(tableNames[0]);
         }
         std::shared_ptr<IndexedTable> indexedTable = newIndexedTable(table);
-        joinedTable->append(indexedTable);
-    }
+        builder = QueryBuilder(indexedTable);
+    } else {
+        if (tableNames.size() > 2) {
+            throw Error::SelectError("only support table joins with 2 tables");
+        }
 
-    QueryBuilder builder(joinedTable);
+        std::shared_ptr<JoinedTable> joinedTable =
+            std::make_shared<JoinedTable>();
+
+        for (const auto &name : tableNames) {
+            Table *table = getTable(name).second;
+            if (table == nullptr) {
+                throw Error::TableNotExistsError(name);
+            }
+            std::shared_ptr<IndexedTable> indexedTable = newIndexedTable(table);
+            joinedTable->append(indexedTable);
+        }
+        builder = QueryBuilder(joinedTable);
+    }
 
     for (const auto &cond : valueConditions) {
         builder.condition(cond);
@@ -595,6 +765,15 @@ QueryBuilder DBMS::select(
     }
 
     return builder;
+}
+
+QueryBuilder DBMS::buildQueryForUpdateOrDelete(
+    const std::string &table,
+    const std::vector<CompareValueCondition> &valueConditions,
+    const std::vector<CompareColumnCondition> &columnConditions,
+    const std::vector<CompareNullCondition> &nullConditions) {
+    return buildQuery({table}, {}, valueConditions, columnConditions,
+                      nullConditions, -1, 0, true);
 }
 
 QueryResult DBMS::select(Internal::QueryBuilder &builder) {

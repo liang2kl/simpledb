@@ -188,6 +188,11 @@ std::vector<ColumnInfo> QueryBuilder::getColumnInfo() {
     return result;
 }
 
+bool QueryBuilder::validForUpdateOrDelete() const {
+    return selectFilter.selectors.size() == 0 && limitFilter.limit < 0 &&
+           offsetFilter.offset == 0;
+}
+
 void QueryBuilder::checkDataSource() {
     if (getDataSource() == nullptr) {
         throw NoScanDataSourceError();

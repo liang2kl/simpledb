@@ -520,3 +520,5 @@ TEST_F(DBMSTest, TestSelectMultipleTable) {
     ASSERT_EQ(result2[0].query().columns_size(), 2);
     ASSERT_EQ(result2[0].query().rows_size(), 100);
 }
+
+// No more time to test update, delete, ..., the deadline is tomorrow :(

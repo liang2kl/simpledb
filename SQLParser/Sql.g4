@@ -50,8 +50,10 @@ table_statement:
 	| 'DROP' 'TABLE' Identifier								# drop_table
 	| 'DESC' Identifier										# describe_table
 	| 'INSERT' 'INTO' Identifier 'VALUES' insert_value_list	# insert_into_table
-	| 'DELETE' 'FROM' Identifier 'WHERE' where_and_clause			# delete_from_table
-	| 'UPDATE' Identifier 'SET' set_clause 'WHERE' where_and_clause	# update_table
+	| 'DELETE' 'FROM' Identifier 'WHERE' where_and_clause # delete_from_table
+	| 'UPDATE' Identifier 'SET' set_clause (
+		'WHERE' where_and_clause
+	)? # update_table
 	| select_table													# select_table_;
 
 select_table:

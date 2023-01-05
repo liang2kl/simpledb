@@ -31,6 +31,7 @@ public:
 
     using Range = std::pair<int, int>;  // [first, second]
 
+    bool has(int key);
     void iterateEq(int key, IterateFunc func);
     void iterateRange(Range, IterateFunc func);
     std::vector<RecordID> findEq(int key);

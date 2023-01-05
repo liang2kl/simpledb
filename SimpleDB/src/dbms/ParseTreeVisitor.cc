@@ -327,8 +327,10 @@ antlrcpp::Any ParseTreeVisitor::visitWhere_operator_expression(
     if (expressionNode->value() != nullptr) {
         result.value =
             ParseHelper::parseColumnValue(ctx->expression()->value()).data;
+        result.isValueCondition = true;
     } else if (expressionNode->column() != nullptr) {
         result.rhs = expressionNode->column()->accept(this).as<ColumnId>();
+        result.isValueCondition = false;
     }
 
     return result;
@@ -355,12 +357,12 @@ antlrcpp::Any ParseTreeVisitor::visitColumn(
     return id;
 }
 
+using ConditionTuple = std::tuple<std::vector<CompareValueCondition>,
+                                  std::vector<CompareColumnCondition>,
+                                  std::vector<CompareNullCondition>>;
+
 antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
     SqlParser::Select_table_Context *ctx) {
-    using ConditionTuple = std::tuple<std::vector<CompareValueCondition>,
-                                      std::vector<CompareColumnCondition>,
-                                      std::vector<CompareNullCondition>>;
-
     auto selectTable = ctx->select_table();
     ConditionTuple tuple;
 
@@ -445,12 +447,57 @@ antlrcpp::Any ParseTreeVisitor::visitSelect_table_(
         }
     }
 
-    // TODO: Multiple tables
-    QueryBuilder builder = dbms->select(tableNames, selectors, valConds,
-                                        colConds, nullConds, limit, offset);
+    QueryBuilder builder = dbms->buildQuery(tableNames, selectors, valConds,
+                                            colConds, nullConds, limit, offset);
 
     QueryResult result = dbms->select(builder);
     return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitUpdate_table(
+    SqlParser::Update_tableContext *ctx) {
+    ConditionTuple tuple;
+
+    if (ctx->where_and_clause() != nullptr) {
+        tuple = ctx->where_and_clause()->accept(this).as<ConditionTuple>();
+    }
+
+    auto &[valConds, colConds, nullConds] = tuple;
+
+    std::string tableName = ctx->Identifier()->getText();
+
+    QueryBuilder builder = dbms->buildQueryForUpdateOrDelete(
+        tableName, valConds, colConds, nullConds);
+
+    auto setClause = ctx->set_clause();
+    int numColumn = setClause->Identifier().size();
+    assert(numColumn == setClause->EqualOrAssign().size());
+
+    std::vector<std::string> columnNames;
+    Columns columns;
+    for (int i = 0; i < numColumn; i++) {
+        columnNames.push_back(setClause->Identifier(i)->getText());
+        columns.push_back(ParseHelper::parseColumnValue(setClause->value(i)));
+    }
+
+    PlainResult res = dbms->update(builder, columnNames, columns);
+    return wrap(res);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitDelete_from_table(
+    SqlParser::Delete_from_tableContext *ctx) {
+    ConditionTuple tuple =
+        ctx->where_and_clause()->accept(this).as<ConditionTuple>();
+
+    auto &[valConds, colConds, nullConds] = tuple;
+
+    std::string tableName = ctx->Identifier()->getText();
+
+    QueryBuilder builder = dbms->buildQueryForUpdateOrDelete(
+        tableName, valConds, colConds, nullConds);
+
+    PlainResult res = dbms->delete_(builder);
+    return wrap(res);
 }
 
 }  // namespace Internal

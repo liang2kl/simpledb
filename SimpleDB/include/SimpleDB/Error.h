@@ -141,8 +141,9 @@ DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
 DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
 DECLARE_ERROR(AlterPrimaryKey, ExecutionErrorBase, "Fail to alter primary key");
 DECLARE_ERROR(AlterIndex, ExecutionErrorBase, "Fail to alter index");
-DECLARE_ERROR(Insert, ExecutionErrorBase, "Fail to insert record");
+DECLARE_ERROR(Insert, ExecutionErrorBase, "INSERT statement failed");
 DECLARE_ERROR(Select, ExecutionErrorBase, "SELECT statement failed");
+DECLARE_ERROR(Update, ExecutionErrorBase, "UPDATE statement failed");
 
 }  // namespace Error
 

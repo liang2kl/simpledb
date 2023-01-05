@@ -24,6 +24,8 @@ public:
     virtual bool acceptCondition(
         const CompareValueCondition &condition) override;
 
+    Table *getTable();
+
 #if !TESTING
 private:
 #endif

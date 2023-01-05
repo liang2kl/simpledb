@@ -54,9 +54,6 @@ public:
     virtual antlrcpp::Any visitShow_indexes(
         SQLParser::SqlParser::Show_indexesContext *ctx) override;
 
-    virtual antlrcpp::Any visitInsert_into_table(
-        SQLParser::SqlParser::Insert_into_tableContext *ctx) override;
-
     virtual antlrcpp::Any visitWhere_and_clause(
         SQLParser::SqlParser::Where_and_clauseContext *ctx) override;
     virtual antlrcpp::Any visitWhere_operator_expression(
@@ -66,8 +63,14 @@ public:
     virtual antlrcpp::Any visitColumn(
         SQLParser::SqlParser::ColumnContext *ctx) override;
 
+    virtual antlrcpp::Any visitInsert_into_table(
+        SQLParser::SqlParser::Insert_into_tableContext *ctx) override;
     virtual antlrcpp::Any visitSelect_table_(
         SQLParser::SqlParser::Select_table_Context *ctx) override;
+    virtual antlrcpp::Any visitUpdate_table(
+        SQLParser::SqlParser::Update_tableContext *ctx) override;
+    virtual antlrcpp::Any visitDelete_from_table(
+        SQLParser::SqlParser::Delete_from_tableContext *ctx) override;
 
 private:
     DBMS *dbms;

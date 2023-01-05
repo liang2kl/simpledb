@@ -154,6 +154,18 @@ void Index::remove(int key, RecordID rid) {
     meta.numEntry--;
 }
 
+bool Index::has(int key) {
+    checkInit();
+
+    bool ret = false;
+    iterateEq(key, [&](RecordID id) {
+        ret = true;
+        return false;
+    });
+
+    return ret;
+}
+
 std::vector<RecordID> Index::findEq(int key) {
     std::vector<RecordID> ret;
 

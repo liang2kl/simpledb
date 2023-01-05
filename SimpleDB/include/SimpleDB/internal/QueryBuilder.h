@@ -17,6 +17,8 @@ public:
     using Result = std::vector<std::pair<RecordID, Columns>>;
     QueryBuilder(QueryDataSource *dataSource);
     QueryBuilder(std::shared_ptr<QueryDataSource> dataSource);
+    QueryBuilder() = default;
+
     QueryBuilder &condition(const CompareValueCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
                             const char *string);
@@ -38,6 +40,9 @@ public:
     virtual void iterate(IterateCallback callback) override;
     virtual std::vector<ColumnInfo> getColumnInfo() override;
 
+    bool validForUpdateOrDelete() const;
+    QueryDataSource *getDataSource();
+
 private:
     std::vector<ValueConditionFilter> valueConditionFilters;
     std::vector<ColumnConditionFilter> columnConditionFilters;
@@ -49,7 +54,6 @@ private:
     QueryDataSource *dataSourceRawPtr = nullptr;
     std::shared_ptr<QueryDataSource> dataSourceSharedPtr;
     bool isRaw;
-    QueryDataSource *getDataSource();
     VirtualTable virtualTable;
 
     void checkDataSource();
