@@ -1,6 +1,7 @@
 #include "internal/IndexedTable.h"
 
 #include <algorithm>
+#include <cassert>
 #include <climits>
 #include <cstdint>
 #include <vector>

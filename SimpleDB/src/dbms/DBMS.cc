@@ -2,6 +2,7 @@
 
 #include <any>
 #include <bitset>
+#include <cassert>
 #include <cstdio>
 #include <filesystem>
 #include <memory>

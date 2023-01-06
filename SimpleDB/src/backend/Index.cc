@@ -1,5 +1,6 @@
 #include "internal/Index.h"
 
+#include <cassert>
 #include <climits>
 #include <queue>
 #include <string>

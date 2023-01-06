@@ -1,5 +1,6 @@
 #include "internal/JoinedTable.h"
 
+#include <cassert>
 #include <memory>
 #include <vector>
 

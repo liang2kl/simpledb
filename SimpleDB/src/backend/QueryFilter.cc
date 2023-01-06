@@ -1,5 +1,6 @@
 #include "internal/QueryFilter.h"
 
+#include <cassert>
 #include <cstdint>
 #include <limits>
 #include <regex>

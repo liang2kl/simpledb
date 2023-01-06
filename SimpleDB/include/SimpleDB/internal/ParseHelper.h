@@ -3,6 +3,7 @@
 
 #include <SQLParser/SqlParser.h>
 
+#include <cassert>
 #include <cstring>
 #include <string>
 
