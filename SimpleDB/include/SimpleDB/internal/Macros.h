@@ -13,14 +13,14 @@ const int NUM_BUFFER_PAGE = 1024;
 
 const int MAX_VARCHAR_LEN = 256 - 1;
 const int MAX_COLUMN_SIZE = MAX_VARCHAR_LEN + 1;
-const int MAX_COLUMNS = 12;
+const int MAX_COLUMNS = 16;
 const int MAX_COLUMN_NAME_LEN = 64;
 const int MAX_TABLE_NAME_LEN = 64;
 const int MAX_DATABASE_NAME_LEN = MAX_VARCHAR_LEN;
 const int MAX_FOREIGN_KEYS = 12;
 
 const int MAX_SLOT_PER_PAGE = 64;
-const int16_t COLUMN_BITMAP_ALL = 0b111111111111;
+const int16_t COLUMN_BITMAP_ALL = ~0;
 static_assert(MAX_SLOT_PER_PAGE < NUM_BUFFER_PAGE);
 
 const uint16_t TABLE_META_CANARY = 0xDDBB;
