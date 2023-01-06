@@ -639,12 +639,45 @@ PlainResult DBMS::update(QueryBuilder &builder,
     // Check foreign key constaints (referencing other tables).
     auto referencingColumns =
         findForeignKeys(currentDatabase, table->meta.name, {}, {}, {});
+    std::vector<ForeignKeyInfo> relativeForeignKeys;
+    for (const auto &foreignKey : referencingColumns) {
+        int index = table->getColumnIndex(foreignKey.column.c_str());
+        if (updateBitmap & (1L << index)) {
+            relativeForeignKeys.push_back(foreignKey);
+        }
+    }
+    printf("Size: %lu, name %s\n", relativeForeignKeys.size(),
+           relativeForeignKeys[0].column.c_str());
     // Check if the new values of the referencing columns are valid.
-    bool hasReferencingColumns =
-        this->hasReferencingRecord(table, referencingColumns, columns);
-    if (!hasReferencingColumns) {
-        throw Error::UpdateError(
-            ForeignKeyViolationError("referenced column not found").what());
+    for (const auto &foreignKey : relativeForeignKeys) {
+        Table *refTable = getTable(foreignKey.refTable).second;
+        assert(refTable != nullptr);
+        int refColIndex =
+            refTable->getColumnIndex(foreignKey.refColumn.c_str());
+        int oriColIndex = table->getColumnIndex(foreignKey.column.c_str());
+        assert(refColIndex >= 0);
+        assert(oriColIndex >= 0);
+        int indexInUpdateCols = columnUpdateIndexRevMapping[oriColIndex];
+        assert(indexInUpdateCols != -1);
+        assert(columns[indexInUpdateCols].type == INT);
+
+        auto indexedTable = newIndexedTable(refTable);
+
+        QueryBuilder builder(indexedTable);
+        builder
+            .condition(foreignKey.refColumn, EQ,
+                       columns[indexInUpdateCols].data.intValue)
+            .limit(1);
+        auto result = builder.execute();
+
+        if (result.empty()) {
+            throw Error::UpdateError(
+                ForeignKeyViolationError(
+                    "referenced record " + foreignKey.refColumn + "(" +
+                    std::to_string(columns[indexInUpdateCols].data.intValue) +
+                    ") not found")
+                    .what());
+        }
     }
 
     // Perform updates (update index by the way).
@@ -1138,8 +1171,10 @@ bool DBMS::hasReferencingRecord(
             .condition(foreignKey.refColumn, EQ,
                        allNewColumns[oriColIndex].data.intValue)
             .limit(1);
+        auto result = builder.execute();
+        printf("%d\n", result[0].second[0].data.intValue);
 
-        if (builder.execute().empty()) {
+        if (result.empty()) {
             return false;
         }
     }
