@@ -26,15 +26,15 @@ public:
     void create(const std::string &file);
     void close();
 
-    void insert(int key, RecordID id);
-    void remove(int key, RecordID rid);
+    void insert(int key, bool isNull, RecordID id);
+    void remove(int key, bool isNull, RecordID rid);
 
     using Range = std::pair<int, int>;  // [first, second]
 
-    bool has(int key);
-    void iterateEq(int key, IterateFunc func);
+    bool has(int key, bool isNull);
+    void iterateEq(int key, bool isNull, IterateFunc func);
     void iterateRange(Range, IterateFunc func);
-    std::vector<RecordID> findEq(int key);
+    std::vector<RecordID> findEq(int key, bool isNull);
     void setReadOnly();
 
 #ifndef TESTING
@@ -51,6 +51,7 @@ private:
 
     struct IndexEntry {
         int key;
+        bool isNull = false;
         RecordID record;
 
         bool operator==(const IndexEntry &rhs) const;

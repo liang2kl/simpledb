@@ -454,12 +454,6 @@ PlainResult DBMS::createIndex(const std::string &tableName,
             "creating index on VARCHAR or FLOAT is not supported");
     }
 
-    if (columnMeta.nullable) {
-        throw Error::AlterIndexError(
-            "creating index on nullable column is not "
-            "supported");
-    }
-
     // Now create the index. We are not caching this as it is relatively
     // lightweight.
     Index newIndex;
@@ -469,7 +463,8 @@ PlainResult DBMS::createIndex(const std::string &tableName,
 
     // Inser existing records into the index.
     table->iterate([&](RecordID id, Columns &columns) {
-        newIndex.insert(columns[columnIndex].data.intValue, id);
+        newIndex.insert(columns[columnIndex].data.intValue,
+                        columns[columnIndex].isNull, id);
         return true;
     });
 
@@ -634,7 +629,8 @@ PlainResult DBMS::update(QueryBuilder &builder,
         // The the index of this column.
         auto index = indexes[indexMapping[primaryKeyIndex]];
         // Check if the new pk already exists.
-        if (index->has(columns[primaryKeyIndex].data.intValue)) {
+        if (index->has(columns[primaryKeyIndex].data.intValue,
+                       columns[primaryKeyIndex].isNull)) {
             throw Error::UpdateError("duplicate primary key");
         }
     }
@@ -660,8 +656,10 @@ PlainResult DBMS::update(QueryBuilder &builder,
             if (indexMapping[columnIndex] >= 0) {
                 auto index = indexes[indexMapping[columnIndex]];
                 int updateColIndex = columnUpdateIndexRevMapping[columnIndex];
-                index->remove(oldColumns[i][updateColIndex].data.intValue, rid);
-                index->insert(columns[updateColIndex].data.intValue, rid);
+                auto &oldCol = oldColumns[i][updateColIndex];
+                auto &newCol = columns[updateColIndex];
+                index->remove(oldCol.data.intValue, oldCol.isNull, rid);
+                index->insert(newCol.data.intValue, newCol.isNull, rid);
             }
         }
     }
@@ -731,7 +729,8 @@ PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
         // Update index.
         for (int j = 0; j < indexMapping.size(); j++) {
             auto index = indexes[j];
-            index->remove(oldColumns[i][indexMapping[j]].data.intValue, rid);
+            auto &oldCol = oldColumns[i][indexMapping[j]];
+            index->remove(oldCol.data.intValue, oldCol.isNull, rid);
         }
     }
 
@@ -848,8 +847,11 @@ PlainResult DBMS::insert(const std::string &tableName,
         int key = columnMapping[columnIndex] == -1
                       ? table->meta.columns[columnIndex].defaultValue.intValue
                       : columns[columnMapping[columnIndex]].data.intValue;
+        bool isNull = columnMapping[columnIndex] == -1
+                          ? !table->meta.columns[columnIndex].hasDefault
+                          : columns[columnMapping[columnIndex]].isNull;
 
-        index.insert(key, id);
+        index.insert(key, isNull, id);
         index.close();
     }
 

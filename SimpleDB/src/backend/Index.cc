@@ -92,7 +92,7 @@ void Index::close() {
     // TODO: More cleanup
 }
 
-void Index::insert(int key, RecordID id) {
+void Index::insert(int key, bool isNull, RecordID id) {
     Logger::log(VERBOSE,
                 "Index: inserting index (key: %d) at page %d, slot %d\n", key,
                 id.page, id.slot);
@@ -104,7 +104,7 @@ void Index::insert(int key, RecordID id) {
         throw Internal::WriteOnReadOnlyIndexError();
     }
 
-    auto result = findEntry({key, id}, /*skipInvalid=*/false);
+    auto result = findEntry({key, isNull, id}, /*skipInvalid=*/false);
     NodeIndex nodeIndex = std::get<0>(result);
     int index = std::get<1>(result);
     bool found = std::get<2>(result);
@@ -124,7 +124,7 @@ void Index::insert(int key, RecordID id) {
         }
     } else {
         // Insert the record into the node.
-        insertEntry(&node->shared, {key, id});
+        insertEntry(&node->shared, {key, isNull, id});
         checkOverflowFrom(nodeIndex);
     }
 
@@ -135,7 +135,7 @@ void Index::insert(int key, RecordID id) {
     meta.numEntry++;
 }
 
-void Index::remove(int key, RecordID rid) {
+void Index::remove(int key, bool isNull, RecordID rid) {
     Logger::log(VERBOSE, "Index: removing record %d\n", key);
     checkInit();
 
@@ -146,7 +146,7 @@ void Index::remove(int key, RecordID rid) {
     }
 
     auto [nodeIndex, index, found] =
-        findEntry({key, rid}, /*skipInvalid=*/true);
+        findEntry({key, isNull, rid}, /*skipInvalid=*/true);
 
     if (!found) {
         throw Internal::IndexKeyNotExistsError();
@@ -166,11 +166,11 @@ void Index::remove(int key, RecordID rid) {
     meta.numEntry--;
 }
 
-bool Index::has(int key) {
+bool Index::has(int key, bool isNull) {
     checkInit();
 
     bool ret = false;
-    iterateEq(key, [&](RecordID id) {
+    iterateEq(key, isNull, [&](RecordID id) {
         ret = true;
         return false;
     });
@@ -178,10 +178,10 @@ bool Index::has(int key) {
     return ret;
 }
 
-std::vector<RecordID> Index::findEq(int key) {
+std::vector<RecordID> Index::findEq(int key, bool isNull) {
     std::vector<RecordID> ret;
 
-    iterateEq(key, [&](RecordID id) {
+    iterateEq(key, isNull, [&](RecordID id) {
         ret.push_back(id);
         return true;
     });
@@ -189,7 +189,7 @@ std::vector<RecordID> Index::findEq(int key) {
     return ret;
 }
 
-void Index::iterateEq(int key, IterateFunc func) {
+void Index::iterateEq(int key, bool isNull, IterateFunc func) {
     iterateRange({key, key}, func);
 }
 
@@ -201,8 +201,8 @@ void Index::iterateRange(Range range, IterateFunc func) {
 
     // Just "find" the {INT_MIN, INT_MIN} record, which must be the start of the
     // sequenece, if the key matches the target key.
-    auto [nodeIndex, index, _] =
-        findEntry({lo, {INT_MIN, INT_MIN}}, /*skipInvalid=*/true);
+    auto [nodeIndex, index, _] = findEntry(
+        {lo, /*isNull=*/false, {INT_MIN, INT_MIN}}, /*skipInvalid=*/true);
 
     // Iterate from the start of the sequence.
     PageHandle handle = getHandle(nodeIndex);
@@ -526,11 +526,24 @@ void Index::dump() {
 
 // ==== IndexEntry ====
 bool Index::IndexEntry::operator>(const IndexEntry &rhs) const {
-    return key > rhs.key || (key == rhs.key && record > rhs.record);
+    if (!isNull) {
+        if (rhs.isNull) {
+            return true;
+        } else {
+            return key > rhs.key || (key == rhs.key && record > rhs.record);
+        }
+    } else {
+        if (!rhs.isNull) {
+            return false;
+        } else {
+            return record > rhs.record;
+        }
+    }
 }
 
 bool Index::IndexEntry::operator==(const IndexEntry &rhs) const {
-    return key == rhs.key && record == rhs.record;
+    return ((isNull && rhs.isNull) || (key == rhs.key)) &&
+           isNull == rhs.isNull && record == rhs.record;
 }
 
 }  // namespace Internal
