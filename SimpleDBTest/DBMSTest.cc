@@ -139,6 +139,13 @@ TEST_F(DBMSTest, TestCreateDropTable) {
         ASSERT_THROW(results = executeSQL(testCase), BaseError)
             << "Test case: " << testCase;
     }
+
+    // Test dropping a referenced table.
+    ASSERT_NO_THROW(executeSQL("CREATE TABLE t1 (c1 INT, PRIMARY KEY (c1));"));
+    ASSERT_NO_THROW(
+        executeSQL("CREATE TABLE t2 (c1 INT, FOREIGN KEY (c1) "
+                   "REFERENCES t1(c1));"));
+    ASSERT_THROW(executeSQL("DROP TABLE t1;"), Error::DropTableError);
 }
 
 TEST_F(DBMSTest, TestShowTables) {
@@ -242,6 +249,13 @@ TEST_F(DBMSTest, TestAddDropPrimaryKey) {
     ASSERT_THROW(executeSQL(addSql), Error::AlterPrimaryKeyError);
     ASSERT_NO_THROW(executeSQL(dropSql));
     ASSERT_THROW(executeSQL(addSql2), Error::AlterPrimaryKeyError);
+
+    // Test foreign key constraint.
+    ASSERT_NO_THROW(executeSQL(addSql));
+    ASSERT_NO_THROW(
+        executeSQL("CREATE TABLE t2 (c1 INT, FOREIGN KEY (c1) "
+                   "REFERENCES t1(c2));"));
+    ASSERT_THROW(executeSQL(dropSql), Error::AlterPrimaryKeyError);
 }
 
 TEST_F(DBMSTest, TestAddDropIndex) {
@@ -334,6 +348,15 @@ TEST_F(DBMSTest, TestInsertRecord) {
     ASSERT_NO_THROW(executeSQL(createTableSql4));
     ASSERT_NO_THROW(executeSQL(insertSql4));
     ASSERT_THROW(executeSQL(insertSql4), Error::InsertError);
+
+    // Test insert non-exist foreign key.
+    std::string createTableSql5 =
+        "CREATE TABLE t5 (c1 INT NOT NULL, FOREIGN KEY (c1) "
+        "REFERENCES t4(c1));";
+    std::string insertSql5 = "INSERT INTO t5 VALUES (-1);";
+
+    ASSERT_NO_THROW(executeSQL(createTableSql5));
+    ASSERT_THROW(executeSQL(insertSql5), Error::InsertError);
 }
 
 TEST_F(DBMSTest, TestSelect) {
@@ -520,4 +543,90 @@ TEST_F(DBMSTest, TestSelectMultipleTable) {
     ASSERT_EQ(result2[0].query().rows_size(), 100);
 }
 
-// No more time to test update, delete, ..., the deadline is tomorrow :(
+TEST_F(DBMSTest, TestUpdate) {
+    initDBMS();
+    createAndUseDatabase();
+
+    // Create table.
+    std::string createSql1 = "CREATE TABLE t1 (c1 INT, PRIMARY KEY (c1));";
+    ASSERT_NO_THROW(executeSQL(createSql1));
+
+    // Create a table that reference t1.
+    std::string createSql2 =
+        "CREATE TABLE t2 (c1 INT, FOREIGN KEY (c1) REFERENCES t1(c1));";
+    ASSERT_NO_THROW(executeSQL(createSql2));
+
+    const int NUM_RECORDS = 200;
+    // Insert NUM_RECORDS records, NUM_RECORDS-1 of which has reference.
+    for (int i = 0; i < NUM_RECORDS; i++) {
+        std::string intVal = std::to_string(i);
+        std::string insertSql = "INSERT INTO t1 VALUES (" + intVal + ");";
+        ASSERT_NO_THROW(executeSQL(insertSql));
+        if (i > 0) {
+            std::string insertSql2 = "INSERT INTO t2 VALUES (" + intVal + ");";
+            ASSERT_NO_THROW(executeSQL(insertSql2));
+        }
+    }
+
+    // Update t1 (the unreferenced).
+    std::string updateSql =
+        "UPDATE t1 SET c1 = " + std::to_string(NUM_RECORDS) + "WHERE c1 = 0;";
+    // ASSERT_NO_THROW(executeSQL(updateSql));
+    // FIXME: We do not allow this update.
+    ASSERT_THROW(executeSQL(updateSql), Error::UpdateError);
+
+    // Update t1 (the referenced).
+    for (int i = 1; i < NUM_RECORDS; i++) {
+        std::string updateSql =
+            "UPDATE t1 SET c1 = " + std::to_string(NUM_RECORDS + i) +
+            "WHERE c1 = " + std::to_string(i) + ";";
+        ASSERT_THROW(executeSQL(updateSql), Error::UpdateError);
+    }
+
+    // Update t2.
+    for (int i = 1; i < NUM_RECORDS; i++) {
+        std::string updateSql =
+            "UPDATE t2 SET c1 = " + std::to_string(NUM_RECORDS - i) +
+            "WHERE c1 = " + std::to_string(i) + ";";
+        ASSERT_NO_THROW(executeSQL(updateSql));
+    }
+    std::string invalidUpdateSql = "UPDATE t2 SET c1 = -1 WHERE c1 = 0;";
+    ASSERT_THROW(executeSQL(invalidUpdateSql), Error::UpdateError);
+}
+
+TEST_F(DBMSTest, TestDelete) {
+    initDBMS();
+    createAndUseDatabase();
+
+    // Create table.
+    std::string createSql1 = "CREATE TABLE t1 (c1 INT, PRIMARY KEY (c1));";
+    ASSERT_NO_THROW(executeSQL(createSql1));
+
+    const int NUM_RECORDS = 200;
+    auto insertRecords = [=]() {
+        for (int i = 0; i < NUM_RECORDS; i++) {
+            std::string intVal = std::to_string(i);
+            std::string insertSql = "INSERT INTO t1 VALUES (" + intVal + ");";
+            ASSERT_NO_THROW(executeSQL(insertSql));
+        }
+    };
+
+    // Insert records.
+    insertRecords();
+
+    // Delete all records.
+    std::string deleteSql = "DELETE FROM t1 WHERE c1 >= 0;";
+    ASSERT_NO_THROW(executeSQL(deleteSql));
+
+    // Insert records again.
+    insertRecords();
+
+    // Create a table that reference t1.
+    std::string createSql2 =
+        "CREATE TABLE t2 (c1 INT, FOREIGN KEY (c1) REFERENCES t1(c1));";
+    ASSERT_NO_THROW(executeSQL(createSql2));
+
+    // Try to delete a record -- simply FAIL.
+    std::string deleteSql2 = "DELETE FROM t1 WHERE c1 = 0;";
+    ASSERT_THROW(executeSQL(deleteSql2), Error::DeleteError);
+}

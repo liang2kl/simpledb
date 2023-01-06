@@ -68,6 +68,8 @@ void DBMS::init() {
                     systemDatabaseTableColumns);
     initSystemTable(&systemTablesTable, "tables", systemTablesTableColumns);
     initSystemTable(&systemIndexesTable, "indexes", systemIndexesTableColumns);
+    initSystemTable(&systemForeignKeyTable, "foreign_key",
+                    systemForeignKeyTableColumns);
 
     initialized = true;
 }
@@ -75,6 +77,8 @@ void DBMS::init() {
 void DBMS::close() {
     systemDatabaseTable.close();
     systemTablesTable.close();
+    systemIndexesTable.close();
+    systemForeignKeyTable.close();
 
     clearCurrentDatabase();
     initialized = false;
@@ -101,6 +105,8 @@ std::vector<Service::ExecutionResult> DBMS::executeSQL(std::istream &stream) {
 }
 
 PlainResult DBMS::createDatabase(const std::string &dbName) {
+    Logger::log(VERBOSE, "DBMS: creating database %s\n", dbName.c_str());
+
     if (dbName.size() > MAX_DATABASE_NAME_LEN) {
         throw Error::InvalidDatabaseNameError("database name too long");
     }
@@ -129,6 +135,8 @@ PlainResult DBMS::createDatabase(const std::string &dbName) {
 }
 
 PlainResult DBMS::dropDatabase(const std::string &dbName) {
+    Logger::log(VERBOSE, "DBMS: dropping database %s\n", dbName.c_str());
+
     auto [id, columns] = findDatabase(dbName);
     if (id == RecordID::NULL_RECORD) {
         throw Error::DatabaseNotExistError(dbName);
@@ -148,10 +156,14 @@ PlainResult DBMS::dropDatabase(const std::string &dbName) {
     systemDatabaseTable.remove(id);
     std::filesystem::remove_all(rootPath / dbName);
 
+    // TODO: Remove index
+
     return makePlainResult("OK");
 }
 
 PlainResult DBMS::useDatabase(const std::string &dbName) {
+    Logger::log(VERBOSE, "DBMS: using database %s\n", dbName.c_str());
+
     if (dbName == currentDatabase) {
         return makePlainResult("Already in database " + dbName);
     }
@@ -168,10 +180,10 @@ PlainResult DBMS::useDatabase(const std::string &dbName) {
 }
 
 ShowDatabasesResult DBMS::showDatabases() {
+    Logger::log(VERBOSE, "DBMS: showing databases\n");
+
     QueryBuilder builder(&systemDatabaseTable);
-
     QueryBuilder::Result queryResult = builder.execute();
-
     ShowDatabasesResult result;
 
     for (const auto &res : queryResult) {
@@ -185,7 +197,9 @@ ShowDatabasesResult DBMS::showDatabases() {
 PlainResult DBMS::createTable(const std::string &tableName,
                               const std::vector<ColumnMeta> &columns,
                               const std::string &primaryKey,
-                              const std::vector<ForeignKey> &foreignKeys) {
+                              const std::vector<_ForeignKey> &_foreignKeys) {
+    Logger::log(VERBOSE, "DBMS: creating table %s\n", tableName.c_str());
+
     checkUseDatabase();
 
     if (tableName.size() > MAX_TABLE_NAME_LEN) {
@@ -200,20 +214,42 @@ PlainResult DBMS::createTable(const std::string &tableName,
         throw Error::TableExistsError(tableName);
     }
 
+    // Create a mutable copy for foreign keys.
+    auto foreignKeys = _foreignKeys;
+
+    // First validate foreign keys (table, column and type).
+    for (auto &foreignKey : foreignKeys) {
+        auto [rid, table] = getTable(foreignKey.table);
+
+        if (rid == RecordID::NULL_RECORD) {
+            throw Error::CreateTableError("A foreign key's referencing table " +
+                                          foreignKey.table + " not found");
+        }
+
+        int columnIndex = table->getColumnIndex(foreignKey.ref.c_str());
+        if (columnIndex < 0) {
+            throw Error::CreateTableError(
+                "A foreign key's referencing column " + foreignKey.ref +
+                " not found in table " + foreignKey.table);
+        }
+
+        if (columnIndex != table->meta.primaryKeyIndex) {
+            throw Error::CreateTableError(
+                "A foreign key's referencing column " + foreignKey.ref +
+                " is not the primary key of table " + foreignKey.table);
+        }
+
+        const ColumnMeta &column = table->meta.columns[columnIndex];
+        // Set the referenced type for later checking.
+        foreignKey.type = column.type;
+    }
+
     std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
     Table *table = new Table();
 
     try {
-        table->create(path, tableName, columns, primaryKey);
-    } catch (Internal::TooManyColumnsError &e) {
-        throw CreateTableError(e.what());
-    } catch (Internal::InvalidPrimaryKeyError &e) {
-        throw CreateTableError(e.what());
-    } catch (Internal::CreateTableError &e) {
-        throw CreateTableError(e.what());
-    } catch (Internal::InvalidColumnSizeError &e) {
-        throw CreateTableError(e.what());
-    } catch (Internal::DuplicateColumnNameError &e) {
+        table->create(path, tableName, columns, primaryKey, foreignKeys);
+    } catch (BaseError &e) {
         throw CreateTableError(e.what());
     }
 
@@ -226,6 +262,17 @@ PlainResult DBMS::createTable(const std::string &tableName,
          table->meta.primaryKeyIndex >= 0 ? Column(table->meta.primaryKeyIndex)
                                           : Column::nullIntColumn()});
 
+    // Append to the system foreign key table.
+    for (const auto &foreignKey : foreignKeys) {
+        systemForeignKeyTable.insert({
+            Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN),
+            Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
+            Column(foreignKey.name.c_str(), MAX_COLUMN_NAME_LEN),
+            Column(foreignKey.table.c_str(), MAX_TABLE_NAME_LEN),
+            Column(foreignKey.ref.c_str(), MAX_COLUMN_NAME_LEN),
+        });
+    }
+
     // Create index on primary key.
     if (!primaryKey.empty()) {
         createIndex(tableName, primaryKey, /*isPrimaryKey=*/true);
@@ -235,6 +282,8 @@ PlainResult DBMS::createTable(const std::string &tableName,
 }
 
 PlainResult DBMS::dropTable(const std::string &tableName) {
+    Logger::log(VERBOSE, "DBMS: dropping table %s\n", tableName.c_str());
+
     checkUseDatabase();
 
     RecordID id = findTable(currentDatabase, tableName).first;
@@ -242,7 +291,15 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
         throw Error::TableNotExistsError(tableName);
     }
 
-    std::filesystem::path path = getUserTablePath(currentDatabase, tableName);
+    // Check if this breaks any foreign key constaints (referencing column).
+    auto foreignKeys = findForeignKeys(currentDatabase, {}, {}, tableName, {});
+    if (!foreignKeys.empty()) {
+        throw Error::DropTableError(
+            ForeignKeyViolationError(tableName +
+                                     " is referenced by other tables")
+                .what());
+    }
+
     // Close the table, if it's opened.
     auto it = openedTables.find(tableName);
     if (it != openedTables.end()) {
@@ -254,7 +311,19 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
     // Remove the table and other related stuff from the system tables.
     systemTablesTable.remove(id);
 
-    // TODO: Remove index.
+    // Remove index.
+    auto indexDir = getIndexPath(currentDatabase, tableName, "1").parent_path();
+    std::filesystem::remove_all(indexDir);
+
+    QueryBuilder builder(&systemIndexesTable);
+    builder.condition("database", EQ, currentDatabase.c_str())
+        .condition("table", EQ, tableName.c_str());
+
+    builder.iterate([&](RecordID rid, Columns &) {
+        systemIndexesTable.remove(rid);
+        // TODO: If we add indexes on this table, we should also remove them.
+        return true;
+    });
 
     // Remove the table file.
     std::filesystem::remove(getUserTablePath(currentDatabase, tableName));
@@ -263,6 +332,8 @@ PlainResult DBMS::dropTable(const std::string &tableName) {
 }
 
 ShowTableResult DBMS::showTables() {
+    Logger::log(VERBOSE, "DBMS: showing tables\n");
+
     checkUseDatabase();
 
     QueryBuilder::Result queryResult = findAllTables(currentDatabase);
@@ -276,6 +347,8 @@ ShowTableResult DBMS::showTables() {
 }
 
 DescribeTableResult DBMS::describeTable(const std::string &tableName) {
+    Logger::log(VERBOSE, "DBMS: describing table %s\n", tableName.c_str());
+
     checkUseDatabase();
 
     auto [recordId, table] = getTable(tableName);
@@ -303,6 +376,9 @@ DescribeTableResult DBMS::describeTable(const std::string &tableName) {
 
 PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
                                   const std::string &primaryKey, bool drop) {
+    Logger::log(VERBOSE, "DBMS: altering primary key of table %s\n",
+                tableName.c_str());
+
     checkUseDatabase();
 
     auto [recordId, table] = getTable(tableName);
@@ -317,6 +393,15 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
             if (actualPk.empty() && table->meta.primaryKeyIndex >= 0) {
                 actualPk =
                     table->meta.columns[table->meta.primaryKeyIndex].name;
+            }
+            // Check foreign key constraints.
+            auto referencingColumns =
+                findForeignKeys(currentDatabase, {}, {}, tableName, actualPk);
+            if (!referencingColumns.empty()) {
+                throw Error::AlterPrimaryKeyError(
+                    ForeignKeyViolationError(actualPk +
+                                             " is referenced by other tables")
+                        .what());
             }
             table->dropPrimaryKey(primaryKey);
             dropIndex(tableName, actualPk, /*isPrimaryKey=*/true);
@@ -340,6 +425,8 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
 PlainResult DBMS::createIndex(const std::string &tableName,
                               const std::string &columnName,
                               bool isPrimaryKey) {
+    Logger::log(VERBOSE, "DBMS: creating index on %s.%s", tableName.c_str(),
+                columnName.c_str());
     checkUseDatabase();
     auto [id, record] = findIndex(currentDatabase, tableName, columnName);
 
@@ -400,6 +487,9 @@ PlainResult DBMS::createIndex(const std::string &tableName,
 
 PlainResult DBMS::dropIndex(const std::string &tableName,
                             const std::string &columnName, bool isPrimaryKey) {
+    Logger::log(VERBOSE, "DBMS: dropping index on %s.%s", tableName.c_str(),
+                columnName.c_str());
+
     checkUseDatabase();
     auto [id, record] = findIndex(currentDatabase, tableName, columnName);
 
@@ -440,6 +530,9 @@ PlainResult DBMS::dropIndex(const std::string &tableName,
 }
 
 ShowIndexesResult DBMS::showIndexes(const std::string &tableName) {
+    Logger::log(VERBOSE, "DBMS: showing indexes of table %s\n",
+                tableName.c_str());
+
     checkUseDatabase();
 
     auto result = findIndexes(currentDatabase, tableName);
@@ -468,6 +561,8 @@ PlainResult DBMS::update(QueryBuilder &builder,
     assert(indexedTable != nullptr);
 
     Table *table = indexedTable->getTable();
+
+    Logger::log(VERBOSE, "DBMS: updating table %s\n", table->meta.name);
 
     // Check if the input columns are valid.
     std::vector<ColumnInfo> columnInfos = builder.getColumnInfo();
@@ -504,23 +599,32 @@ PlainResult DBMS::update(QueryBuilder &builder,
         }
     }
 
+    // Check foreign key constaints (referenced by other tables).
+    auto referencedColumns =
+        findForeignKeys(currentDatabase, {}, {}, table->meta.name, {});
+    // FIXME: We just forbid updating referenced columns here.
+    for (const auto &foreignKey : referencedColumns) {
+        int index = table->getColumnIndex(foreignKey.refColumn.c_str());
+        if (updateBitmap & (1L << index)) {
+            throw Error::UpdateError(
+                ForeignKeyViolationError("cannot update referenced column " +
+                                         foreignKey.refColumn)
+                    .what());
+        }
+    }
+
     // First get id of all records.
     std::vector<RecordID> rids;
     std::vector<Columns> oldColumns;
 
     builder.iterate([&](RecordID id, Columns &record) {
         rids.push_back(id);
-        oldColumns.emplace_back();
-        // Store the old values of the index.
-        for (int i = 0; i < indexMapping.size(); i++) {
-            if (indexMapping[i] >= 0) {
-                oldColumns[oldColumns.size() - 1].push_back(record[i]);
-            }
-        }
+        // TODO: We can only copying necessary columns here.
+        oldColumns.push_back(record);
         return true;
     });
 
-    // Check constraints.
+    // Check primary key constraints.
     if (primaryKeyIndex >= 0) {
         if (rids.size() >= 2) {
             // This update is doomed to cause a duplicate pk.
@@ -533,6 +637,17 @@ PlainResult DBMS::update(QueryBuilder &builder,
         if (index->has(columns[primaryKeyIndex].data.intValue)) {
             throw Error::UpdateError("duplicate primary key");
         }
+    }
+
+    // Check foreign key constaints (referencing other tables).
+    auto referencingColumns =
+        findForeignKeys(currentDatabase, table->meta.name, {}, {}, {});
+    // Check if the new values of the referencing columns are valid.
+    bool hasReferencingColumns =
+        this->hasReferencingRecord(table, referencingColumns, columns);
+    if (!hasReferencingColumns) {
+        throw Error::UpdateError(
+            ForeignKeyViolationError("referenced column not found").what());
     }
 
     // Perform updates (update index by the way).
@@ -551,8 +666,6 @@ PlainResult DBMS::update(QueryBuilder &builder,
         }
     }
 
-    // TODO: FK...
-
     // Close all indexes.
     for (auto &index : indexes) {
         index->close();
@@ -562,19 +675,28 @@ PlainResult DBMS::update(QueryBuilder &builder,
 }
 
 PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
-    // Happily, we only need to check foreign key references here, no annoying
-    // primary key.
-    // TODO: Check PK.
-
     checkUseDatabase();
     assert(builder.validForUpdateOrDelete());
 
-    // Get all indexes.
     IndexedTable *indexedTable =
         dynamic_cast<IndexedTable *>(builder.getDataSource());
     assert(indexedTable != nullptr);
     Table *table = indexedTable->getTable();
 
+    Logger::log(VERBOSE, "DBMS: deleting records from %s\n", table->meta.name);
+
+    // Check foreign key constaints (referenced by other tables).
+    auto referencedColumns =
+        findForeignKeys(currentDatabase, {}, {}, table->meta.name, {});
+    // FIXME: We just forbid deleting from table with referenced columns.
+    if (!referencedColumns.empty()) {
+        throw Error::DeleteError(
+            ForeignKeyViolationError("column " + std::string(table->meta.name) +
+                                     " is referenced by other table")
+                .what());
+    }
+
+    // Get all indexes.
     std::vector<std::shared_ptr<Index>> indexes;
     std::vector<int> indexMapping;  // indexes.i -> col i
 
@@ -602,23 +724,24 @@ PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
         return true;
     });
 
-    // TODO: Constraints.
     // Remove records (and update index).
     for (int i = 0; i < rids.size(); i++) {
         RecordID rid = rids[i];
         table->remove(rid);
-
         // Update index.
         for (int j = 0; j < indexMapping.size(); j++) {
             auto index = indexes[j];
-            index->remove(oldColumns[i][j].data.intValue, rid);
+            index->remove(oldColumns[i][indexMapping[j]].data.intValue, rid);
         }
     }
 
     // Close all indexes.
-    for (auto &index : indexes) {
+    for (auto index : indexes) {
         index->close();
     }
+
+    Logger::log(VERBOSE, "DBMS: deleted %lu records from %s\n", rids.size(),
+                table->meta.name);
 
     return makePlainResult("OK", rids.size());
 }
@@ -626,6 +749,7 @@ PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
 PlainResult DBMS::insert(const std::string &tableName,
                          const std::vector<Column> &_columns,
                          ColumnBitmap emptyBits) {
+    Logger::log(VERBOSE, "DBMS: inserting into %s\n", tableName.c_str());
     checkUseDatabase();
 
     // Create a mutable copy.
@@ -686,10 +810,21 @@ PlainResult DBMS::insert(const std::string &tableName,
         builder.condition(primaryKeyName, EQ, key).limit(1);
 
         builder.iterate([&](RecordID id, Columns &record) {
-            throw Error::InsertError("duplicate primary key" +
+            throw Error::InsertError("duplicate primary key " +
                                      std::to_string(record[0].data.intValue));
             return false;
         });
+    }
+
+    // Check foreign keys.
+    // Check if the new values of the referencing columns are valid.
+    auto referencingColumns =
+        findForeignKeys(currentDatabase, table->meta.name, {}, {}, {});
+    bool hasReferencingColumns =
+        this->hasReferencingRecord(table, referencingColumns, columns);
+    if (!hasReferencingColumns) {
+        throw Error::InsertError(
+            ForeignKeyViolationError("referenced column not found").what());
     }
 
     RecordID id = table->insert(columns, ~emptyBits);
@@ -797,6 +932,8 @@ QueryBuilder DBMS::buildQueryForUpdateOrDelete(
 }
 
 QueryResult DBMS::select(Internal::QueryBuilder &builder) {
+    Logger::log(VERBOSE, "DBMS: selecting\n");
+
     QueryBuilder::Result result;
     std::vector<ColumnInfo> columns;
 
@@ -941,6 +1078,72 @@ QueryBuilder::Result DBMS::findIndexes(const std::string &database,
     return builder.execute();
 }
 
+std::vector<DBMS::ForeignKeyInfo> DBMS::findForeignKeys(
+    const std::string &database, const std::string &table,
+    const std::string &column, const std::string &refTable,
+    const std::string &refColumn) {
+    QueryBuilder builder(&systemForeignKeyTable);
+
+    builder.condition("database", EQ, database.c_str());
+
+    if (!table.empty()) {
+        builder.condition("table", EQ, table.c_str());
+    }
+    if (!column.empty()) {
+        builder.condition("column", EQ, column.c_str());
+    }
+    if (!refTable.empty()) {
+        builder.condition("ref_table", EQ, refTable.c_str());
+    }
+    if (!refColumn.empty()) {
+        builder.condition("ref_column", EQ, refColumn.c_str());
+    }
+
+    auto result = builder.execute();
+    std::vector<ForeignKeyInfo> infos;
+
+    for (const auto &pair : result) {
+        auto [_, columns] = pair;
+        ForeignKeyInfo info;
+        info.database = columns[0].data.stringValue;
+        info.table = columns[1].data.stringValue;
+        info.column = columns[2].data.stringValue;
+        info.refTable = columns[3].data.stringValue;
+        info.refColumn = columns[4].data.stringValue;
+        infos.push_back(info);
+    }
+
+    return infos;
+}
+
+bool DBMS::hasReferencingRecord(
+    const Table *oriTable,
+    const std::vector<ForeignKeyInfo> &referencingColumns,
+    const Columns &allNewColumns) {
+    for (const auto &foreignKey : referencingColumns) {
+        Table *table = getTable(foreignKey.refTable).second;
+        assert(table != nullptr);
+        int refColIndex = table->getColumnIndex(foreignKey.refColumn.c_str());
+        int oriColIndex = oriTable->getColumnIndex(foreignKey.column.c_str());
+        assert(refColIndex >= 0);
+
+        auto indexedTable = newIndexedTable(table);
+
+        QueryBuilder builder(indexedTable);
+        assert(allNewColumns[oriColIndex].type == INT);
+        builder
+            .condition(foreignKey.refColumn, EQ,
+                       allNewColumns[oriColIndex].data.intValue)
+            .limit(1);
+
+        if (builder.execute().empty()) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 std::pair<RecordID, Table *> DBMS::getTable(const std::string &tableName) {
     RecordID id = findTable(currentDatabase, tableName).first;
     if (id == RecordID::NULL_RECORD) {
@@ -981,7 +1184,11 @@ std::shared_ptr<IndexedTable> DBMS::newIndexedTable(Table *table) {
         table,
         [this](const std::string &table,
                const std::string &column) -> std::shared_ptr<Index> {
-            return this->getIndex(currentDatabase, table, column).second;
+            auto index = this->getIndex(currentDatabase, table, column).second;
+            if (index != nullptr) {
+                index->setReadOnly();
+            }
+            return index;
         });
 
     return indexedTable;

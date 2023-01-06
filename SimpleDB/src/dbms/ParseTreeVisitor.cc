@@ -122,7 +122,7 @@ antlrcpp::Any ParseTreeVisitor::visitCreate_table(
         ctx->field_list()
             ->accept(this)
             .as<std::tuple<std::vector<ColumnMeta>, std::string,
-                           std::vector<ForeignKey>>>();
+                           std::vector<_ForeignKey>>>();
 
     PlainResult result = dbms->createTable(ctx->Identifier()->getText(),
                                            columns, primaryKey, foreignKeys);
@@ -147,7 +147,7 @@ antlrcpp::Any ParseTreeVisitor::visitField_list(
     SqlParser::Field_listContext *ctx) {
     std::vector<ColumnMeta> columns;
     std::string primaryKey;
-    std::vector<ForeignKey> foreignKeys;
+    std::vector<_ForeignKey> foreignKeys;
 
     for (auto field : ctx->field()) {
         if (dynamic_cast<SqlParser::Normal_fieldContext *>(field)) {
@@ -161,7 +161,14 @@ antlrcpp::Any ParseTreeVisitor::visitField_list(
                     ->Identifier()
                     ->getText();
         } else if (dynamic_cast<SqlParser::Foreign_key_fieldContext *>(field)) {
-            foreignKeys.push_back(field->accept(this).as<ForeignKey>());
+            foreignKeys.push_back(_ForeignKey{});
+            _ForeignKey &fk = foreignKeys.back();
+
+            auto *fkField =
+                static_cast<SqlParser::Foreign_key_fieldContext *>(field);
+            fk.name = fkField->Identifier(0)->getText();
+            fk.table = fkField->Identifier(1)->getText();
+            fk.ref = fkField->Identifier(2)->getText();
         } else {
             assert(false);
         }

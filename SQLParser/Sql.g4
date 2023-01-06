@@ -80,9 +80,9 @@ alter_statement:
 field_list: field (',' field)*;
 
 field:
-	Identifier type_ ('NOT' Null)? ('DEFAULT' value)?	# normal_field
-	| 'PRIMARY' 'KEY' '(' Identifier ')'				# primary_key_field
-	| 'FOREIGN' 'KEY' (Identifier)? '(' identifiers ')' 'REFERENCES' Identifier '(' identifiers ')'	#
+	Identifier type_ ('NOT' Null)? ('DEFAULT' value)?								# normal_field
+	| 'PRIMARY' 'KEY' '(' Identifier ')'											# primary_key_field
+	| 'FOREIGN' 'KEY' '(' Identifier ')' 'REFERENCES' Identifier '(' Identifier ')'	#
 		foreign_key_field;
 
 type_: 'INT' | 'VARCHAR' '(' Integer ')' | 'FLOAT';

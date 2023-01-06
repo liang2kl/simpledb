@@ -67,7 +67,9 @@ DECLARE_ERROR(ColumnFull, TableErrorBase, "The column is full");
 DECLARE_ERROR(ColumnExists, TableErrorBase, "The column already exists");
 DECLARE_ERROR(InvalidPageMeta, TableErrorBase, "The page meta is invalid");
 DECLARE_ERROR(TooManyColumns, TableErrorBase, "Too many columns");
+DECLARE_ERROR(TooManyForeignKeys, TableErrorBase, "Too many foreign keys");
 DECLARE_ERROR(InvalidPrimaryKey, TableErrorBase, "Invalid primary key");
+DECLARE_ERROR(InvalidForeignKey, TableErrorBase, "Invalid foreign key");
 DECLARE_ERROR(PrimaryKeyExists, TableErrorBase, "Primary key exists");
 DECLARE_ERROR(PrimaryKeyNotExists, TableErrorBase,
               "Primary key does not exist");
@@ -79,6 +81,8 @@ DECLARE_ERROR(ValueNotGiven, TableErrorBase,
               "The value of a column without default value is not given");
 DECLARE_ERROR(IncorrectColumnNum, TableErrorBase,
               "Incorrect number of columns are given");
+DECLARE_ERROR(ForeignKeyViolation, TableErrorBase,
+              "Violating foreign key constraints");
 
 // ==== Iterator Error ====
 DECLARE_ERROR_CLASS(Iterator, InternalErrorBase, "Iterator error");
@@ -100,6 +104,8 @@ DECLARE_ERROR(IndexNotInitialized, IndexErrorBase,
               "The index is not initialized yet");
 DECLARE_ERROR(IndexKeyExists, IndexErrorBase, "Duplicate index key found");
 DECLARE_ERROR(IndexKeyNotExists, IndexErrorBase, "The index does not exist");
+DECLARE_ERROR(WriteOnReadOnlyIndex, IndexErrorBase,
+              "Internal: trying to write on a read-only index");
 
 // ==== QueryBuilder Error ====
 DECLARE_ERROR_CLASS(QueryBuilder, InternalErrorBase, "QueryBuilder error");
@@ -139,11 +145,13 @@ DECLARE_ERROR(TableNotExists, ExecutionErrorBase, "The table does not exist");
 DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
               "More than one primary key is given");
 DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
+DECLARE_ERROR(DropTable, ExecutionErrorBase, "Fail to drop table");
 DECLARE_ERROR(AlterPrimaryKey, ExecutionErrorBase, "Fail to alter primary key");
 DECLARE_ERROR(AlterIndex, ExecutionErrorBase, "Fail to alter index");
 DECLARE_ERROR(Insert, ExecutionErrorBase, "INSERT statement failed");
 DECLARE_ERROR(Select, ExecutionErrorBase, "SELECT statement failed");
 DECLARE_ERROR(Update, ExecutionErrorBase, "UPDATE statement failed");
+DECLARE_ERROR(Delete, ExecutionErrorBase, "DELETE statement failed");
 
 }  // namespace Error
 

@@ -56,10 +56,12 @@ private:
     Internal::Table systemDatabaseTable;
     Internal::Table systemTablesTable;
     Internal::Table systemIndexesTable;
+    Internal::Table systemForeignKeyTable;
 
     static std::vector<Internal::ColumnMeta> systemDatabaseTableColumns;
     static std::vector<Internal::ColumnMeta> systemTablesTableColumns;
     static std::vector<Internal::ColumnMeta> systemIndexesTableColumns;
+    static std::vector<Internal::ColumnMeta> systemForeignKeyTableColumns;
 
     Internal::ParseTreeVisitor visitor;
     std::map<std::string, Internal::Table *> openedTables;
@@ -74,8 +76,8 @@ private:
     Service::PlainResult createTable(
         const std::string &tableName,
         const std::vector<Internal::ColumnMeta> &columns,
-        const std::string &primaryKey,
-        const std::vector<Internal::ForeignKey> &foreignKeys);
+        const std::string &primaryKey = std::string(),
+        const std::vector<Internal::_ForeignKey> &foreignKeys = {});
     Service::PlainResult dropTable(const std::string &tableName);
     Service::DescribeTableResult describeTable(const std::string &tableName);
 
@@ -132,6 +134,14 @@ private:
     Service::PlainResult makePlainResult(const std::string &msg,
                                          int affectedRows = -1);
 
+    struct ForeignKeyInfo {
+        Internal::RecordID rid;
+        std::string database;
+        std::string table;
+        std::string column;
+        std::string refTable;
+        std::string refColumn;
+    };
     std::pair<Internal::RecordID, Internal::Columns> findDatabase(
         const std::string &dbName);
     std::pair<Internal::RecordID, Internal::Columns> findTable(
@@ -142,6 +152,15 @@ private:
         const std::string &columnName);
     Internal::QueryBuilder::Result findIndexes(const std::string &database,
                                                const std::string &table);
+    std::vector<ForeignKeyInfo> findForeignKeys(const std::string &database,
+                                                const std::string &table,
+                                                const std::string &column,
+                                                const std::string &refTable,
+                                                const std::string &refColumn);
+    bool hasReferencingRecord(
+        const Internal::Table *oriTable,
+        const std::vector<ForeignKeyInfo> &referencingColumns,
+        const Internal::Columns &allNewColumns);
     std::pair<Internal::RecordID, Internal::Table *> getTable(
         const std::string &tableName);
     std::pair<Internal::RecordID, std::shared_ptr<Internal::Index>> getIndex(

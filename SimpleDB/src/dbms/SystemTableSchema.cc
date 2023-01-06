@@ -46,4 +46,32 @@ std::vector<Internal::ColumnMeta> DBMS::systemIndexesTableColumns = {
        ordinary index to primary key index */
     {.type = INT, .nullable = false, .name = "type", .hasDefault = false}};
 
+std::vector<Internal::ColumnMeta> DBMS::systemForeignKeyTableColumns = {
+    {.name = "database",
+     .type = VARCHAR,
+     .size = MAX_DATABASE_NAME_LEN,
+     .nullable = false,
+     .hasDefault = false},
+    {.name = "table",
+     .type = VARCHAR,
+     .size = MAX_TABLE_NAME_LEN,
+     .nullable = false,
+     .hasDefault = false},
+    {.name = "column",
+     .type = VARCHAR,
+     .size = MAX_COLUMN_NAME_LEN,
+     .nullable = false,
+     .hasDefault = false},
+    {.name = "ref_table",
+     .type = VARCHAR,
+     .size = MAX_TABLE_NAME_LEN,
+     .nullable = false,
+     .hasDefault = false},
+    {.name = "ref_column",
+     .type = VARCHAR,
+     .size = MAX_COLUMN_NAME_LEN,
+     .nullable = false,
+     .hasDefault = false},
+};
+
 }  // namespace SimpleDB

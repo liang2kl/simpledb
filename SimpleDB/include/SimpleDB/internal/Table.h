@@ -21,7 +21,20 @@ namespace Internal {
 struct ForeignKey {
     char name[MAX_COLUMN_NAME_LEN];
     char table[MAX_TABLE_NAME_LEN];
-    char column[MAX_COLUMN_NAME_LEN];
+    char ref[MAX_COLUMN_NAME_LEN];
+};
+
+struct _ForeignKey {
+    std::string name;
+    std::string table;
+    std::string ref;
+    DataType type;  // The referencing column's type, for validation.
+
+    void fill(ForeignKey &key) const {
+        std::strcpy(key.name, name.c_str());
+        std::strcpy(key.table, table.c_str());
+        std::strcpy(key.ref, ref.c_str());
+    }
 };
 
 struct ColumnMeta {
@@ -54,9 +67,11 @@ public:
     void open(const std::string &file) noexcept(false);
 
     // Create a new table in a file.
-    void create(const std::string &file, const std::string &name,
-                const std::vector<ColumnMeta> &columns,
-                const std::string &primaryKey = std::string()) noexcept(false);
+    void create(
+        const std::string &file, const std::string &name,
+        const std::vector<ColumnMeta> &columns,
+        const std::string &primaryKey = {},
+        const std::vector<_ForeignKey> &foreignKeys = {}) noexcept(false);
 
     // Get record.
     [[nodiscard]] Columns get(RecordID id,

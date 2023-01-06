@@ -35,6 +35,7 @@ public:
     void iterateEq(int key, IterateFunc func);
     void iterateRange(Range, IterateFunc func);
     std::vector<RecordID> findEq(int key);
+    void setReadOnly();
 
 #ifndef TESTING
 private:
@@ -102,6 +103,7 @@ private:
     IndexMeta meta;
 
     bool initialized = false;
+    bool readOnly = false;
 
     void flushMeta();
     void checkInit() noexcept(false);

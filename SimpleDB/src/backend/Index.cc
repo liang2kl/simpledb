@@ -74,6 +74,8 @@ void Index::create(const std::string &file) {
     initialized = true;
 }
 
+void Index::setReadOnly() { readOnly = true; }
+
 void Index::close() {
     if (!initialized) {
         return;
@@ -81,7 +83,9 @@ void Index::close() {
 
     Logger::log(VERBOSE, "Index: closing index\n");
 
-    flushMeta();
+    if (!readOnly) {
+        flushMeta();
+    }
 
     PF::close(fd);
     initialized = false;
@@ -94,6 +98,11 @@ void Index::insert(int key, RecordID id) {
                 id.page, id.slot);
 
     checkInit();
+    if (readOnly) {
+        Logger::log(ERROR,
+                    "Index: internal error: writing into a read-only index\n");
+        throw Internal::WriteOnReadOnlyIndexError();
+    }
 
     auto result = findEntry({key, id}, /*skipInvalid=*/false);
     NodeIndex nodeIndex = std::get<0>(result);
@@ -110,19 +119,15 @@ void Index::insert(int key, RecordID id) {
         if (!node->valid(index)) {
             // The record was deleted, simply mark as valid.
             node->validBitmap |= (1L << index);
-            goto out;
+        } else {
+            throw Internal::IndexKeyExistsError(std::to_string(key));
         }
-        throw Internal::IndexKeyExistsError(std::to_string(key));
+    } else {
+        // Insert the record into the node.
+        insertEntry(&node->shared, {key, id});
+        checkOverflowFrom(nodeIndex);
     }
 
-    // Insert the record into the node.
-    insertEntry(&node->shared, {key, id});
-
-    // Check if the insertion breaks the constraints. If so, split recusively to
-    // fix them.
-    checkOverflowFrom(nodeIndex);
-
-out:
     // Renew the handle and mark dirty.
     handle = PF::renew(handle);
     PF::markDirty(handle);
@@ -133,6 +138,12 @@ out:
 void Index::remove(int key, RecordID rid) {
     Logger::log(VERBOSE, "Index: removing record %d\n", key);
     checkInit();
+
+    if (readOnly) {
+        Logger::log(ERROR,
+                    "Index: internal error: writing into a read-only index\n");
+        throw Internal::WriteOnReadOnlyIndexError();
+    }
 
     auto [nodeIndex, index, found] =
         findEntry({key, rid}, /*skipInvalid=*/true);
@@ -324,6 +335,19 @@ int Index::insertEntry(SharedNode *sharedNode, const IndexEntry &entry) {
         sharedNode->entry[i] = sharedNode->entry[i - 1];
     }
 
+    // Also, shift the valid bitmap!
+    if (sharedNode->isLeaf) {
+        LeafNode *node = (LeafNode *)sharedNode;
+        for (int i = sharedNode->numEntry; i > index; i--) {
+            if (node->valid(i - 1)) {
+                node->validBitmap |= (1L << i);
+            } else {
+                node->validBitmap &= ~(1L << i);
+            }
+        }
+        node->validBitmap |= (1L << index);
+    }
+
     sharedNode->entry[index] = entry;
     sharedNode->numEntry++;
 
@@ -476,10 +500,14 @@ void Index::dump() {
         PageHandle handle = getHandle(index);
         SharedNode *node = load<SharedNode *>(index, handle);
 
-        printf("Node %d: ", index);
-        for (int i = 0; i < node->numEntry; i++) {
-            printf("[%d, %d-%d] ", node->entry[i].key,
-                   node->entry[i].record.page, node->entry[i].record.slot);
+        printf("Node %d (is leaf: %d): ", index, node->isLeaf);
+        if (node->isLeaf) {
+            for (int i = 0; i < node->numEntry; i++) {
+                printf("[%s%d, %d-%d] ",
+                       ((LeafNode *)node)->valid(i) ? "" : "X: ",
+                       node->entry[i].key, node->entry[i].record.page,
+                       node->entry[i].record.slot);
+            }
         }
         printf("( %d : ", node->parent);
 

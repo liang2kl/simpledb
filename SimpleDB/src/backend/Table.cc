@@ -97,7 +97,8 @@ void Table::open(const std::string &file) {
 
 void Table::create(const std::string &file, const std::string &name,
                    const std::vector<ColumnMeta> &columns,
-                   const std::string &primaryKey) {
+                   const std::string &primaryKey,
+                   const std::vector<_ForeignKey> &foreignKeys) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 
@@ -116,7 +117,6 @@ void Table::create(const std::string &file, const std::string &name,
         throw Internal::TooManyColumnsError();
     }
 
-    // TODO: Check foreign keys.
     // Check primary key.
     int primaryKeyIndex = -1;
     if (!primaryKey.empty()) {
@@ -136,21 +136,6 @@ void Table::create(const std::string &file, const std::string &name,
             throw InvalidPrimaryKeyError("field not exists");
         }
     }
-
-    try {
-        // Create and open the file.
-        PF::create(file);
-    } catch (Internal::FileExistsError) {
-        Logger::log(
-            WARNING,
-            "Table: creating an empty table to file %s that already exists\n",
-            file.c_str());
-    } catch (BaseError) {
-        Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
-        throw Internal::CreateTableError();
-    }
-
-    fd = PF::open(file);
 
     if (name.size() > MAX_TABLE_NAME_LEN) {
         Logger::log(
@@ -196,6 +181,37 @@ void Table::create(const std::string &file, const std::string &name,
         totalSize += columns[i].size;
     }
 
+    // Check and add foreign keys.
+    if (foreignKeys.size() > MAX_FOREIGN_KEYS) {
+        Logger::log(
+            ERROR,
+            "Table: fail to create table: too many foreign keys: %ld, max %d\n",
+            foreignKeys.size(), MAX_FOREIGN_KEYS);
+        throw Internal::TooManyForeignKeysError();
+    }
+
+    for (int i = 0; i < foreignKeys.size(); i++) {
+        const auto &foreignKey = foreignKeys[i];
+        auto pair = columnNameMap.find(foreignKey.name);
+        if (pair == columnNameMap.end()) {
+            Logger::log(ERROR,
+                        "Table: fail to create table: foreign key column %s "
+                        "does not exist\n",
+                        foreignKey.name.c_str());
+            throw Internal::ColumnNotFoundError(foreignKey.name);
+        }
+        // Check type.
+        if (meta.columns[pair->second].type != foreignKey.type) {
+            Logger::log(ERROR,
+                        "Table: fail to create table: foreign key column %s "
+                        "has type %d, but foreign key has type %d\n",
+                        foreignKey.name.c_str(),
+                        meta.columns[pair->second].type, foreignKey.type);
+            throw Internal::InvalidForeignKeyError(foreignKey.name);
+        }
+        foreignKey.fill(meta.foreignKeys[i]);
+    }
+
     // Set the primary key as not nullable.
     if (primaryKeyIndex != -1) {
         meta.columns[primaryKeyIndex].nullable = false;
@@ -210,6 +226,21 @@ void Table::create(const std::string &file, const std::string &name,
     }
 
     meta.recordSize = totalSize;
+
+    try {
+        // Create and open the file.
+        PF::create(file);
+    } catch (Internal::FileExistsError) {
+        Logger::log(
+            WARNING,
+            "Table: creating an empty table to file %s that already exists\n",
+            file.c_str());
+    } catch (BaseError) {
+        Logger::log(ERROR, "Table: fail to create table to %s\n", file.c_str());
+        throw Internal::CreateTableError();
+    }
+
+    fd = PF::open(file);
 
     initialized = true;
 }
