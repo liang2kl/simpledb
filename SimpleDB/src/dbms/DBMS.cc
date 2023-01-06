@@ -471,17 +471,20 @@ Service::PlainResult DBMS::addForeignKey(const std::string &tableName,
             " is not the primary key of the referenced table");
     }
 
-    // Check if the existing rows are valid.
-    auto indexedRefTable = newIndexedTable(refTable);
+    auto _refTable = refTable;
 
     table->iterate([&](RecordID, Columns &columns) {
-        const auto &value = columns[columnIndex].data;
+        int key = columns[columnIndex].data.intValue;
+        // Check if the existing rows are valid.
+        // FIXME: I don't know why we need to create a new indexed table here
+        // every time, but it won't work using a shared indexed table :(
+        auto indexedRefTable = newIndexedTable(_refTable);
         QueryBuilder builder(indexedRefTable);
-        builder.condition({.columnName = refColumn}, EQ, value).limit(1);
+        builder.condition(refColumn, EQ, key).limit(1);
         if (builder.execute().empty()) {
             throw Error::AlterForeignKeyError(
                 "one or more referenced rows cannot be found for " +
-                std::to_string(value.intValue));
+                std::to_string(key));
         }
         return true;
     });
