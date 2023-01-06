@@ -136,6 +136,11 @@ Status SQLService::ExecuteSQLProgram(ServerContext* context,
                   e.what());
         STOP_CLOCK();
         return Status::OK;
+    } catch (AlterForeignKeyError& e) {
+        makeError(response, ErrorType::ExecutionError_Type_ERR_ALT_FOREIGN_KEY,
+                  e.what());
+        STOP_CLOCK();
+        return Status::OK;
     } catch (AlterIndexError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_ALT_INDEX,
                   e.what());
@@ -148,6 +153,16 @@ Status SQLService::ExecuteSQLProgram(ServerContext* context,
         return Status::OK;
     } catch (SelectError& e) {
         makeError(response, ErrorType::ExecutionError_Type_ERR_SELECT,
+                  e.what());
+        STOP_CLOCK();
+        return Status::OK;
+    } catch (UpdateError& e) {
+        makeError(response, ErrorType::ExecutionError_Type_ERR_UPDATE,
+                  e.what());
+        STOP_CLOCK();
+        return Status::OK;
+    } catch (DeleteError& e) {
+        makeError(response, ErrorType::ExecutionError_Type_ERR_DELETE,
                   e.what());
         STOP_CLOCK();
         return Status::OK;

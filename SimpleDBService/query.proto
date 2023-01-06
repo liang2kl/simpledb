@@ -57,9 +57,12 @@ message ExecutionError {
     ERR_MUL_PRIKEY = 15;
     ERR_CREATE_TABLE = 16;
     ERR_ALT_PRIKEY = 17;
-    ERR_ALT_INDEX = 18;
-    ERR_INSERT = 19;
-    ERR_SELECT = 20;
+    ERR_ALT_FOREIGN_KEY = 18;
+    ERR_ALT_INDEX = 19;
+    ERR_INSERT = 20;
+    ERR_SELECT = 21;
+    ERR_UPDATE = 22;
+    ERR_DELETE = 23;
   }
   string message = 1;
   Type type = 2;
