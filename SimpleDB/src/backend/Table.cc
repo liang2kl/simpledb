@@ -209,6 +209,7 @@ void Table::create(const std::string &file, const std::string &name,
                         meta.columns[pair->second].type, foreignKey.type);
             throw Internal::InvalidForeignKeyError(foreignKey.name);
         }
+        meta.columns[pair->second].nullable = true;
         foreignKey.fill(meta.foreignKeys[i]);
     }
 
