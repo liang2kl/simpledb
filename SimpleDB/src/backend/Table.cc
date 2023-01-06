@@ -135,9 +135,6 @@ void Table::create(const std::string &file, const std::string &name,
         if (primaryKeyIndex == -1) {
             throw InvalidPrimaryKeyError("field not exists");
         }
-        if (columns[primaryKeyIndex].nullable) {
-            throw InvalidPrimaryKeyError("primary key cannot be nullable");
-        }
     }
 
     try {
@@ -197,6 +194,11 @@ void Table::create(const std::string &file, const std::string &name,
         columnNameMap[columns[i].name] = i;
 
         totalSize += columns[i].size;
+    }
+
+    // Set the primary key as not nullable.
+    if (primaryKeyIndex != -1) {
+        meta.columns[primaryKeyIndex].nullable = false;
     }
 
     if (totalSize > PAGE_SIZE - sizeof(RecordMeta)) {

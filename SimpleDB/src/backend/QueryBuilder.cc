@@ -36,6 +36,15 @@ QueryBuilder &QueryBuilder::condition(const std::string &columnName,
     return condition(ColumnId{.columnName = columnName.c_str()}, op, string);
 }
 
+QueryBuilder &QueryBuilder::condition(const std::string &columnName,
+                                      CompareOp op, int value) {
+    CompareValueCondition cond;
+    cond.value = ColumnValue{.intValue = value};
+    cond.op = op;
+    cond.columnId = {.columnName = columnName};
+    return condition(cond);
+}
+
 QueryBuilder &QueryBuilder::condition(const ColumnId &id, CompareOp op,
                                       const char *string) {
     return condition(CompareValueCondition(id, op, string));

@@ -2,6 +2,7 @@
 
 #include <climits>
 #include <queue>
+#include <string>
 
 #include "internal/Comparer.h"
 #include "internal/Logger.h"
@@ -106,12 +107,12 @@ void Index::insert(int key, RecordID id) {
 
     if (found) {
         // The record already exists.
-        if (node->valid(index)) {
+        if (!node->valid(index)) {
             // The record was deleted, simply mark as valid.
             node->validBitmap |= (1L << index);
             goto out;
         }
-        throw Internal::IndexKeyExistsError();
+        throw Internal::IndexKeyExistsError(std::to_string(key));
     }
 
     // Insert the record into the node.

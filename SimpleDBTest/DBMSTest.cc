@@ -133,7 +133,6 @@ TEST_F(DBMSTest, TestCreateDropTable) {
         /* Primary key failures */
         "CREATE TABLE t1 (c1 INT NOT NULL, PRIMARY KEY (c2));",
         "CREATE TABLE t1 (c1 FLOAT NOT NULL, PRIMARY KEY (c1));",
-        "CREATE TABLE t1 (c1 INT, PRIMARY KEY (c1));",
     };
 
     for (auto testCase : failedCases) {

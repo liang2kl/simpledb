@@ -22,6 +22,8 @@ public:
     QueryBuilder &condition(const CompareValueCondition &condition);
     QueryBuilder &condition(const std::string &columnName, CompareOp op,
                             const char *string);
+    QueryBuilder &condition(const std::string &columnName, CompareOp op,
+                            int value);
     QueryBuilder &condition(const ColumnId &columnId, CompareOp op,
                             const char *string);
     QueryBuilder &condition(const CompareColumnCondition &condition);

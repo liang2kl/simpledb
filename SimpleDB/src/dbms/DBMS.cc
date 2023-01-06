@@ -553,6 +553,11 @@ PlainResult DBMS::update(QueryBuilder &builder,
 
     // TODO: FK...
 
+    // Close all indexes.
+    for (auto &index : indexes) {
+        index->close();
+    }
+
     return makePlainResult("OK", rids.size());
 }
 
@@ -610,6 +615,11 @@ PlainResult DBMS::delete_(Internal::QueryBuilder &builder) {
         }
     }
 
+    // Close all indexes.
+    for (auto &index : indexes) {
+        index->close();
+    }
+
     return makePlainResult("OK", rids.size());
 }
 
@@ -644,7 +654,16 @@ PlainResult DBMS::insert(const std::string &tableName,
             // Check if the data type is matched.
             if (!columns[indexOfSource].isNull &&
                 table->meta.columns[i].type != columns[indexOfSource].type) {
-                throw Error::InsertError("data type does not match");
+                // A fix for casting from int to float.
+                if (table->meta.columns[i].type == DataType::FLOAT &&
+                    columns[indexOfSource].type == DataType::INT) {
+                    // Allow int to float.
+                    columns[indexOfSource].type = DataType::FLOAT;
+                    columns[indexOfSource].data.floatValue =
+                        columns[indexOfSource].data.intValue;
+                } else {
+                    throw Error::InsertError("data type does not match");
+                }
             }
             columnMapping[i] = indexOfSource;
             // Also, check null value and set corresponding data type.
@@ -657,19 +676,20 @@ PlainResult DBMS::insert(const std::string &tableName,
     if (table->meta.primaryKeyIndex >= 0) {
         int primaryKeyIndex = table->meta.primaryKeyIndex;
         std::string primaryKeyName = table->meta.columns[primaryKeyIndex].name;
-        const char *key =
+        int key =
             columnMapping[primaryKeyIndex] == -1
-                ? table->meta.columns[primaryKeyIndex].defaultValue.stringValue
-                : columns[columnMapping[primaryKeyIndex]].data.stringValue;
-        // TODO: Index-based search.
-        QueryBuilder builder(table);
+                ? table->meta.columns[primaryKeyIndex].defaultValue.intValue
+                : columns[columnMapping[primaryKeyIndex]].data.intValue;
+        // Index-based search.
+        auto indexedTable = newIndexedTable(table);
+        QueryBuilder builder(indexedTable);
         builder.condition(primaryKeyName, EQ, key).limit(1);
 
-        auto result = builder.execute();
-
-        if (result.size() != 0) {
-            throw Error::InsertError("primary key already exists");
-        }
+        builder.iterate([&](RecordID id, Columns &record) {
+            throw Error::InsertError("duplicate primary key" +
+                                     std::to_string(record[0].data.intValue));
+            return false;
+        });
     }
 
     RecordID id = table->insert(columns, ~emptyBits);
