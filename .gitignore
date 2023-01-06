@@ -1,6 +1,6 @@
 .vscode
 .DS_Store
-dbdata/
+dbdata*/
 tmp/
 
 # Bazel

@@ -61,3 +61,10 @@ def print_duration(duration):
     else:
         desc = f"{duration:.3f}us"
     print(Colors.FAINT + desc + Colors.END)
+
+def transform_sql_literal(val: str):
+    try:
+        float(val)
+        return val
+    except ValueError:
+        return "'" + val + "'"

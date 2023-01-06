@@ -1,12 +1,13 @@
 import argparse
 import sys
+import csv
 from prompt_toolkit import prompt
 from pygments.lexers.sql import SqlLexer
 from prompt_toolkit.lexers import PygmentsLexer
 import SimpleDBService.query_pb2 as query_pb2
 import grpc
 
-from util import print_html, print_bold, print_table, print_duration
+from util import print_html, print_bold, print_table, print_duration, transform_sql_literal
 from client import SimpleDBClient
 
 lexer = PygmentsLexer(SqlLexer)
@@ -14,7 +15,9 @@ lexer = PygmentsLexer(SqlLexer)
 STARTUP_PROMPT = """\
 <b>SimpleDB Client</b>
   By: Liang Yesheng &lt;liang2kl@outlook.com&gt;
+"""
 
+USAGE = """\
 <b>Usage</b>
   Execute:   Esc  + Enter
   Discard:   Ctrl + C
@@ -115,6 +118,21 @@ def send_request(sql: str):
         global current_db
         current_db = responses[-1].current_db
 
+def send_request_silent(sql: str):
+    try:
+        batch_resp = client.execute(sql)
+        responses = batch_resp.responses
+    except grpc.RpcError as e:
+        return f"RPC Error ({e.code()}): " + e.details()
+
+    if len(responses) != 1:
+        return "Multiple responses"
+    resp = responses[0]
+    if resp.HasField("error"):
+        err_name = query_pb2.ExecutionError.Type.Name(resp.error.type)
+        return f"ERROR ({err_name}): " + resp.error.message
+    return None
+
 def main_loop():
     while True:
         try:
@@ -135,12 +153,18 @@ if __name__ == "__main__":
     parser.add_argument("--server", "-s", action="store", dest="server_addr",
                         default="127.0.0.0:9100",
                         help="Listening address of SimpleDB gRPC server")
+    parser.add_argument("--csv", action="store", dest="csv_file",
+                        help="CSV file to import")
+    parser.add_argument("--db", "-d", action="store", dest="db_name", help="Database name to import")
+    parser.add_argument("--table", "-t", action="store", dest="table_name", help="Table name to import")
+
     result = parser.parse_args(sys.argv[1:])
 
     print_html(STARTUP_PROMPT)
     print_bold("Run configurations")
     for k, v in result.__dict__.items():
-        print(f"  {k.replace('_', ' ').capitalize()}: {v}")
+        if v is not None:
+            print(f"  {k.replace('_', ' ').capitalize()}: {v}")
     print("")
 
     success = connect_server(result.server_addr)
@@ -149,5 +173,26 @@ if __name__ == "__main__":
         print("Error: failed to connect to server, exiting...")
         sys.exit(1)
     
-    main_loop()
+    if result.csv_file is not None:
+        print(f"Importing {result.csv_file} to {result.db_name}.{result.table_name}...")
+        err = send_request_silent("USE " + result.db_name + ";")
+        if err is not None:
+            print(err)
+            exit(1)
+        with open(result.csv_file, "r") as f:
+            reader = csv.reader(f)
+            lines = 0
+            for row in reader:
+                row = [transform_sql_literal(r) for r in row]
+                sql = f"INSERT INTO {result.table_name} VALUES ({','.join(row)});"
+                err = send_request_silent(sql)
+                if err is not None:
+                    print(err + " (" + sql + ")")
+                    exit(1)
+                else:
+                    lines += 1
+                    print("Processed %d rows" % lines, end="\r")
+    else:
+        print_html(USAGE)
+        main_loop()
 
