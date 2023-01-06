@@ -27,7 +27,6 @@ program: statement* EOF;
 
 statement:
 	db_statement ';'
-	| io_statement ';'
 	| table_statement ';'
 	| alter_statement ';'
 	| Annotation ';'
@@ -39,11 +38,7 @@ db_statement:
 	| 'SHOW' 'DATABASES'			# show_dbs
 	| 'USE' Identifier						# use_db
 	| 'SHOW' 'TABLES'						# show_tables
-	| 'SHOW' 'INDEXES' 'FROM' Identifier	# show_indexes;
-
-io_statement:
-	'LOAD' 'FROM' 'FILE' String 'TO' 'TABLE' Identifier		# load_data
-	| 'DUMP' 'TO' 'FILE' String 'FROM' 'TABLE' Identifier	# dump_data;
+	| 'SHOW' 'INDEXES' 'FROM' Identifier # show_indexes;
 
 table_statement:
 	'CREATE' 'TABLE' Identifier '(' field_list ')'			# create_table
@@ -59,7 +54,7 @@ table_statement:
 select_table:
 	'SELECT' selectors 'FROM' identifiers (
 		'WHERE' where_and_clause
-	)? ('GROUP' 'BY' column)? (
+	)? (
 		'LIMIT' Integer ('OFFSET' Integer)?
 	)?;
 
@@ -68,9 +63,7 @@ alter_statement:
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'INDEX' '(' identifiers ')'	# alter_drop_index
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'PRIMARY' 'KEY' (
 		Identifier
-
-
-	)?																		# alter_table_drop_pk
+	)? # alter_table_drop_pk
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'FOREIGN' 'KEY' '(' Identifier ')'	#
 		alter_table_drop_foreign_key
 	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' 'PRIMARY' 'KEY' '(' Identifier ')' #
@@ -88,8 +81,6 @@ field:
 
 type_: 'INT' | 'VARCHAR' '(' Integer ')' | 'FLOAT';
 
-// value_lists: value_list (',' value_list)*;
-
 insert_value: value | 'DEFAULT';
 
 insert_value_list: '(' insert_value (',' insert_value)* ')';
@@ -101,12 +92,8 @@ value: Integer | String | Float | Null;
 where_and_clause: where_clause ('AND' where_clause)*;
 
 where_clause:
-	column operator_ expression				# where_operator_expression
-	| column operator_ '(' select_table ')'	# where_operator_select
-	| column 'IS' (WhereNot)? Null			# where_null
-	| column 'IN' value_list				# where_in_list
-	| column 'IN' '(' select_table ')'		# where_in_select
-	| column 'LIKE' String					# where_like_string;
+	column operator_ expression		# where_operator_expression
+	| column 'IS' (WhereNot)? Null	# where_null;
 
 column: (Identifier '.')? Identifier;
 

@@ -74,9 +74,6 @@ antlrcpp::Any ParseTreeVisitor::visitStatement(
     if (ctx->db_statement()) {
         return ctx->db_statement()->accept(this);
     }
-    if (ctx->io_statement()) {
-        return ctx->io_statement()->accept(this);
-    }
     if (ctx->table_statement()) {
         return ctx->table_statement()->accept(this);
     }
