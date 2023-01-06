@@ -77,13 +77,19 @@ private:
         const std::string &tableName,
         const std::vector<Internal::ColumnMeta> &columns,
         const std::string &primaryKey = std::string(),
-        const std::vector<Internal::_ForeignKey> &foreignKeys = {});
+        const std::vector<Internal::ForeignKey> &foreignKeys = {});
     Service::PlainResult dropTable(const std::string &tableName);
     Service::DescribeTableResult describeTable(const std::string &tableName);
 
     Service::PlainResult alterPrimaryKey(const std::string &tableName,
                                          const std::string &primaryKey,
                                          bool drop);
+    Service::PlainResult addForeignKey(const std::string &tableName,
+                                       const std::string &column,
+                                       const std::string &refTable,
+                                       const std::string &refColumn);
+    Service::PlainResult dropForeignKey(const std::string &tableName,
+                                        const std::string &column);
     Service::PlainResult createIndex(const std::string &tableName,
                                      const std::string &columnName,
                                      bool isPrimaryKey = false);

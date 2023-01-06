@@ -99,7 +99,7 @@ void Table::open(const std::string &file) {
 void Table::create(const std::string &file, const std::string &name,
                    const std::vector<ColumnMeta> &columns,
                    const std::string &primaryKey,
-                   const std::vector<_ForeignKey> &foreignKeys) {
+                   const std::vector<ForeignKey> &foreignKeys) {
     Logger::log(VERBOSE, "Table: initializing empty table to %s\n",
                 file.c_str());
 
@@ -211,7 +211,6 @@ void Table::create(const std::string &file, const std::string &name,
             throw Internal::InvalidForeignKeyError(foreignKey.name);
         }
         meta.columns[pair->second].nullable = true;
-        foreignKey.fill(meta.foreignKeys[i]);
     }
 
     // Set the primary key as not nullable.

@@ -47,6 +47,11 @@ public:
         SQLParser::SqlParser::Alter_table_drop_pkContext *ctx) override;
     virtual antlrcpp::Any visitAlter_table_add_pk(
         SQLParser::SqlParser::Alter_table_add_pkContext *ctx) override;
+    virtual antlrcpp::Any visitAlter_table_drop_foreign_key(
+        SQLParser::SqlParser::Alter_table_drop_foreign_keyContext *ctx)
+        override;
+    virtual antlrcpp::Any visitAlter_table_add_foreign_key(
+        SQLParser::SqlParser::Alter_table_add_foreign_keyContext *ctx) override;
     virtual antlrcpp::Any visitAlter_add_index(
         SQLParser::SqlParser::Alter_add_indexContext *ctx) override;
     virtual antlrcpp::Any visitAlter_drop_index(

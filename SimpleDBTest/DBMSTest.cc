@@ -258,6 +258,29 @@ TEST_F(DBMSTest, TestAddDropPrimaryKey) {
     ASSERT_THROW(executeSQL(dropSql), Error::AlterPrimaryKeyError);
 }
 
+TEST_F(DBMSTest, TestAddDropForeignKey) {
+    initDBMS();
+    createAndUseDatabase();
+
+    std::string createSql1 = "CREATE TABLE t1 (c1 INT, PRIMARY KEY(c1));";
+    std::string createSql2 = "CREATE TABLE t2 (c1 INT);";
+
+    ASSERT_NO_THROW(executeSQL(createSql1));
+    ASSERT_NO_THROW(executeSQL(createSql2));
+
+    std::string addSql =
+        "ALTER TABLE t2 ADD CONSTRAINT FOREIGN KEY (c1) "
+        "REFERENCES t1(c1);";
+
+    ASSERT_NO_THROW(executeSQL(addSql));
+    ASSERT_THROW(executeSQL(addSql), Error::AlterForeignKeyError);
+
+    std::string dropSql = "ALTER TABLE t2 DROP FOREIGN KEY (c1);";
+
+    ASSERT_NO_THROW(executeSQL(dropSql));
+    ASSERT_THROW(executeSQL(dropSql), Error::AlterForeignKeyError);
+}
+
 TEST_F(DBMSTest, TestAddDropIndex) {
     initDBMS();
     createAndUseDatabase();

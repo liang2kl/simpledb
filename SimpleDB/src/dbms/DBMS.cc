@@ -198,7 +198,7 @@ ShowDatabasesResult DBMS::showDatabases() {
 PlainResult DBMS::createTable(const std::string &tableName,
                               const std::vector<ColumnMeta> &columns,
                               const std::string &primaryKey,
-                              const std::vector<_ForeignKey> &_foreignKeys) {
+                              const std::vector<ForeignKey> &ForeignKeys) {
     Logger::log(VERBOSE, "DBMS: creating table %s\n", tableName.c_str());
 
     checkUseDatabase();
@@ -216,7 +216,7 @@ PlainResult DBMS::createTable(const std::string &tableName,
     }
 
     // Create a mutable copy for foreign keys.
-    auto foreignKeys = _foreignKeys;
+    auto foreignKeys = ForeignKeys;
 
     // First validate foreign keys (table, column and type).
     for (auto &foreignKey : foreignKeys) {
@@ -419,6 +419,100 @@ PlainResult DBMS::alterPrimaryKey(const std::string &tableName,
         recordId,
         {drop ? Column::nullIntColumn() : Column(table->meta.primaryKeyIndex)},
         0b100);
+
+    return makePlainResult("OK");
+}
+
+Service::PlainResult DBMS::addForeignKey(const std::string &tableName,
+                                         const std::string &column,
+                                         const std::string &refTableName,
+                                         const std::string &refColumn) {
+    Logger::log(VERBOSE,
+                "DBMS: adding foreign key %s.%s%s (referencing %s.%s)\n",
+                tableName.c_str(), column.c_str(), column.empty() ? "" : " ",
+                refTableName.c_str(), refColumn.c_str());
+    checkUseDatabase();
+
+    // Check if the foreign key exists.
+    auto foreignKeys =
+        findForeignKeys(currentDatabase, tableName, column, {}, {});
+    if (!foreignKeys.empty()) {
+        throw Error::AlterForeignKeyError("foreign key already exists");
+    }
+
+    // Check if the table exists.
+    auto [tableId, table] = getTable(tableName);
+    if (tableId == RecordID::NULL_RECORD) {
+        throw Error::AlterForeignKeyError("the table " + tableName +
+                                          " does not exist");
+    }
+    int columnIndex = table->getColumnIndex(column.c_str());
+    // Check if the referencing column exists.
+    if (columnIndex < 0) {
+        throw Error::AlterForeignKeyError("the referencing column " + column +
+                                          " does not exist");
+    }
+
+    // Check if the referenced column exists.
+    auto [refId, refTable] = getTable(refTableName);
+    if (refId == RecordID::NULL_RECORD) {
+        throw Error::AlterForeignKeyError("the referenced table " +
+                                          refTableName + " does not exist");
+    }
+
+    int refColumnIndex = refTable->getColumnIndex(refColumn.c_str());
+    if (refColumnIndex < 0) {
+        throw Error::AlterForeignKeyError("the referenced column " + refColumn +
+                                          " does not exist");
+    }
+    if (refColumnIndex != refTable->meta.primaryKeyIndex) {
+        throw Error::AlterForeignKeyError(
+            "the referenced column " + refColumn +
+            " is not the primary key of the referenced table");
+    }
+
+    // Check if the existing rows are valid.
+    auto indexedRefTable = newIndexedTable(refTable);
+
+    table->iterate([&](RecordID, Columns &columns) {
+        const auto &value = columns[columnIndex].data;
+        QueryBuilder builder(indexedRefTable);
+        builder.condition({.columnName = refColumn}, EQ, value).limit(1);
+        if (builder.execute().empty()) {
+            throw Error::AlterForeignKeyError(
+                "one or more referenced rows cannot be found for " +
+                std::to_string(value.intValue));
+        }
+        return true;
+    });
+
+    // OK, it's valid. Add an entry to the system table.
+    systemForeignKeyTable.insert(
+        {Column(currentDatabase.c_str(), MAX_DATABASE_NAME_LEN),
+         Column(tableName.c_str(), MAX_TABLE_NAME_LEN),
+         Column(column.c_str(), MAX_COLUMN_NAME_LEN),
+         Column(refTableName.c_str(), MAX_TABLE_NAME_LEN),
+         Column(refColumn.c_str(), MAX_COLUMN_NAME_LEN)});
+
+    return makePlainResult("OK");
+}
+
+Service::PlainResult DBMS::dropForeignKey(const std::string &tableName,
+                                          const std::string &column) {
+    Logger::log(VERBOSE, "DBMS: dropping foreign key %s.%s\n",
+                tableName.c_str(), column.c_str());
+    checkUseDatabase();
+
+    // Check if the foreign key exists.
+    auto foreignKeys =
+        findForeignKeys(currentDatabase, tableName, column, {}, {});
+    if (foreignKeys.empty()) {
+        throw Error::AlterForeignKeyError("the foreign key does not exist");
+    }
+    assert(foreignKeys.size() == 1);
+
+    // Just delete the entry from the system table.
+    systemForeignKeyTable.remove(foreignKeys[0].rid);
 
     return makePlainResult("OK");
 }
@@ -646,8 +740,7 @@ PlainResult DBMS::update(QueryBuilder &builder,
             relativeForeignKeys.push_back(foreignKey);
         }
     }
-    printf("Size: %lu, name %s\n", relativeForeignKeys.size(),
-           relativeForeignKeys[0].column.c_str());
+
     // Check if the new values of the referencing columns are valid.
     for (const auto &foreignKey : relativeForeignKeys) {
         Table *refTable = getTable(foreignKey.refTable).second;
@@ -1139,13 +1232,14 @@ std::vector<DBMS::ForeignKeyInfo> DBMS::findForeignKeys(
     std::vector<ForeignKeyInfo> infos;
 
     for (const auto &pair : result) {
-        auto [_, columns] = pair;
+        auto [rid, columns] = pair;
         ForeignKeyInfo info;
         info.database = columns[0].data.stringValue;
         info.table = columns[1].data.stringValue;
         info.column = columns[2].data.stringValue;
         info.refTable = columns[3].data.stringValue;
         info.refColumn = columns[4].data.stringValue;
+        info.rid = rid;
         infos.push_back(info);
     }
 
@@ -1172,7 +1266,6 @@ bool DBMS::hasReferencingRecord(
                        allNewColumns[oriColIndex].data.intValue)
             .limit(1);
         auto result = builder.execute();
-        printf("%d\n", result[0].second[0].data.intValue);
 
         if (result.empty()) {
             return false;

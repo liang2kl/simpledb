@@ -123,7 +123,7 @@ antlrcpp::Any ParseTreeVisitor::visitCreate_table(
         ctx->field_list()
             ->accept(this)
             .as<std::tuple<std::vector<ColumnMeta>, std::string,
-                           std::vector<_ForeignKey>>>();
+                           std::vector<ForeignKey>>>();
 
     PlainResult result = dbms->createTable(ctx->Identifier()->getText(),
                                            columns, primaryKey, foreignKeys);
@@ -148,7 +148,7 @@ antlrcpp::Any ParseTreeVisitor::visitField_list(
     SqlParser::Field_listContext *ctx) {
     std::vector<ColumnMeta> columns;
     std::string primaryKey;
-    std::vector<_ForeignKey> foreignKeys;
+    std::vector<ForeignKey> foreignKeys;
 
     for (auto field : ctx->field()) {
         if (dynamic_cast<SqlParser::Normal_fieldContext *>(field)) {
@@ -162,8 +162,8 @@ antlrcpp::Any ParseTreeVisitor::visitField_list(
                     ->Identifier()
                     ->getText();
         } else if (dynamic_cast<SqlParser::Foreign_key_fieldContext *>(field)) {
-            foreignKeys.push_back(_ForeignKey{});
-            _ForeignKey &fk = foreignKeys.back();
+            foreignKeys.push_back(ForeignKey{});
+            ForeignKey &fk = foreignKeys.back();
 
             auto *fkField =
                 static_cast<SqlParser::Foreign_key_fieldContext *>(field);
@@ -218,6 +218,27 @@ antlrcpp::Any ParseTreeVisitor::visitAlter_table_drop_pk(
         ctx->Identifier(0)->getText(),
         ctx->Identifier(1) == nullptr ? "" : ctx->Identifier(1)->getText(),
         /*drop=*/true);
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_table_drop_foreign_key(
+    SqlParser::Alter_table_drop_foreign_keyContext *ctx) {
+    std::string tableName = ctx->Identifier(0)->getText();
+    std::string columnName = ctx->Identifier(1)->getText();
+
+    PlainResult result = dbms->dropForeignKey(tableName, columnName);
+    return wrap(result);
+}
+
+antlrcpp::Any ParseTreeVisitor::visitAlter_table_add_foreign_key(
+    SqlParser::Alter_table_add_foreign_keyContext *ctx) {
+    std::string tableName = ctx->Identifier(0)->getText();
+    std::string columnName = ctx->Identifier(1)->getText();
+    std::string refTableName = ctx->Identifier(2)->getText();
+    std::string refColumnName = ctx->Identifier(3)->getText();
+
+    PlainResult result =
+        dbms->addForeignKey(tableName, columnName, refTableName, refColumnName);
     return wrap(result);
 }
 

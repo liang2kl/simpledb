@@ -147,6 +147,7 @@ DECLARE_ERROR(MultiplePrimaryKey, ExecutionErrorBase,
 DECLARE_ERROR(CreateTable, ExecutionErrorBase, "Fail to create table");
 DECLARE_ERROR(DropTable, ExecutionErrorBase, "Fail to drop table");
 DECLARE_ERROR(AlterPrimaryKey, ExecutionErrorBase, "Fail to alter primary key");
+DECLARE_ERROR(AlterForeignKey, ExecutionErrorBase, "Fail to alter foreign key");
 DECLARE_ERROR(AlterIndex, ExecutionErrorBase, "Fail to alter index");
 DECLARE_ERROR(Insert, ExecutionErrorBase, "INSERT statement failed");
 DECLARE_ERROR(Select, ExecutionErrorBase, "SELECT statement failed");

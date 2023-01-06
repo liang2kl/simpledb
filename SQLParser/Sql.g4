@@ -69,13 +69,14 @@ alter_statement:
 	| 'ALTER' 'TABLE' Identifier 'DROP' 'PRIMARY' 'KEY' (
 		Identifier
 
-	)?																					# alter_table_drop_pk
-	| 'ALTER' 'TABLE' Identifier 'DROP' 'FOREIGN' 'KEY' Identifier						# alter_table_drop_foreign_key
-	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' 'PRIMARY' 'KEY' '(' Identifier ')'	#
-		alter_table_add_pk
-	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' (Identifier)? 'FOREIGN' 'KEY' '(' identifiers
-		')' 'REFERENCES' Identifier '(' identifiers ')'				# alter_table_add_foreign_key
-	| 'ALTER' 'TABLE' Identifier 'ADD' 'UNIQUE' '(' identifiers ')'	# alter_table_add_unique;
+
+	)?																		# alter_table_drop_pk
+	| 'ALTER' 'TABLE' Identifier 'DROP' 'FOREIGN' 'KEY' '(' Identifier ')'	#
+		alter_table_drop_foreign_key
+	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' 'PRIMARY' 'KEY' '(' Identifier ')' #
+	alter_table_add_pk
+	| 'ALTER' 'TABLE' Identifier 'ADD' 'CONSTRAINT' 'FOREIGN' 'KEY' '(' Identifier ')' 'REFERENCES'
+		Identifier '(' Identifier ')' # alter_table_add_foreign_key;
 
 field_list: field (',' field)*;
 

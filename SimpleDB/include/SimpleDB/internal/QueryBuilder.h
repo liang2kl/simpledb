@@ -26,6 +26,9 @@ public:
                             int value);
     QueryBuilder &condition(const ColumnId &columnId, CompareOp op,
                             const char *string);
+    QueryBuilder &condition(const ColumnId &columnId, CompareOp op,
+                            const ColumnValue &value);
+
     QueryBuilder &condition(const CompareColumnCondition &condition);
     QueryBuilder &nullCondition(const CompareNullCondition &condition);
     QueryBuilder &nullCondition(const std::string &columnName, bool isNull);
