@@ -5,8 +5,8 @@
 所有支持的功能（即支持的 SQL）见[文法文件](SQLParser/Sql.g4)。
 
 <div>
-<img style="width:45%" src="docs/server_screenshot.png">
-<img style="width:45%" src="docs/client_screenshot.png">
+<img style="width:48%" src="docs/server_screenshot.png">
+<img style="width:48%" src="docs/client_screenshot.png">
 </div>
 
 ## 架构
@@ -18,8 +18,8 @@
 - `SimpleDB`（依赖库）：DBMS，负责数据库管理、SQL 的解析和执行
 - `SQLParser`（依赖库）：解析 SQL 并生成 AST
 - `SimpleDBService`（依赖库）：gRPC 库，用于支持网络传输
-- `SimpleDBServer`（二进制程序）：通过 `SimpleDB` 处理客户端请求并返回结果
-- `SimpleDBClient`（二进制程序）：处理用户请求，向客户端发送 SQL 语句，并显示返回的结果
+- `SimpleDBServer`（二进制程序）：服务器，通过 `SimpleDB` 处理客户端请求并返回结果
+- `SimpleDBClient`（二进制程序）：客户端，处理用户请求，向服务器发送 SQL 语句，并显示返回的结果
 - `SimpleDBTest`（单元测试）：对 `SimpleDB` 进行测试
 
 各个部分及其使用的第三方库的依赖关系如下：
