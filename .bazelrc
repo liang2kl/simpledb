@@ -1,5 +1,6 @@
 build --cxxopt='-std=c++17'
-build --linkopt='-fuse-ld=lld'
+build:macos --linkopt='-Wl,-no_fixup_chains'
+build:linux --linkopt='-fuse-ld=lld'
 build --host_action_env=PATH=/bin:/usr/bin --incompatible_strict_action_env
 build --java_runtime_version=remotejdk_11
 build --client_env=CC=clang
