@@ -11,9 +11,9 @@ http_archive(
 # rules_proto_grpc
 http_archive(
     name = "rules_proto_grpc",
-    url = "https://github.com/rules-proto-grpc/rules_proto_grpc/archive/refs/tags/4.2.0.tar.gz",
-    strip_prefix = "rules_proto_grpc-4.2.0",
-    sha256 = "bbe4db93499f5c9414926e46f9e35016999a4e9f6e3522482d3760dc61011070"
+    url = "https://github.com/rules-proto-grpc/rules_proto_grpc/archive/4.3.0.tar.gz",
+    strip_prefix = "rules_proto_grpc-4.3.0",
+    sha256 = "fb7fc7a3c19a92b2f15ed7c4ffb2983e956625c1436f57a3430b897ba9864059"
 )
 load("@rules_proto_grpc//:repositories.bzl", "rules_proto_grpc_repos", "rules_proto_grpc_toolchains")
 rules_proto_grpc_toolchains()

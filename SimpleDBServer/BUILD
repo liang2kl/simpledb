@@ -6,4 +6,5 @@ cc_binary(
     ],
     srcs = glob(["src/**"]),
     visibility = ["//visibility:public"],
+    linkstatic = True,
 )

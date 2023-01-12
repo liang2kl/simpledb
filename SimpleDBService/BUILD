@@ -11,6 +11,7 @@ proto_library(
 cpp_grpc_library(
     name = "simpledb_service",
     protos = [":query_proto"],
+    linkstatic = True,
 )
 
 python_grpc_library(

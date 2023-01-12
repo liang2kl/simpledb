@@ -11,4 +11,5 @@ cc_test(
     ],
     local_defines = ["DEBUG=1", "TESTING=1"],
     visibility = ["//visibility:public"],
+    linkstatic = True,
 )

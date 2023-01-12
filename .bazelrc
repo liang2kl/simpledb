@@ -1,5 +1,7 @@
 build --cxxopt='-std=c++17'
-build --linkopt='-Wl,-no_fixup_chains'
+build --linkopt='-fuse-ld=lld'
 build --host_action_env=PATH=/bin:/usr/bin --incompatible_strict_action_env
+build --java_runtime_version=remotejdk_11
+build --client_env=CC=clang
 
 test --test_output=all

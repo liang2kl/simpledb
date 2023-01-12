@@ -6,6 +6,7 @@ cc_library(
     strip_include_prefix = "include/SimpleDB",
     includes = ["include"],
     visibility = ["//visibility:public"],
+    linkstatic = True,
 )
 
 cc_library(
@@ -17,4 +18,5 @@ cc_library(
     includes = ["include"],
     local_defines = ["DEBUG=1", "TESTING=1"],
     visibility = ["//visibility:public"],
+    linkstatic = True,
 )

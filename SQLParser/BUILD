@@ -35,5 +35,6 @@ cc_library(
         "@antlr4_runtimes//:cpp",
     ],
     includes = ["generated.inc"],
-    visibility = ["//visibility:public"]
+    visibility = ["//visibility:public"],
+    linkstatic = True,
 )

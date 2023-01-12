@@ -1,11 +1,10 @@
 #ifndef _SIMPLEDB_INDEX_H
 #define _SIMPLEDB_INDEX_H
 
-#include <sys/_types/_int16_t.h>
-
 #include <functional>
 #include <string>
 #include <tuple>
+#include <utility>
 #include <vector>
 
 #include "internal/PageFile.h"

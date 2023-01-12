@@ -28,41 +28,79 @@
 
 ## 编译与运行
 
-使用 [Bazel](https://bazel.build) 自动编译。
+> macOS 13.0 和 Ubuntu 22.04 测试编译通过，其余环境未测试。
+
+### 环境配置
+
+使用 [Bazel](https://bazel.build) 和 clang 编译。
+
+**对于 macOS**：
+
+安装 Xcode command line tools：
+
+```
+xcode-select --install
+```
+
+安装 Bazel：
+
+```
+brew install bazel
+```
+
+**对于 Ubuntu**：
+
+安装 Bazel 6.0.0：
+
+```
+sudo apt install apt-transport-https curl gnupg -y
+curl -fsSL https://bazel.build/bazel-release.pub.gpg | gpg --dearmor >bazel-archive-keyring.gpg
+sudo mv bazel-archive-keyring.gpg /usr/share/keyrings
+echo "deb [arch=amd64 signed-by=/usr/share/keyrings/bazel-archive-keyring.gpg] https://storage.googleapis.com/bazel-apt stable jdk1.8" | sudo tee /etc/apt/sources.list.d/bazel.list
+sudo apt update && sudo apt install bazel-6.0.0
+```
+
+安装 clang 和 lld：
+
+```
+sudo apt install clang lld
+```
+
+### 运行
 
 运行服务器：
 
-```bash
+```
 bazel run -- :simpledb_server --dir=<data_directory> [--debug | --verbose] [--addr=<listening_address>]
 ```
 
 运行交互式客户端：
 
-```bash
+```
 bazel run -- :simpledb_client --server=<addr>
 ```
 
 从 CSV 中导入数据：
 
-```bash
+```
 bazel run -- :simpledb_client --server=<addr> --csv=<csv_file> --db=<db_name> --table=<table_name>
 ```
 
 运行单元测试：
 
-```bash
+```
 bazel test :test_all
 ```
 
 编译所有 target：
 
-```bash
+```
 bazel build //...
 ```
 
 编译结束后，运行此命令以生成 `compile_commands.json`：
 
-```bash
+```
 bazel run @hedron_compile_commands//:refresh_all
 ```
 
