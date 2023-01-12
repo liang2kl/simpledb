@@ -9,13 +9,17 @@
 #include <grpcpp/server_builder.h>
 #include <stdio.h>
 
+#include <condition_variable>
 #include <csignal>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <filesystem>
 #include <memory>
+#include <mutex>
 #include <string>
+#include <thread>
+#include <utility>
 
 #include "SQLService.h"
 
@@ -23,6 +27,10 @@
 void runServer();
 void sigintHandler(int);
 void initFromCLIFlags(int argc, char *argv[]);
+void checkShutdown();
+
+std::mutex mutex;
+std::condition_variable cv;
 
 // CLI flags and validators
 DEFINE_string(dir, "", "Root directory of the database data");
@@ -103,6 +111,11 @@ void runServer() {
     builder.AddListeningPort(FLAGS_addr, grpc::InsecureServerCredentials())
         .RegisterService(&service);
     server = builder.BuildAndStart();
+
+    // Create a shutdown thread.
+    std::thread t(checkShutdown);
+    t.join();
+
     server->Wait();
 
     delete dbms;
@@ -111,5 +124,11 @@ void runServer() {
 void sigintHandler(int) {
     // Exit gracefully...
     std::cout << "\nShutting down server..." << std::endl;
+    cv.notify_one();
+}
+
+void checkShutdown() {
+    std::unique_lock<std::mutex> lock(mutex);
+    cv.wait(lock);
     server->Shutdown();
 }
